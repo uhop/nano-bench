@@ -36,11 +36,8 @@ const sup = (sorted1, sorted2) => {
 
 const kstest = (sorted1, sorted2, alpha = 0.05) => {
   const d = sup(sorted1, sorted2),
-    n = sorted1.length,
-    m = sorted2.length,
-    t = 1 / n + 1 / m,
-    limit = Math.sqrt((-Math.log(alpha / 2) / 2) * t);
-  return {value: d, limit, rejected: d > limit};
+    limit = Math.sqrt((-Math.log(alpha / 2) / 2) * (1 / sorted1.length + 1 / sorted2.length));
+  return {value: d, alpha, limit, rejected: d > limit};
 };
 
 export default kstest;
