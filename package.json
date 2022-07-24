@@ -1,0 +1,34 @@
+{
+  "name": "nano-bench",
+  "version": "1.0.0",
+  "description": "Small utility to benchmark code with Node.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "tape6 --flags O"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uhop/nano-bench.git"
+  },
+  "keywords": [
+    "benchmark",
+    "performance",
+    "statistics"
+  ],
+  "author": "Eugene Lazutkin <eugene.lazutkin@gmail.com> (https://www.lazutkin.com/)",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/uhop/nano-bench/issues"
+  },
+  "homepage": "https://github.com/uhop/nano-bench#readme",
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "tape-six": "^0.9.3"
+  },
+  "tape6": {
+    "tests": ["tests/test-*.*js"]
+  }
+}
