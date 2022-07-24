@@ -20,11 +20,12 @@ const sup = (sorted1, sorted2) => {
     }
     result = Math.max(result, Math.abs(i / size1 - j / size2));
   }
-  if (i < size1) {
+  while (i < size1) {
     const a = sorted1[i];
     for (++i; i < size1 && a === sorted1[i]; ++i);
     result = Math.max(result, Math.abs(i / size1 - j / size2));
-  } else if (j < size2) {
+  }
+  while (j < size2) {
     const b = sorted2[j];
     for (++j; j < size2 && b === sorted2[j]; ++j);
     result = Math.max(result, Math.abs(i / size1 - j / size2));
