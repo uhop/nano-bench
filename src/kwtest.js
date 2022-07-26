@@ -23,19 +23,20 @@ export const getParameters = (groups, N = getTotal(groups)) => {
 
 export const rankData = groups => {
   const N = getTotal(groups),
+    k = groups.length,
     t = new Array(N);
 
   // put in one array preserving grouping
   let o = 0;
-  for (let i = 0; i < groups.length; ++i) {
+  for (let i = 0; i < k; ++i) {
     const group = groups[i];
     for (let j = 0; j < group.length; ++j) {
       t[o++] = {value: group[j], group: i};
     }
   }
 
-  const avgGroupRank = new Array(groups.length);
-  avgGroupRank.fill(0);
+  const groupRank = new Array(k);
+  groupRank.fill(0);
 
   // sort and rank
   t.sort((a, b) => a.value - b.value);
@@ -44,35 +45,37 @@ export const rankData = groups => {
     const value = t[i].value;
     while (ahead < t.length && value === t[ahead].value) ++ahead;
     if (ahead - i === 1) {
-      avgGroupRank[t[i].group] += t[i].rank = i + 1;
+      groupRank[t[i].group] += t[i].rank = i + 1;
     } else {
       const rank = (i + 1 + ahead) / 2;
       for (let j = i; j < ahead; ++j) {
-        avgGroupRank[t[j].group] += t[j].rank = rank;
+        groupRank[t[j].group] += t[j].rank = rank;
       }
     }
     i = ahead;
   }
-  for (let i = 0; i < avgGroupRank.length; ++i) {
-    avgGroupRank[i] /= groups[i].length;
-  }
+  const avgGroupRank = groupRank.map((rank, i) => rank / groups[i].length);
 
-  const avgRank = (N + 1) / 2;
-  // console.log(t, avgRank, avgGroupRank);
+  const avgRank = (N + 1) / 2, avgRankC = N * avgRank * avgRank;
 
   // calculate required sums
-  let numerator = 0;
+  let numerator = 0, T = 0;
   for (let i = 0; i < avgGroupRank.length; ++i) {
     const x = avgGroupRank[i] - avgRank;
     numerator += groups[i].length * x * x;
+    T += groupRank[i] * groupRank[i] / groups[i].length - avgRankC;
   }
 
-  let denominator = 0;
+  let denominator = 0, S2 = 0;
   for (let i = 0; i < t.length; ++i) {
     const x = t[i].rank - avgRank;
     denominator += x * x;
+    S2 = t[i].rank * t[i].rank - avgRankC;
   }
 
+  S2 /= N - 1;
+  T /= S2;
+
   // calculate and return H statistics
-  return ((N - 1) * numerator) / denominator;
+  return {H: ((N - 1) * numerator) / denominator, T, S2, groupRank, avgGroupRank, avgRank, k, N};
 };
