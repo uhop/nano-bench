@@ -3,8 +3,8 @@
 // beta approximation: https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.661.7863&rep=rep1&type=pdf
 // incomplete beta function: https://mathworld.wolfram.com/IncompleteBetaFunction.html
 
-const LIMIT = 1000;
-const EPSILON = 1e-30;
+import betaPpf from './beta-ppf.js';
+import chiSquaredPpf from './chi-squared-ppf.js';
 
 const getTotal = groups => groups.reduce((acc, group) => acc + group.length, 0);
 
@@ -56,17 +56,20 @@ export const rankData = groups => {
   }
   const avgGroupRank = groupRank.map((rank, i) => rank / groups[i].length);
 
-  const avgRank = (N + 1) / 2, avgRankC = N * avgRank * avgRank;
+  const avgRank = (N + 1) / 2,
+    avgRankC = N * avgRank * avgRank;
 
   // calculate required sums
-  let numerator = 0, T = 0;
+  let numerator = 0,
+    T = 0;
   for (let i = 0; i < avgGroupRank.length; ++i) {
     const x = avgGroupRank[i] - avgRank;
     numerator += groups[i].length * x * x;
-    T += groupRank[i] * groupRank[i] / groups[i].length - avgRankC;
+    T += (groupRank[i] * groupRank[i]) / groups[i].length - avgRankC;
   }
 
-  let denominator = 0, S2 = 0;
+  let denominator = 0,
+    S2 = 0;
   for (let i = 0; i < t.length; ++i) {
     const x = t[i].rank - avgRank;
     denominator += x * x;
@@ -79,3 +82,31 @@ export const rankData = groups => {
   // calculate and return H statistics
   return {H: ((N - 1) * numerator) / denominator, T, S2, groupRank, avgGroupRank, avgRank, k, N};
 };
+
+const kwtest = (sortedArrays, alpha = 0.05) => {
+  const {a, b, nu, k, N} = getParameters(sortedArrays),
+    {H, T, S2, avgGroupRank} = rankData(sortedArrays),
+    limit = betaPpf(1 - alpha, a, b) * nu, // Hc
+    results = {value: H, alpha, limit, rejected: H > limit};
+
+  if (!results.rejected) return results;
+
+  // post-hoc tests
+
+  const matrix = new Array(k),
+    C = chiSquaredPpf(1 - alpha / 2, N - k) * Math.sqrt((S2 * (N - 1 - T)) / (N - k));
+
+  for (let i = 0; i < k; ++i) {
+    matrix[i] = new Array(k);
+    for (let j = i + 1; j < k; ++j) {
+      matrix[i][j] =
+        Math.abs(avgGroupRank[i] - avgGroupRank[j]) >
+        C * Math.sqrt(1 / sortedArrays[i].length + 1 / sortedArrays[j].length);
+    }
+  }
+
+  results.matrix = matrix;
+  return results;
+};
+
+export default kwtest;
