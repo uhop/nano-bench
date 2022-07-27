@@ -93,19 +93,19 @@ const kwtest = (sortedArrays, alpha = 0.05) => {
 
   // post-hoc tests
 
-  const matrix = new Array(k),
+  const m = new Array(k),
     C = chiSquaredPpf(1 - alpha / 2, N - k) * Math.sqrt((S2 * (N - 1 - T)) / (N - k));
 
   for (let i = 0; i < k; ++i) {
-    matrix[i] = new Array(k);
+    m[i] = new Array(k);
     for (let j = i + 1; j < k; ++j) {
-      matrix[i][j] =
+      m[i][j] =
         Math.abs(avgGroupRank[i] - avgGroupRank[j]) >
         C * Math.sqrt(1 / sortedArrays[i].length + 1 / sortedArrays[j].length);
     }
   }
 
-  results.matrix = matrix;
+  results.groupDifference = m;
   return results;
 };
 

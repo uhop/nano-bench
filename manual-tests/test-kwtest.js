@@ -3,7 +3,7 @@ import kwtest from '../src/kwtest.js';
 const ALPHA = 0.05;
 
 const calculateH = (...groups) => {
-  const results = kwtest(groups);
+  const results = kwtest(groups, ALPHA);
 
   console.log('results:', results);
   console.log(results.rejected ? 'STATISTICALLY SIGNIFICANT' : 'statistically insignificant');
@@ -14,9 +14,9 @@ const calculateH = (...groups) => {
 
   console.log('\nStatistically significant difference between groups:');
 
-  for (let i = 0, k = results.matrix.length; i < k; ++i) {
+  for (let i = 0, k = results.groupDifference.length; i < k; ++i) {
     for (let j = i + 1; j < k; ++j) {
-      if (results.matrix[i][j]) {
+      if (results.groupDifference[i][j]) {
         console.log(i, j);
       }
     }
