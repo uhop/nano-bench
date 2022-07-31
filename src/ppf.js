@@ -2,8 +2,8 @@ import {rk23} from './rk.js';
 import bsearch from './bsearch.js';
 
 // percent point function
-const ppf = (fn, z) => {
-  const {ts, us, finalValue} = rk23(fn),
+const ppf = (fn, z, options) => {
+  const {ts, us, finalValue} = rk23(fn, options),
     value = finalValue * z,
     index = bsearch(us, x => x < value);
   if (!index) return ts[0];
