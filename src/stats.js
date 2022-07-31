@@ -5,7 +5,25 @@ export const mean = data => {
     m += data[i] / size;
   }
   return m;
-}
+};
+
+export const stdDev = (data, meanValue = mean(data)) => {
+  let s = 0;
+  const size = data.length;
+  for (let i = 0; i < size; ++i) {
+    const diff = data[i] - meanValue;
+    s += (diff * diff) / size;
+  }
+  return Math.sqrt(s);
+};
+
+export const zScore = (x, mean, stdDev) => (x - mean) / stdDev;
+
+export const makeZScoreFn = data => {
+  const m = mean(data),
+    s = stdDev(data, m);
+  return x => (x - m) / s;
+};
 
 export const getPercentile = (sortedArray, value) => {
   // getting percentile (index) by value
