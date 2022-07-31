@@ -2,7 +2,11 @@ import kwtest from '../src/kwtest.js';
 
 const ALPHA = 0.05;
 
-const calculateH = (...groups) => {
+const numericSortingAsc = (a, b) => a - b;
+
+const testGroups = (...groups) => {
+  groups.forEach(group => group.sort(numericSortingAsc));
+
   const results = kwtest(groups, ALPHA);
 
   console.log('results:', results);
@@ -25,7 +29,7 @@ const calculateH = (...groups) => {
 
 // Test case from: https://www.statisticshowto.com/probability-and-statistics/statistics-definitions/kruskal-wallis/
 
-calculateH(
+testGroups(
   [23, 41, 54, 66, 90], // women
   [45, 55, 60, 70, 72], // men
   [20, 30, 34, 40, 44] // minorities
