@@ -1,12 +1,10 @@
 // Kruskal-Wallis significance test
 // based on https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_one-way_analysis_of_variance
 // beta approximation: https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.661.7863&rep=rep1&type=pdf
-// incomplete beta function: https://mathworld.wolfram.com/IncompleteBetaFunction.html
 
 import betaPpf from './beta-ppf.js';
 import chiSquaredPpf from './chi-squared-ppf.js';
-
-const getTotal = groups => groups.reduce((acc, group) => acc + group.length, 0);
+import rank, {getTotal} from './rank.js';
 
 export const getParameters = (groups, N = getTotal(groups)) => {
   const k = groups.length,
@@ -22,41 +20,7 @@ export const getParameters = (groups, N = getTotal(groups)) => {
 };
 
 export const rankData = groups => {
-  const N = getTotal(groups),
-    k = groups.length,
-    t = new Array(N);
-
-  // put in one array preserving grouping
-  let o = 0;
-  for (let i = 0; i < k; ++i) {
-    const group = groups[i];
-    for (let j = 0; j < group.length; ++j) {
-      t[o++] = {value: group[j], group: i};
-    }
-  }
-
-  const groupRank = new Array(k);
-  groupRank.fill(0);
-
-  // sort and rank
-  t.sort((a, b) => a.value - b.value);
-  for (let i = 0; i < t.length; ) {
-    let ahead = i + 1;
-    const value = t[i].value;
-    while (ahead < t.length && value === t[ahead].value) ++ahead;
-    if (ahead - i === 1) {
-      groupRank[t[i].group] += t[i].rank = i + 1;
-    } else {
-      const rank = (i + 1 + ahead) / 2;
-      for (let j = i; j < ahead; ++j) {
-        groupRank[t[j].group] += t[j].rank = rank;
-      }
-    }
-    i = ahead;
-  }
-  const avgGroupRank = groupRank.map((rank, i) => rank / groups[i].length);
-
-  const avgRank = (N + 1) / 2,
+  const {N, k, ranked: t, groupRank, avgGroupRank, avgRank} = rank(groups),
     avgRankC = N * avgRank * avgRank;
 
   // calculate required sums
@@ -83,13 +47,15 @@ export const rankData = groups => {
   return {H: ((N - 1) * numerator) / denominator, T, S2, groupRank, avgGroupRank, avgRank, k, N};
 };
 
-const kwtest = (sortedArrays, alpha = 0.05) => {
+export const kwtest = (sortedArrays, alpha = 0.05) => {
+  if (sortedArrays.length < 2) throw new Error('Two or more data arrays were expected');
+
   const {a, b, nu, k, N} = getParameters(sortedArrays),
     {H, T, S2, avgGroupRank} = rankData(sortedArrays),
     limit = betaPpf(1 - alpha, a, b) * nu, // Hc
     results = {value: H, alpha, limit, rejected: H > limit};
 
-  if (!results.rejected) return results;
+  if (!results.rejected || k < 3) return results;
 
   // post-hoc tests
 
