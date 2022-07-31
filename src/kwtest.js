@@ -53,9 +53,9 @@ export const kwtest = (sortedArrays, alpha = 0.05) => {
   const {a, b, nu, k, N} = getParameters(sortedArrays),
     {H, T, S2, avgGroupRank} = rankData(sortedArrays),
     limit = betaPpf(1 - alpha, a, b) * nu, // Hc
-    results = {value: H, alpha, limit, rejected: H > limit};
+    results = {value: H, alpha, limit, different: H > limit};
 
-  if (!results.rejected || k < 3) return results;
+  if (!results.different || k < 3) return results;
 
   // post-hoc tests
 

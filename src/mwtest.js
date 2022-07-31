@@ -29,7 +29,7 @@ export const mwtest = (sorted1, sorted2, alpha = 0.05) => {
   const z = (u - m) / s,
     zc = zPpf(alpha / 2);
 
-  return {value: z, alpha, limit: zc, rejected: z < zc || z > -zc};
+  return {value: z, alpha, limit: zc, different: z < zc || z > -zc};
 };
 
 export default mwtest;

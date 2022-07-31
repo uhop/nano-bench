@@ -63,7 +63,7 @@ const compare = async (label1, fn1, label2, fn2, options = {}, options1 = {}, op
   print(label2, stats2, options2?.nSeries || options?.nSeries || 100);
   console.log(
     'The difference is statistically ' +
-      (results.rejected ? 'SIGNIFICANT' : 'insignificant') +
+      (results.different ? 'SIGNIFICANT' : 'insignificant') +
       '.\n'
   );
 };

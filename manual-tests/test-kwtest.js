@@ -10,9 +10,9 @@ const testGroups = (...groups) => {
   const results = kwtest(groups, ALPHA);
 
   console.log('results:', results);
-  console.log(results.rejected ? 'STATISTICALLY SIGNIFICANT' : 'statistically insignificant');
+  console.log(results.different ? 'STATISTICALLY SIGNIFICANT' : 'statistically insignificant');
 
-  if (!results.rejected) return;
+  if (!results.different) return;
 
   // post-hoc tests
 

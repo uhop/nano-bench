@@ -11,7 +11,7 @@ const testGroups = (group1, group2) => {
   const results = mwtest(group1, group2, ALPHA);
 
   console.log('results:', results);
-  // console.log(results.rejected ? 'STATISTICALLY SIGNIFICANT' : 'statistically insignificant');
+  // console.log(results.different ? 'STATISTICALLY SIGNIFICANT' : 'statistically insignificant');
 };
 
 // Test case form: https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test
