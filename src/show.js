@@ -1,6 +1,6 @@
 import compare from './compare.js';
 import {mean, bootstrap, getWeightedValue} from '../src/stats.js';
-import {prepareTimeFormat, formatTime, abbrNumber} from '../src/formatters.js';
+import {prepareTimeFormat, formatTime, formatInteger, formatNumber, abbrNumber} from '../src/formatters.js';
 
 const ALPHA = 0.05,
   N_SERIES = 100,
@@ -12,7 +12,13 @@ const getPercentile = weight => samples =>
 
 const show = async (inputs, options) => {
   options = Object.assign({alpha: ALPHA, nSeries: N_SERIES, bootstrap: BOOTSTRAP}, options);
-  console.log('\nmeasuring...\n');
+  console.log(
+    `\nmeasuring (confidence interval: ${formatNumber(100 * (1 - options.alpha), {
+      decimals: 2
+    })}%, series: ${formatInteger(options.nSeries)}, bootstrap samples: ${formatInteger(
+      options.bootstrap
+    )}) ...\n`
+  );
   const results = await compare(inputs, options),
     b = options.bootstrap,
     data = results.data,
