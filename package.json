@@ -2,8 +2,11 @@
   "name": "nano-bench",
   "version": "1.0.0",
   "description": "Small utility to benchmark code with Node.",
-  "main": "src/index.js",
   "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    "./*.js": "./src/*.js"
+  },
   "scripts": {
     "test": "tape6 --flags O"
   },
@@ -25,7 +28,7 @@
   "files": [
     "src"
   ],
-  "dependencies": {
+  "devDependencies": {
     "tape-six": "^0.9.3"
   },
   "tape6": {
