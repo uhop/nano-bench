@@ -8,7 +8,7 @@
     "./*.js": "./src/*.js"
   },
   "scripts": {
-    "test": "tape6 --flags O"
+    "test": "tape6 --flags FO"
   },
   "repository": {
     "type": "git",
