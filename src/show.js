@@ -53,7 +53,7 @@ const show = async (inputs, options) => {
 
   if (!results.different || !results.groupDifference) return;
 
-  console.log('\nStatistically significant difference between groups:\n');
+  console.log('\nA statistically significant difference between groups:\n');
 
   for (let i = 0, k = results.groupDifference.length; i < k; ++i) {
     for (let j = i + 1; j < k; ++j) {
