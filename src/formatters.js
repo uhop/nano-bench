@@ -102,3 +102,35 @@ export const abbrNumber = (n, options) => {
     ((e && abbr.charAt(e)) || '')
   );
 };
+
+export const compareDifference = (a, b) => {
+  // works only on positive numbers
+  a = Math.abs(a);
+  b = Math.abs(b);
+
+  const less = a < b;
+  if (!less) [a, b] = [b, a];
+
+  const absDiff = b - a,
+    diff = absDiff / a;
+  if (diff === Infinity) return {less, infinity: true};
+
+  if (diff < 2) {
+    const percentage = diff * 100;
+    if (percentage < 0.001) return {less, equality: true};
+    if (percentage < 1) return {less, percentage: formatNumber(percentage, {decimals: 3})};
+    if (percentage < 10) return {less, percentage: formatNumber(percentage, {decimals: 2})};
+    if (percentage < 100) return {less, percentage: formatNumber(percentage, {decimals: 1})};
+    return {less, percentage: formatNumber(percentage, {decimals: 0})};
+  }
+
+  const ratio = b / a;
+
+  if (ratio < 10000) {
+    if (ratio < 10) return {less, ratio: formatNumber(ratio, {decimals: 2})};
+    if (ratio < 100) return {less, ratio: formatNumber(ratio, {decimals: 1})};
+    return {less, ratio: formatNumber(ratio, {decimals: 0})};
+  }
+
+  return {less, ratio: ratio.toPrecision(2).replace(/0+e/i, 'e').replace(/\.e/i, 'e').replace(/e\+/i, 'e')};
+};
