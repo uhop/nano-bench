@@ -7,7 +7,7 @@ export const mean = data => {
   return m;
 };
 
-export const stdDev2 = (data, meanValue = mean(data)) => {
+export const variance = (data, meanValue = mean(data)) => {
   let s = 0;
   const size = data.length;
   for (let i = 0; i < size; ++i) {
@@ -17,7 +17,7 @@ export const stdDev2 = (data, meanValue = mean(data)) => {
   return s;
 };
 
-export const stdDev = (data, meanValue = mean(data)) => Math.sqrt(stdDev2(data, meanValue));
+export const stdDev = (data, meanValue = mean(data)) => Math.sqrt(variance(data, meanValue));
 
 export const zScore = (x, mean, stdDev) => (x - mean) / stdDev;
 
