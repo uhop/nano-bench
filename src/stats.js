@@ -7,15 +7,17 @@ export const mean = data => {
   return m;
 };
 
-export const stdDev = (data, meanValue = mean(data)) => {
+export const stdDev2 = (data, meanValue = mean(data)) => {
   let s = 0;
   const size = data.length;
   for (let i = 0; i < size; ++i) {
     const diff = data[i] - meanValue;
     s += (diff * diff) / size;
   }
-  return Math.sqrt(s);
+  return s;
 };
+
+export const stdDev = (data, meanValue = mean(data)) => Math.sqrt(stdDev2(data, meanValue));
 
 export const zScore = (x, mean, stdDev) => (x - mean) / stdDev;
 
@@ -24,6 +26,42 @@ export const makeZScoreFn = data => {
     s = stdDev(data, m);
   return x => (x - m) / s;
 };
+
+export const skewness = (data, meanValue = mean(data), stdDevValue = stdDev(data, meanValue)) => {
+  let s = 0;
+  const size = data.length;
+  for (let i = 0; i < size; ++i) {
+    const z = (data[i] - meanValue) / stdDevValue;
+    s += (z * z * z) / size;
+  }
+  return s;
+};
+
+export const adjustedSkewness = (
+  data,
+  meanValue = mean(data),
+  stdDevValue = stdDev(data, meanValue)
+) => {
+  const size = data.length;
+  return (Math.sqrt(size * (size - 1)) / (size - 2)) * skewness(data, meanValue, stdDevValue);
+};
+
+export const kurtosis = (data, meanValue = mean(data), stdDevValue = stdDev(data, meanValue)) => {
+  let s = 0;
+  const size = data.length;
+  for (let i = 0; i < size; ++i) {
+    const z = (data[i] - meanValue) / stdDevValue,
+      z2 = z * z;
+    s += (z2 * z2) / size;
+  }
+  return s;
+};
+
+export const excessKurtosis = (
+  data,
+  meanValue = mean(data),
+  stdDevValue = stdDev(data, meanValue)
+) => kurtosis(data, meanValue, stdDevValue) - 3;
 
 export const getPercentile = (sortedArray, value) => {
   // getting percentile (index) by value
