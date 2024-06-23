@@ -2,8 +2,8 @@ import test from 'tape-six';
 
 import {nextLevel} from '../src/runner.js';
 
-test('nextLevel()', async t => {
-  await t.test('from 1', t => {
+test('nextLevel()', t => {
+  t.test('from 1', t => {
     const result = [1];
 
     while (result.length < 10) {
@@ -13,7 +13,7 @@ test('nextLevel()', async t => {
     t.deepEqual(result, [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]);
   });
 
-  await t.test('from 3', t => {
+  t.test('from 3', t => {
     const result = [3];
 
     while (result.length < 10) {
@@ -23,7 +23,7 @@ test('nextLevel()', async t => {
     t.deepEqual(result, [3, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]);
   });
 
-  await t.test('from 11', t => {
+  t.test('from 11', t => {
     const result = [11];
 
     while (result.length < 10) {
