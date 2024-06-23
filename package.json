@@ -32,6 +32,11 @@
     "tape-six": "^0.9.3"
   },
   "tape6": {
-    "tests": ["tests/test-*.*js"]
+    "tests": [
+      "tests/test-*.*js"
+    ]
+  },
+  "dependencies": {
+    "console-toolkit": "^1.0.0"
   }
 }
