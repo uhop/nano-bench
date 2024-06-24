@@ -5,7 +5,8 @@
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    "./*.js": "./src/*.js"
+    ".": "./src/index.js",
+    "./*": "./src/*"
   },
   "scripts": {
     "test": "tape6 --flags FO"

@@ -1,6 +1,6 @@
 import {measure, measurePar} from './runner.js';
-import kwtest from './kwtest.js';
-import mwtest from './mwtest.js';
+import kwtest from '../significance/kwtest.js';
+import mwtest from '../significance/mwtest.js';
 
 const ALPHA = 0.05;
 

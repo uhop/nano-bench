@@ -1,8 +1,8 @@
 // Mann-Whitney U test
 // based on https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test
 
-import rank from './rank.js';
-import zPpf from './z-ppf.js';
+import rank from '../stats/rank.js';
+import zPpf from '../stats/z-ppf.js';
 
 export const mwtest = (sorted1, sorted2, alpha = 0.05) => {
   const {groupRank, ranked: t} = rank([sorted1, sorted2]),

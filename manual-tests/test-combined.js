@@ -1,6 +1,6 @@
-import mwtest from '../src/mwtest.js';
-import kstest from '../src/kstest.js';
-import kwtest from '../src/kwtest.js';
+import mwtest from 'nano-bench/significance/mwtest.js';
+import kstest from 'nano-bench/significance/kstest.js';
+import kwtest from 'nano-bench/significance/kwtest.js';
 
 const ALPHA = 0.05; // confidence is 95%
 

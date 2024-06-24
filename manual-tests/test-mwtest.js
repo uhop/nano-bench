@@ -1,4 +1,4 @@
-import mwtest from '../src/mwtest.js';
+import mwtest from 'nano-bench/significance/mwtest.js';
 
 const ALPHA = 0.05; // confidence is 95%
 

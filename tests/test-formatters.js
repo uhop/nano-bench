@@ -1,6 +1,6 @@
 import test from 'tape-six';
 
-import {formatInteger, formatNumber, abbrNumber} from '../src/formatters.js';
+import {formatInteger, formatNumber, abbrNumber} from 'nano-bench/formatters.js';
 
 test('formatters', t => {
   t.test('formatInteger()', t => {

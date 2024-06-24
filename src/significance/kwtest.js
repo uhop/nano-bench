@@ -2,9 +2,9 @@
 // based on https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_one-way_analysis_of_variance
 // beta approximation: https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.661.7863&rep=rep1&type=pdf
 
-import betaPpf from './beta-ppf.js';
-import chiSquaredPpf from './chi-squared-ppf.js';
-import rank, {getTotal} from './rank.js';
+import betaPpf from '../stats/beta-ppf.js';
+import chiSquaredPpf from '../stats/chi-squared-ppf.js';
+import rank, {getTotal} from '../stats/rank.js';
 
 export const getParameters = (groups, N = getTotal(groups)) => {
   const k = groups.length,

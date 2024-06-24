@@ -1,6 +1,6 @@
 import compare from './compare.js';
-import {mean, bootstrap, getWeightedValue} from '../src/stats.js';
-import {prepareTimeFormat, formatTime, formatInteger, formatNumber, abbrNumber} from '../src/formatters.js';
+import {mean, bootstrap, getWeightedValue} from '../stats.js';
+import {prepareTimeFormat, formatTime, formatInteger, formatNumber, abbrNumber} from '../formatters.js';
 
 const ALPHA = 0.05,
   N_SERIES = 100,

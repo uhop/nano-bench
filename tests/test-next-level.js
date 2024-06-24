@@ -1,6 +1,6 @@
 import test from 'tape-six';
 
-import {nextLevel} from '../src/runner.js';
+import {nextLevel} from 'nano-bench/bench/runner.js';
 
 test('nextLevel()', t => {
   t.test('from 1', t => {

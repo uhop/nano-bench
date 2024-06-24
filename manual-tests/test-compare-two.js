@@ -1,6 +1,6 @@
-import {measure, wrapper} from '../src/runner.js';
-import {abbrNumber, formatTime, prepareTimeFormat} from '../src/formatters.js';
-import {mean, getWeightedValue, bootstrap} from '../src/stats.js';
+import {measure, wrapper} from 'nano-bench/bench/runner.js';
+import {abbrNumber, formatTime, prepareTimeFormat} from 'nano-bench/formatters.js';
+import {mean, getWeightedValue, bootstrap} from 'nano-bench/stats.js';
 
 const ALPHA = 0.05; // confidence is 95%
 

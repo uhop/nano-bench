@@ -1,4 +1,4 @@
-import kwtest from '../src/kwtest.js';
+import kwtest from 'nano-bench/significance/kwtest.js';
 
 const ALPHA = 0.05;
 

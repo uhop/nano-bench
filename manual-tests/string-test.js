@@ -1,4 +1,4 @@
-import show from '../src/show.js';
+import show from 'nano-bench/bench/show.js';
 
 await show({
   strings: n => {

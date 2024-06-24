@@ -1,5 +1,5 @@
-import {rk23} from './rk.js';
-import bsearch from './bsearch.js';
+import {rk23} from '../utils/rk.js';
+import bsearch from '../utils/bsearch.js';
 
 // percent point function
 const ppf = (fn, z, options) => {
