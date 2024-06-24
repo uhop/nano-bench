@@ -1,23 +1,25 @@
-import {measure} from './runner.js';
+import {measure, measurePar} from './runner.js';
 import kwtest from './kwtest.js';
 import mwtest from './mwtest.js';
 
 const ALPHA = 0.05;
 
-const compare = async (inputs, options = {}) => {
+const compare = async (inputs, options = {}, report) => {
   const keys = Object.keys(inputs);
   if (keys.length < 2) throw new Error('The "inputs" is supposed to have 2 or more samples.');
 
   options = Object.assign({alpha: ALPHA}, options);
+  const measureFn = options.usePar ? measurePar : measure;
 
   const stats = new Array(keys.length);
   for (let i = 0; i < keys.length; ++i) {
-    stats[i] = await measure(inputs[keys[i]], options);
+    stats[i] = await measureFn(inputs[keys[i]], options, report);
     stats[i].ensureSorted();
   }
   const reps = stats.map(stat => stat.reps);
   stats.forEach(stat => stat.normalizeReps());
 
+  report?.('calculating-significance', {stats, options});
   let results;
   if (keys.length > 2) {
     results = kwtest(stats.map(stat => stat.data), options.alpha);
@@ -26,6 +28,7 @@ const compare = async (inputs, options = {}) => {
   }
   results.data = stats.map(stat => stat.data);
   results.reps = reps;
+  report?.('significance-results', results);
   return results;
 };
 

@@ -94,7 +94,7 @@ export const benchmarkSeries = async (
 export const benchmarkSeriesPar = async (fn, n, {nSeries = 100, DataArray = Array} = {}) => {
   const benchmarks = [];
   for (; nSeries > 0; --nSeries) benchmarks.push(benchmark(fn, n));
-  const results = Promise.all(benchmarks);
+  const results = await Promise.all(benchmarks);
   return DataArray === Array ? results : DataArray.from(results);
 };
 
@@ -133,24 +133,36 @@ export class Stats {
 
 export const measure = async (
   fn,
-  {nSeries = 100, threshold = 20, startFrom = 1, timeout = 5, DataArray = Array} = {}
+  {nSeries = 100, threshold = 20, startFrom = 1, timeout = 5, DataArray = Array} = {},
+  report
 ) => {
-  const reps = startFrom < 0 ? -startFrom : await findLevel(fn, {threshold, startFrom, timeout}),
-    start = performance.now(),
+  report?.('finding-reps');
+  const reps = startFrom < 0 ? -startFrom : await findLevel(fn, {threshold, startFrom, timeout});
+  report?.('found-reps', {reps});
+  report?.('starting-benchmarks', {nSeries, reps});
+  const start = performance.now(),
     data = await benchmarkSeries(fn, reps, {nSeries, timeout, DataArray}),
-    finish = performance.now();
-  return new Stats({data, reps, time: finish - start});
+    finish = performance.now(),
+    result = {data, reps, time: finish - start};
+  report?.('finished-benchmarks', {...result, nSeries});
+  return new Stats(result);
 };
 
 export const measurePar = async (
   fn,
-  {nSeries = 100, threshold = 20, startFrom = 1, timeout = 5, DataArray = Array} = {}
+  {nSeries = 100, threshold = 20, startFrom = 1, timeout = 5, DataArray = Array} = {},
+  report
 ) => {
-  const reps = startFrom < 0 ? -startFrom : await findLevel(fn, {threshold, startFrom, timeout}),
-    start = performance.now(),
+  report?.('finding-reps');
+  const reps = startFrom < 0 ? -startFrom : await findLevel(fn, {threshold, startFrom, timeout});
+  report?.('found-reps', {reps});
+  report?.('starting-benchmarks', {nSeries, reps});
+  const start = performance.now(),
     data = await benchmarkSeriesPar(fn, reps, {nSeries, DataArray}),
-    finish = performance.now();
-  return new Stats({data, reps, time: finish - start});
+    finish = performance.now(),
+    result = {data, reps, time: finish - start};
+  report?.('finished-benchmarks', {...result, nSeries});
+  return new Stats(result);
 };
 
 export const wrapper = fn => n => {
