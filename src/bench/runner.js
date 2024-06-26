@@ -20,23 +20,26 @@ export const nextLevel = n => {
   return n;
 };
 
-export const findLevel = (fn, {threshold = 20, startFrom = 1, timeout = 5} = {}) =>
+export const findLevel = (fn, {threshold = 20, startFrom = 1, timeout = 5} = {}, report) =>
   new Promise((resolve, reject) => {
-    const bench = n => {
+    const bench = async n => {
+      report && (await report('finding-level', {n}));
       try {
         const start = performance.now(),
           result = fn(n),
           finish = performance.now();
         if (result && typeof result.then == 'function') {
           // thenable
-          result.then(() => {
+          result.then(async () => {
             const finish = performance.now();
             if (finish - start >= threshold) return resolve(n);
+            report && (await report('finding-level-next', {n, time: finish - start}));
             setTimeout(bench, timeout, nextLevel(n));
           }, reject);
           return;
         }
         if (finish - start >= threshold) return resolve(n);
+        report && (await report('finding-level-next', {n, time: finish - start}));
         setTimeout(bench, timeout, nextLevel(n));
       } catch (error) {
         reject(error);

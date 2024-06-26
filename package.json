@@ -8,6 +8,10 @@
     ".": "./src/index.js",
     "./*": "./src/*"
   },
+  "bin": {
+    "nano-bench": "./bin/nano-bench.js",
+    "nano-watch": "./bin/nano-watch.js"
+  },
   "scripts": {
     "test": "tape6 --flags FO"
   },
@@ -38,6 +42,7 @@
     ]
   },
   "dependencies": {
+    "commander": "^12.1.0",
     "console-toolkit": "^1.0.0"
   }
 }
