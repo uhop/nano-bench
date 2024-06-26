@@ -1,0 +1,34 @@
+{
+  "version": "3",
+  "packages": {
+    "specifiers": {
+      "npm:commander@^12.1.0": "npm:commander@12.1.0",
+      "npm:console-toolkit@^1.0.0": "npm:console-toolkit@1.0.0",
+      "npm:tape-six@^0.9.3": "npm:tape-six@0.9.6"
+    },
+    "npm": {
+      "commander@12.1.0": {
+        "integrity": "sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA==",
+        "dependencies": {}
+      },
+      "console-toolkit@1.0.0": {
+        "integrity": "sha512-X29IVgTPt5H9LSpHzZQTAHsI9B4lGZj92TLSczuKH910mEJVJHTjm6tqmNVyg9yxZJIWeTYggFVV5L3894HQTQ==",
+        "dependencies": {}
+      },
+      "tape-six@0.9.6": {
+        "integrity": "sha512-mRMOXsnPMWRba7857C46ydq1b2QTPZB8Bgcoc6iqpCe0alqvDXbrYlfvuxS88sgBQjXkF4F0zWeD0lPJiEIk3Q==",
+        "dependencies": {}
+      }
+    }
+  },
+  "remote": {},
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:commander@^12.1.0",
+        "npm:console-toolkit@^1.0.0",
+        "npm:tape-six@^0.9.3"
+      ]
+    }
+  }
+}
