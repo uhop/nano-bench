@@ -4,7 +4,7 @@ import process from 'node:process';
 
 import {program} from 'commander';
 
-import {CURSOR_NORMAL, CURSOR_INVISIBLE, CLEAR_EOS} from 'console-toolkit/ansi';
+import {CURSOR_NORMAL, CURSOR_INVISIBLE, CLEAR_EOL} from 'console-toolkit/ansi';
 import {
   formatInteger,
   formatNumber,
@@ -66,53 +66,45 @@ const writer = new Writer();
 
 let updater;
 
-process.once('exit', () => updater?.final());
+process.once('exit', () => updater?.done());
 process.once('SIGINT', async () => {
-  updater && (await updater.final());
-  updater = null;
+  if (typeof updater?.finalFrame == 'function') await updater.finalFrame();
   process.exit(0);
 });
 process.once('SIGTERM', () => process.exit(143));
 
-function reportFindLevel(state) {
+function reportFindLevel(state, level, time) {
   switch (state) {
     case 'active':
-      const format = prepareTimeFormat([this.data.time], 1000),
-        time = formatTime(this.data.time, format);
-      return c`${CLEAR_EOS}Batch size: {{save.bright.cyan}}${formatInteger(
-        this.data.n
-      )}{{restore}}, time: {{bright.cyan}}${time}`;
+      const format = prepareTimeFormat([time], 1000),
+        timeString = formatTime(time, format);
+      return c`Batch size: {{save.bright.cyan}}${formatInteger(
+        level
+      )}{{restore}}, time: {{bright.cyan}}${timeString}`;
     case 'finished':
-      return c`${CLEAR_EOS}Batch size: {{bright.cyan}}${formatInteger(this.data.n)}`;
+      return c`Batch size: {{bright.cyan}}${formatInteger(level)}`;
   }
   return [];
 }
 
 updater = new Updater(
   reportFindLevel,
-  {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL},
+  {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL, afterLine: CLEAR_EOL},
   writer
 );
 
 const batchSize = await findLevel(fn, {threshold: options.ms}, async (name, data) => {
   if (name === 'finding-level-next') {
-    updater.data = data;
-    await updater.update();
+    await updater.update(undefined, data.n, data.time);
     await sleep(5);
   }
 });
 
-updater.data = {n: batchSize};
-await updater.final();
+await updater.final(batchSize);
 updater = null;
 
 const medianCounter = new MedianCounter();
 const statCounter = new StatCounter();
-
-const formatTimeLocal = (value, format) => {
-  let result = (value * format.scale).toFixed(format.precision);
-  return result + format.unit;
-};
 
 const showData = time => {
   time /= batchSize;
@@ -122,13 +114,16 @@ const showData = time => {
   const m = process.memoryUsage(),
     median = medianCounter.get(),
     stdDev = Math.sqrt(statCounter.variance),
-    format = prepareTimeFormat([statCounter.mean, stdDev, median], 1000),
+    format = {
+      ...prepareTimeFormat([statCounter.mean, stdDev, median], 1000),
+      keepFractionAsIs: true
+    },
     tableData = [
       ['count', 'time', 'mean', 'stdDev', 'median', 'skewness', 'kurtosis'],
       [style.bright.yellow.text(formatInteger(statCounter.count))]
         .concat(
           [time, statCounter.mean, stdDev, median]
-            .map(value => formatTimeLocal(value, format))
+            .map(value => formatTime(value, format))
             .map(value => style.bright.yellow.text(value))
         )
         .concat(
@@ -168,12 +163,11 @@ const showData = time => {
   return table.toStrings();
 };
 
-function reportBenchmark(state) {
+function reportBenchmark(state, time) {
   switch (state) {
     case 'active':
     case 'finished': {
-      const strings = showData(this.data.time);
-      return `${CLEAR_EOS}${strings.join('\n')}`;
+      return showData(time);
     }
   }
   return [];
@@ -181,16 +175,18 @@ function reportBenchmark(state) {
 
 updater = new Updater(
   reportBenchmark,
-  {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL},
+  {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL, afterLine: CLEAR_EOL},
   writer
 );
 
+updater.finalFrame = () => updater.final(updater.data.time);
+
 for (let i = 0; i < iterations; ++i) {
   const time = await benchmark(fn, batchSize);
-  updater.data = {time, iteration: i};
-  await updater.update();
+  updater.data = {time};
+  await updater.update(undefined, time);
   await sleep(5);
 }
 
-await updater.final();
+await updater.finalFrame();
 updater = null;
