@@ -107,10 +107,6 @@ const medianCounter = new MedianCounter();
 const statCounter = new StatCounter();
 
 const showData = time => {
-  time /= batchSize;
-  medianCounter.add(time);
-  statCounter.add(time);
-
   const m = process.memoryUsage(),
     median = medianCounter.get(),
     stdDev = Math.sqrt(statCounter.variance),
@@ -182,7 +178,10 @@ updater = new Updater(
 updater.finalFrame = () => updater.final(updater.data.time);
 
 for (let i = 0; i < iterations; ++i) {
-  const time = await benchmark(fn, batchSize);
+  const time = await benchmark(fn, batchSize) / batchSize;
+  medianCounter.add(time);
+  statCounter.add(time);
+
   updater.data = {time};
   await updater.update(undefined, time);
   await sleep(5);
