@@ -66,7 +66,7 @@ export const kwtest = (sortedArrays, alpha = 0.05) => {
     m[i] = new Array(k);
   }
   for (let i = 0; i < k; ++i) {
-    m[i][i] = true;
+    m[i][i] = false;
     for (let j = i + 1; j < k; ++j) {
       m[i][j] = m[j][i] =
         Math.abs(avgGroupRank[i] - avgGroupRank[j]) >
