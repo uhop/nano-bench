@@ -6,6 +6,7 @@ import {program} from 'commander';
 
 import {CURSOR_NORMAL, CURSOR_INVISIBLE, CLEAR_EOL} from 'console-toolkit/ansi';
 import {
+  abbrNumber,
   formatInteger,
   formatNumber,
   formatTime,
@@ -20,7 +21,6 @@ import Updater from 'console-toolkit/output/updater.js';
 import {findLevel, benchmark} from '../src/bench/runner.js';
 import {MedianCounter} from '../src/stream-median.js';
 import {StatCounter} from '../src/stream-stats.js';
-import {abbrNumber} from 'console-toolkit/alphanumeric/number-formatters.js';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -78,11 +78,13 @@ function reportFindLevel(state, level, time) {
     case 'active':
       const format = prepareTimeFormat([time], 1000),
         timeString = formatTime(time, format);
-      return c`Batch size: {{save.bright.cyan}}${formatInteger(
+      return c`Batch size: {{save.bright.cyan}}${abbrNumber(
         level
       )}{{restore}}, time: {{bright.cyan}}${timeString}`;
     case 'finished':
-      return c`Batch size: {{bright.cyan}}${formatInteger(level)}`;
+      return c`Batch size: {{bright.cyan}}${abbrNumber(
+        level
+      )}{{reset.all}} {{dim}}(use Ctrl+C to stop)`;
   }
   return [];
 }
@@ -178,7 +180,7 @@ updater = new Updater(
 updater.finalFrame = () => updater.final(updater.data.time);
 
 for (let i = 0; i < iterations; ++i) {
-  const time = await benchmark(fn, batchSize) / batchSize;
+  const time = (await benchmark(fn, batchSize)) / batchSize;
   medianCounter.add(time);
   statCounter.add(time);
 
