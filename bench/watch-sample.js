@@ -1,6 +1,6 @@
 export default n => {
-  const x = [];
-  const a = 'a',
+  const x = [],
+    a = 'a',
     b = 'b';
   for (let i = 0; i < n; ++i) {
     x.pop();
