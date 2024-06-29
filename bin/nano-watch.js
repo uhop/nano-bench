@@ -64,6 +64,10 @@ const iterations =
 
 const writer = new Writer();
 
+await writer.writeString(
+  c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: ${program.description()}\n\n`
+);
+
 let updater;
 
 process.once('exit', () => updater?.done());
@@ -84,7 +88,7 @@ function reportFindLevel(state, level, time) {
     case 'finished':
       return c`Batch size: {{bright.cyan}}${abbrNumber(
         level
-      )}{{reset.all}} {{dim}}(use Ctrl+C to stop)`;
+      )}{{reset.all}} {{dim}}(use Ctrl+C to stop)\n`;
   }
   return [];
 }
@@ -150,7 +154,7 @@ const showData = time => {
           width: 2
         },
         null,
-        {value: c`{{save.bold}}rss:{{restore}} {{bright.cyan}}${abbrNumber(m.rss)}`, width: 2},
+        {value: c`{{save.bold}}resident set size:{{restore}} {{bright.cyan}}${abbrNumber(m.rss)}`, width: 2},
         null
       ]
     ],

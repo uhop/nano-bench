@@ -9,6 +9,8 @@ import {infinity, minus, multiplication} from 'console-toolkit/symbols.js';
 import {
   abbrNumber,
   compareDifference,
+  formatInteger,
+  formatNumber,
   formatTime,
   prepareTimeFormat
 } from 'console-toolkit/alphanumeric/number-formatters.js';
@@ -82,6 +84,19 @@ if (names.length < 1) {
 
 const writer = new Writer();
 
+await writer.write([
+  c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: ${program.description()}`,
+  '',
+  c`Confidence interval: {{save.bright.yellow}}${formatNumber(100 * (1 - options.alpha), {
+    precision: 2
+  })}%{{restore}}, samples: {{save.bright.yellow}}${formatInteger(
+    options.samples
+  )}{{restore}}, bootstrap samples: {{save.bright.yellow}}${formatInteger(
+    options.bootstrap
+  )}{{restore}}`,
+  ''
+]);
+
 let updater;
 
 process.once('exit', () => updater?.done());
@@ -118,6 +133,14 @@ const normalizeSamples = (samples, batchSize) => {
 
 const benchSeries = options.parallel ? benchmarkSeriesPar : benchmarkSeries;
 
+const bold = s => style.bold.text(s),
+  num = s => style.bright.yellow.text(s),
+  faster = s => style.bright.green.text(bold(s) + ' faster'),
+  slower = s => style.bright.red.text(bold(s) + ' slower');
+
+const rabbit = '\u{1f407}',
+  turtle = '\u{1f422}';
+
 let iterations = [];
 if (options.iterations > 0) {
   iterations = new Array(names.length).fill(Math.max(options.iterations, options.minIterations));
@@ -125,81 +148,43 @@ if (options.iterations > 0) {
 
 const results = [],
   stats = [];
-let significance = null;
 
 const tableHeader1 = [
-    {value: '#', height: 2, align: 'dc'},
     {value: 'name', height: 2, align: 'dc'},
     {value: 'time', width: 3, align: 'c'},
     null,
     null,
     {value: 'op/s', height: 2, align: 'dc'},
     {value: 'batch', height: 2, align: 'dc'}
-  ],
+  ].map(cell => cell ? {...cell, value: bold(cell.value)} : null),
   tableHeader2 = [
-    null,
     null,
     {value: 'median', align: 'c'},
     {value: '+', align: 'c'},
     {value: minus, align: 'c'},
     null,
     null
-  ];
-
-if (names.length > 1) {
-  tableHeader1.push({value: 'SSD', width: names.length, align: 'c'});
-  for (let i = 0; i < names.length; ++i) {
-    if (i) tableHeader1.push(null);
-    tableHeader2.push({value: i + 1, align: 'c'});
-  }
-}
+  ].map(cell => cell ? {...cell, value: bold(cell.value)} : null);
 
 const makeTableData = () => {
   const tableData = [tableHeader1, tableHeader2];
   for (let i = 0; i < names.length; ++i) {
-    const row = [i + 1, names[i]],
+    const row = [bold(names[i])],
       s = stats[i];
     if (s) {
       const format = prepareTimeFormat([s.median - s.lo, s.median, s.hi - s.median], 1000);
       row.push(
-        {value: formatTime(s.median, format), align: 'r'},
-        {value: '+' + formatTime(s.hi - s.median, format), align: 'r'},
-        {value: minus + formatTime(s.median - s.lo, format), align: 'r'},
-        {value: abbrNumber(1000 / s.median), align: 'r'}
+        {value: bold(num(formatTime(s.median, format))), align: 'r'},
+        {value: num('+' + formatTime(s.hi - s.median, format)), align: 'r'},
+        {value: num(minus + formatTime(s.median - s.lo, format)), align: 'r'},
+        {value: num(abbrNumber(1000 / s.median)), align: 'r'}
       );
     } else if (i == stats.length) {
       row.push({value: 'measuring...', width: 4}, null, null, null);
     } else {
       row.push(null, null, null, null);
     }
-    row.push(i < iterations.length ? {value: abbrNumber(iterations[i]), align: 'r'} : null);
-    if (names.length > 1) {
-      const sign = significance?.[i];
-      if (sign) {
-        for (let j = 0; j < sign.length; ++j) {
-          if (!sign[j]) {
-            row.push(null);
-            continue;
-          }
-          const result = compareDifference(stats[i].median, stats[j].median);
-          let text = '';
-          if (result.ratio) {
-            text = result.ratio + multiplication;
-          } else if (result.percentage) {
-            text = result.percentage + '%';
-          } else if (result.infinity) {
-            text = infinity;
-          }
-          if (!text) {
-            row.push(null);
-            continue;
-          }
-          row.push({value: text + ' ' + (result.less ? 'faster' : 'slower'), align: 'c'});
-        }
-      } else {
-        row.push(...new Array(names.length).fill(null));
-      }
-    }
+    row.push(i < iterations.length ? {value: num(abbrNumber(iterations[i])), align: 'r'} : null);
     tableData.push(row);
   }
   return tableData;
@@ -257,20 +242,66 @@ for (let i = 0; i < iterations.length; ++i) {
   await sleep(5);
 }
 
+await updater.final();
+updater = null;
+
 // calculate significance
 
 if (results.length > 1) {
+  let significance = null;
+
   for (const samples of results) samples.sort(numericSortingAsc);
   if (results.length == 2) {
     const result = mwtest(results[0], results[1], options.alpha);
-    significance = [
-      [false, result.different],
-      [result.different, false]
-    ];
+    if (result.different)
+      significance = [
+        [false, result.different],
+        [result.different, false]
+      ];
   } else {
     const result = kwtest(results, options.alpha);
-    significance = result.groupDifference;
+    if (result.different) significance = result.groupDifference;
+  }
+
+  if (significance) {
+    const sortedStats = stats.slice().sort((a, b) => a.median - b.median),
+      tableData = [[null, bold('#'), bold('name')]];
+    for (let i = 0; i < names.length; ++i) {
+      tableData[0].push({value: bold(formatInteger(i + 1)), align: 'c'});
+      const row = [null, formatInteger(i + 1), bold(names[i])],
+        signRow = significance[i];
+      for (let j = 0; j < signRow.length; ++j) {
+        if (signRow[j]) {
+          const result = compareDifference(stats[i].median, stats[j].median);
+          let text = '';
+          if (result.infinity) {
+            text = infinity;
+          } else if (result.percentage) {
+            text = result.percentage + '%';
+          } else if (result.ratio) {
+            text = result.ratio + multiplication;
+          }
+          if (text) {
+            text = result.less ? faster(text) : slower(text);
+            row.push({value: text, align: 'c'});
+          } else {
+            row.push(null);
+          }
+        } else {
+          row.push(null);
+        }
+      }
+      // if (stats[i] === sortedStats[0]) {
+      //   row[0] = {value: rabbit + ' ', align: 'c'};
+      // } else if (stats[i] === sortedStats[sortedStats.length - 1]) {
+      //   row[0] = {value: turtle + ' ', align: 'c'};
+      // }
+      tableData.push(row);
+    }
+    const table = makeTable(tableData, lineTheme);
+    writer.writeString(c`\n{{save.bright.cyan.bold}}The difference is statistically significant:{{restore}}\n\n`);
+    writer.write(table.toStrings());
+  } else {
+    writer.writeString('\nThe difference is not statistically significant.\n');
   }
 }
-
-await updater.final();
