@@ -83,20 +83,6 @@ if (names.length < 1) {
 // set up the writer and the updater
 
 const writer = new Writer();
-
-await writer.write([
-  c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: ${program.description()}`,
-  '',
-  c`Confidence interval: {{save.bright.yellow}}${formatNumber(100 * (1 - options.alpha), {
-    precision: 2
-  })}%{{restore}}, samples: {{save.bright.yellow}}${formatInteger(
-    options.samples
-  )}{{restore}}, bootstrap samples: {{save.bright.yellow}}${formatInteger(
-    options.bootstrap
-  )}{{restore}}`,
-  ''
-]);
-
 let updater;
 
 process.once('exit', () => updater?.done());
@@ -146,6 +132,32 @@ if (options.iterations > 0) {
   iterations = new Array(names.length).fill(Math.max(options.iterations, options.minIterations));
 }
 
+await writer.write([
+  c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: ${program.description()}`,
+  '',
+  c`Confidence interval: {{save.bright.yellow}}${formatNumber(100 * (1 - options.alpha), {
+    precision: 2
+  })}%{{restore}}, samples: {{save.bright.yellow}}${formatInteger(
+    options.samples
+  )}{{restore}}, bootstrap samples: {{save.bright.yellow}}${formatInteger(
+    options.bootstrap
+  )}{{restore}}`,
+  iterations.length
+    ? c`Measuring {{save.bright.yellow}}${formatInteger(
+        iterations[0]
+      )}{{restore}} iterations per sample ({{save.bright.yellow}}${formatInteger(
+        iterations[0] * options.samples
+      )}{{restore}} per function)`
+    : c`Measuring {{save.bright.yellow}}${formatTime(
+        options.ms,
+        prepareTimeFormat([options.ms], 1000)
+      )}{{restore}} per sample (~{{save.bright.yellow}}${formatTime(
+        options.ms * 2 * options.samples,
+        prepareTimeFormat([options.ms * 2 * options.samples], 1000)
+      )}{{restore}} per function)`,
+  ''
+]);
+
 const results = [],
   stats = [];
 
@@ -156,7 +168,7 @@ const tableHeader1 = [
     null,
     {value: 'op/s', height: 2, align: 'dc'},
     {value: 'batch', height: 2, align: 'dc'}
-  ].map(cell => cell ? {...cell, value: bold(cell.value)} : null),
+  ].map(cell => (cell ? {...cell, value: bold(cell.value)} : null)),
   tableHeader2 = [
     null,
     {value: 'median', align: 'c'},
@@ -164,7 +176,7 @@ const tableHeader1 = [
     {value: minus, align: 'c'},
     null,
     null
-  ].map(cell => cell ? {...cell, value: bold(cell.value)} : null);
+  ].map(cell => (cell ? {...cell, value: bold(cell.value)} : null));
 
 const makeTableData = () => {
   const tableData = [tableHeader1, tableHeader2];
@@ -265,7 +277,9 @@ if (results.length > 1) {
 
   if (significance) {
     const sortedStats = stats.slice().sort((a, b) => a.median - b.median),
-      tableData = [[null, bold('#'), bold('name')]];
+      tableData = [['  ', bold('#'), bold('name')]];
+    let rabbitIndex = -1,
+      turtleIndex = -1;
     for (let i = 0; i < names.length; ++i) {
       tableData[0].push({value: bold(formatInteger(i + 1)), align: 'c'});
       const row = [null, formatInteger(i + 1), bold(names[i])],
@@ -291,16 +305,22 @@ if (results.length > 1) {
           row.push(null);
         }
       }
-      // if (stats[i] === sortedStats[0]) {
-      //   row[0] = {value: rabbit + ' ', align: 'c'};
-      // } else if (stats[i] === sortedStats[sortedStats.length - 1]) {
-      //   row[0] = {value: turtle + ' ', align: 'c'};
-      // }
+      if (stats[i] === sortedStats[0]) {
+        row[0] = {value: '\t1', align: 'c'};
+      } else if (stats[i] === sortedStats[sortedStats.length - 1]) {
+        row[0] = {value: '\t2', align: 'c'};
+      }
       tableData.push(row);
     }
     const table = makeTable(tableData, lineTheme);
-    writer.writeString(c`\n{{save.bright.cyan.bold}}The difference is statistically significant:{{restore}}\n\n`);
-    writer.write(table.toStrings());
+    table.vAxis[1] = 2;
+    writer.writeString(
+      c`\n{{save.bright.cyan.bold}}The difference is statistically significant:{{restore}}\n\n`
+    );
+    const tableStrings = table
+      .toStrings()
+      .map(line => line.replace(/\t(1|2)/g, m => (m[1] == '2' ? turtle : rabbit)));
+    writer.write(tableStrings);
   } else {
     writer.writeString('\nThe difference is not statistically significant.\n');
   }
