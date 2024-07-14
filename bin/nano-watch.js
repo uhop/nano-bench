@@ -121,7 +121,7 @@ const showData = time => {
       keepFractionAsIs: true
     },
     tableData = [
-      ['count', 'time', 'mean', 'stdDev', 'median', 'skewness', 'kurtosis'],
+      ['#', 'time', 'mean', 'stdDev', 'median', 'skewness', 'kurtosis'],
       [style.bright.yellow.text(formatInteger(statCounter.count))]
         .concat(
           [time, statCounter.mean, stdDev, median]
@@ -154,7 +154,10 @@ const showData = time => {
           width: 2
         },
         null,
-        {value: c`{{save.bold}}resident set size:{{restore}} {{bright.cyan}}${abbrNumber(m.rss)}`, width: 2},
+        {
+          value: c`{{save.bold}}resident set size:{{restore}} {{bright.cyan}}${abbrNumber(m.rss)}`,
+          width: 2
+        },
         null
       ]
     ],
