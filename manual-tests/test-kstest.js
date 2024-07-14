@@ -1,4 +1,4 @@
-import kstest from 'nano-bench/significance/kstest.js';
+import kstest from 'nano-benchmark/significance/kstest.js';
 
 const ALPHA = 0.05; // confidence is 95%
 

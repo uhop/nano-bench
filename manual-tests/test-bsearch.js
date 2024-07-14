@@ -1,4 +1,4 @@
-import bsearch from "nano-bench/utils/bsearch.js";
+import bsearch from "nano-benchmark/utils/bsearch.js";
 
 const testArray = [1, 2, 3, 3, 3, 4, 4];
 

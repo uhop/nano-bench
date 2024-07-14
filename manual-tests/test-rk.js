@@ -1,4 +1,4 @@
-import {rk23} from 'nano-bench/utils/rk.js';
+import {rk23} from 'nano-benchmark/utils/rk.js';
 
 const test = (z, a, b) => {
   const fn = z => {

@@ -1,9 +1,9 @@
-# nano-bench [![NPM version][npm-img]][npm-url]
+# nano-benchmark [![NPM version][npm-img]][npm-url]
 
-[npm-img]:      https://img.shields.io/npm/v/nano-bench.svg
-[npm-url]:      https://npmjs.org/package/nano-bench
+[npm-img]:      https://img.shields.io/npm/v/nano-benchmark.svg
+[npm-url]:      https://npmjs.org/package/nano-benchmark
 
-`nano-bench` provides command-line utilities for benchmarking code and related statistical modules.
+`nano-benchmark` provides command-line utilities for benchmarking code and related statistical modules.
 
 Two utilities are available:
 
@@ -29,7 +29,7 @@ used in tight loops.
 ## Installation
 
 ```bash
-npm install --save nano-bench
+npm install --save nano-benchmark
 ```
 
 ### Deno and Bun support
@@ -41,7 +41,8 @@ Don't forget to specify the appropriate permissions for Deno to run the benchmar
 
 ## Documentation
 
-Both utilities are available by name if you installed `nano-bench` globally (`npm install -g nano-bench`).
+Both utilities are available by name if you installed `nano-benchmark` globally
+(`npm install -g nano-benchmark`).
 If it is installed as a dependency, you can use utilities by name in the `scripts` section of
 your `package.json` file or from the command line by prefixing them with `npx`, e.g., `npx nano-watch`.
 

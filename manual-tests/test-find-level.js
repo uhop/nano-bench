@@ -1,4 +1,4 @@
-import {findLevel} from 'nano-bench/bench/runner.js';
+import {findLevel} from 'nano-benchmark/bench/runner.js';
 
 console.log(
   await findLevel(n => {
