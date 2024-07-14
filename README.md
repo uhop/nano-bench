@@ -32,11 +32,18 @@ used in tight loops.
 npm install --save nano-bench
 ```
 
+### Deno and Bun support
+
+Both [deno](https://deno.land/) and [bun](https://bun.sh/) are supported.
+
+Don't forget to specify the appropriate permissions for Deno to run the benchmark scripts:
+`--allow-read` (required) and `--allow-hrtime` (optional but recommended).
+
 ## Documentation
 
 Both utilities are available by name if you installed `nano-bench` globally (`npm install -g nano-bench`).
 If it is installed as a dependency, you can use utilities by name in the `scripts` section of
-your `package.json` file or prefixing them with `npx`: `npx nano-watch`.
+your `package.json` file or from the command line by prefixing them with `npx`, e.g., `npx nano-watch`.
 
 Utilities are self-documented &mdash; run them with `--help` flag to learn about arguments.
 
