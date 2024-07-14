@@ -1,22 +1,23 @@
 export default {
   strings: n => {
-    const x = [],
-      a = 'a',
+    const a = 'a',
       b = 'b';
     for (let i = 0; i < n; ++i) {
-      x.pop();
-      x.push(a + '-' + b);
+      const x = a + '-' + b;
     }
-    return x;
   },
   backticks: n => {
-    const x = [],
-      a = 'a',
+    const a = 'a',
       b = 'b';
     for (let i = 0; i < n; ++i) {
-      x.pop();
-      x.push(`${a}-${b}`);
+      const x = `${a}-${b}`;
     }
-    return x;
+  },
+  join: n => {
+    const a = 'a',
+      b = 'b';
+    for (let i = 0; i < n; ++i) {
+      const x = [a, b].join('-');
+    }
   }
 };
