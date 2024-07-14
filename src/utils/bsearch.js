@@ -1,11 +1,9 @@
-const bsearch = (sortedArray, lessFn, from = 0, to = sortedArray.length) => {
-  let i = from,
-    j = to;
-  while (j - i > 0) {
-    const m = (i + j) >> 1;
-    if (lessFn(sortedArray[m])) i = m + 1;
-    else j = m;
+const bsearch = (sortedArray, lessFn, l = 0, r = sortedArray.length) => {
+  while (l < r) {
+    const m = (l + r) >> 1;
+    if (lessFn(sortedArray[m])) l = m + 1;
+    else r = m;
   }
-  return j;
+  return r;
 };
 export default bsearch;
