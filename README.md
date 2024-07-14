@@ -9,8 +9,8 @@ Two utilities are available:
 
 * `nano-watch` &mdash; provides statistics in a streaming mode continuously running your code,
   watching memory usage and updating the output.
-* `nano-bench` &mdash; runs benchmark tests on your code, calculating statistics, calculating
-  statistical significance and presenting them in a table.
+* `nano-bench` &mdash; runs benchmark tests on your code, calculating statistics and
+  statistical significance, and presenting them in a tabular format.
 
 The utilities are mostly used to measure performance of your code and compare it with other variants.
 It is geared toward benchmarking and performance tuning of a small fast snippets of code, e.g.,
