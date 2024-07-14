@@ -43,6 +43,6 @@
   },
   "dependencies": {
     "commander": "^12.1.0",
-    "console-toolkit": "^1.1.1"
+    "console-toolkit": "^1.2.0"
   }
 }
