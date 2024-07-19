@@ -33,7 +33,7 @@ program
   .name('nano-bench')
   .description('Small utility to benchmark and compare code.')
   .version('1.0.0')
-  .argument('<file>', 'File to benchmark')
+  .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits.')
   .option('-m, --ms <ms>', 'measurement time in milliseconds', toInt, 50)
   .addOption(
     new Option('-i, --iterations <iterations>', 'measurement iterations (overrides --ms)')
@@ -52,6 +52,12 @@ program.parse();
 
 const options = program.opts(),
   args = program.args;
+
+if (args[0] === 'self') {
+  const name = String(import.meta.url);
+  console.log(name.startsWith('file://') ? name.slice(7) : name);
+  process.exit(0);
+}
 
 // validate the options
 

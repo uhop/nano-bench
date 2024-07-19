@@ -28,7 +28,7 @@ program
   .name('nano-watch')
   .description('Small utility to continuously benchmark code.')
   .version('1.0.0')
-  .argument('<file>', 'File to benchmark')
+  .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits.')
   .argument('[method]', 'Method name to benchmark')
   .option('-m, --ms <ms>', 'milliseconds per iteration', value => parseInt(value), 500)
   .option('-i, --iterations <number>', 'number of iterations (default: Infinity)', value =>
@@ -41,6 +41,12 @@ program.parse();
 
 const options = program.opts(),
   args = program.args;
+
+if (args[0] === 'self') {
+  const name = String(import.meta.url);
+  console.log(name.startsWith('file://') ? name.slice(7) : name);
+  process.exit(0);
+}
 
 const fileName = new URL(args[0], `file://${process.cwd()}/`);
 
