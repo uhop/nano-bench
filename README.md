@@ -111,4 +111,5 @@ BSD 3-Clause License
 
 ## Release history
 
+- 1.0.1: *Added "self" argument to utilities so it can be used with Deno, Bun, etc.*
 - 1.0.0: *Initial release.*
