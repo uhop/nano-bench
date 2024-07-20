@@ -13,7 +13,7 @@ Two utilities are available:
   statistical significance, and presenting them in a tabular format.
 
 The utilities are mostly used to measure performance of your code and compare it with other variants.
-It is geared toward benchmarking and performance tuning of a small fast snippets of code, e.g.,
+It is geared toward benchmarking and performance tuning of small fast snippets of code, e.g.,
 used in tight loops.
 
 ## Visual samples
