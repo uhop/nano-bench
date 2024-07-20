@@ -30,6 +30,16 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const filePath = new URL('../package.json', import.meta.url),
   pkg = JSON.parse(await readFile(filePath, {encoding: 'utf8'}));
 
+const showSelf = () => {
+  const self = new URL(import.meta.url);
+  if (self.protocol === 'file:') {
+    console.log(fileURLToPath(self));
+  } else {
+    console.log(self);
+  }
+  process.exit(0);
+};
+
 program
   .name('nano-watch')
   .description('Small utility to continuously benchmark code.')
@@ -41,22 +51,17 @@ program
     parseInt(value)
   )
   .option('-e, --export <name>', 'name of the export in the file', 'default')
+  .option('--self', 'print the file name to stdout and exit')
   .showHelpAfterError('(add --help to see available options)');
+
+program.on('option:self', showSelf);
 
 program.parse();
 
 const options = program.opts(),
   args = program.args;
 
-if (args[0] === 'self') {
-  const self = new URL(import.meta.url);
-  if (self.protocol === 'file:') {
-    console.log(fileURLToPath(self));
-  } else {
-    console.log(self);
-  }
-  process.exit(0);
-}
+if (args[0] === 'self') showSelf();
 
 const fileName = pathToFileURL(path.join(process.cwd(), args[0]));
 

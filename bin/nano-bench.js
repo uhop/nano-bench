@@ -35,6 +35,16 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
 const filePath = new URL('../package.json', import.meta.url),
   pkg = JSON.parse(await readFile(filePath, {encoding: 'utf8'}));
 
+const showSelf = () => {
+  const self = new URL(import.meta.url);
+  if (self.protocol === 'file:') {
+    console.log(fileURLToPath(self));
+  } else {
+    console.log(self);
+  }
+  process.exit(0);
+};
+
 program
   .name('nano-bench')
   .version(pkg.version)
@@ -52,22 +62,17 @@ program
   .option('-s, --samples <samples>', 'number of samples', toInt, 100)
   .option('-p, --parallel', 'take samples in parallel asynchronously')
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
+  .option('--self', 'returns the file name to stdout and exits')
   .showHelpAfterError('(add --help to see available options)');
+
+program.on('option:self', showSelf);
 
 program.parse();
 
 const options = program.opts(),
   args = program.args;
 
-if (args[0] === 'self') {
-  const self = new URL(import.meta.url);
-  if (self.protocol === 'file:') {
-    console.log(fileURLToPath(self));
-  } else {
-    console.log(self);
-  }
-  process.exit(0);
-}
+if (args[0] === 'self') showSelf();
 
 // validate the options
 
