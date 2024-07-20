@@ -49,7 +49,7 @@ program
   .name('nano-bench')
   .version(pkg.version)
   .description('Small utility to benchmark and compare code.')
-  .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits.')
+  .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits')
   .option('-m, --ms <ms>', 'measurement time in milliseconds', toInt, 50)
   .addOption(
     new Option('-i, --iterations <iterations>', 'measurement iterations (overrides --ms)')

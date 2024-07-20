@@ -44,7 +44,7 @@ program
   .name('nano-watch')
   .description('Small utility to continuously benchmark code.')
   .version(pkg.version)
-  .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits.')
+  .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits')
   .argument('[method]', 'Method name to benchmark')
   .option('-m, --ms <ms>', 'milliseconds per iteration', value => parseInt(value), 500)
   .option('-i, --iterations <number>', 'number of iterations (default: Infinity)', value =>

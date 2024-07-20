@@ -36,7 +36,8 @@ npm install --save nano-benchmark
 
 Both [deno](https://deno.land/) and [bun](https://bun.sh/) are supported.
 
-If you want to run the benchmark in Deno, Bun, etc. you can specify `self` as the `file` argument.
+If you want to run the benchmark in Deno, Bun, etc. you can specify `self` as the `file` argument
+or the `--self` option.
 In this case the utility will print out its file name to `stdout` and exit. It allows running
 the utility with alternative JavaScript interpreters.
 
@@ -44,10 +45,10 @@ Examples with `bash`:
 
 ```bash
 $ npx nano-bench benchmark.js
-$ bun `npx nano-bench self` benchmark.js
-$ deno run --allow-read --allow-hrtime `npx nano-bench self` benchmark.js
-$ deno run -A `npx nano-bench self` benchmark.js
-$ node `npx nano-bench self` benchmark.js
+$ bun `npx nano-bench --self` benchmark.js
+$ deno run --allow-read --allow-hrtime `npx nano-bench --self` benchmark.js
+$ deno run -A `npx nano-bench --self` benchmark.js
+$ node `npx nano-bench --self` benchmark.js
 ```
 
 Don't forget to specify the appropriate permissions for Deno to run the benchmark scripts:
@@ -111,5 +112,6 @@ BSD 3-Clause License
 
 ## Release history
 
+- 1.0.2: *Added the `--self` option.*
 - 1.0.1: *Added "self" argument to utilities so it can be used with Deno, Bun, etc.*
 - 1.0.0: *Initial release.*
