@@ -3,6 +3,7 @@
 import process from 'node:process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import path from 'node:path';
+import {readFile} from 'node:fs/promises';
 
 import {program} from 'commander';
 
@@ -26,10 +27,13 @@ import {StatCounter} from '../src/stream-stats.js';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+const filePath = new URL('../package.json', import.meta.url),
+  pkg = JSON.parse(await readFile(filePath, {encoding: 'utf8'}));
+
 program
   .name('nano-watch')
   .description('Small utility to continuously benchmark code.')
-  .version('1.0.0')
+  .version(pkg.version)
   .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits.')
   .argument('[method]', 'Method name to benchmark')
   .option('-m, --ms <ms>', 'milliseconds per iteration', value => parseInt(value), 500)

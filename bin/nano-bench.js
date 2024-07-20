@@ -3,6 +3,7 @@
 import process from 'node:process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import path from 'node:path';
+import {readFile} from 'node:fs/promises';
 
 import {Option, program} from 'commander';
 
@@ -31,10 +32,13 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
   toInt = value => parseInt(value),
   toFloat = value => parseFloat(value);
 
+const filePath = new URL('../package.json', import.meta.url),
+  pkg = JSON.parse(await readFile(filePath, {encoding: 'utf8'}));
+
 program
   .name('nano-bench')
+  .version(pkg.version)
   .description('Small utility to benchmark and compare code.')
-  .version('1.0.0')
   .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits.')
   .option('-m, --ms <ms>', 'measurement time in milliseconds', toInt, 50)
   .addOption(
