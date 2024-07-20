@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import process from 'node:process';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import path from 'node:path';
 
 import {program} from 'commander';
 
@@ -43,12 +45,16 @@ const options = program.opts(),
   args = program.args;
 
 if (args[0] === 'self') {
-  const name = String(import.meta.url);
-  console.log(name.startsWith('file://') ? name.slice(7) : name);
+  const self = new URL(import.meta.url);
+  if (self.protocol === 'file:') {
+    console.log(fileURLToPath(self));
+  } else {
+    console.log(self);
+  }
   process.exit(0);
 }
 
-const fileName = new URL(args[0], `file://${process.cwd()}/`);
+const fileName = new URL(args[0], pathToFileURL(process.cwd() + path.sep));
 
 let fn;
 try {
