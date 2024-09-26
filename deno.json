@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "nano-benchmark": "./src/index.js",
+    "nano-benchmark/": "./src/"
+  }
+}
