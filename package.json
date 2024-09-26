@@ -1,6 +1,6 @@
 {
   "name": "nano-benchmark",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Small utilities to benchmark code with Node.",
   "type": "module",
   "main": "src/index.js",
@@ -13,7 +13,10 @@
     "nano-watch": "./bin/nano-watch.js"
   },
   "scripts": {
-    "test": "tape6 --flags FO"
+    "test": "tape6 --flags FO",
+    "test:bun": "tape6-bun --flags FO",
+    "test:deno-original": "tape6-deno --flags FO",
+    "test:deno": "deno run -A `tape6-runner main` --flags FO"
   },
   "repository": {
     "type": "git",
@@ -38,7 +41,7 @@
     "src"
   ],
   "devDependencies": {
-    "tape-six": "^0.9.6"
+    "tape-six": "^0.12.2"
   },
   "tape6": {
     "tests": [
@@ -47,6 +50,6 @@
   },
   "dependencies": {
     "commander": "^12.1.0",
-    "console-toolkit": "^1.2.0"
+    "console-toolkit": "^1.2.1"
   }
 }
