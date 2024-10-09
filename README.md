@@ -112,6 +112,7 @@ BSD 3-Clause License
 
 ## Release history
 
+* 1.0.4: *Updated dependencies + added more tests.*
 * 1.0.3: *Updated dependencies.*
 * 1.0.2: *Added the `--self` option.*
 * 1.0.1: *Added "self" argument to utilities so it can be used with Deno, Bun, etc.*

@@ -1,6 +1,6 @@
 {
   "name": "nano-benchmark",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Small utilities to benchmark code with Node.",
   "type": "module",
   "main": "src/index.js",
