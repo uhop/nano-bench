@@ -1,6 +1,6 @@
 {
   "name": "nano-benchmark",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Small utilities to benchmark code with Node.",
   "type": "module",
   "main": "src/index.js",
@@ -43,12 +43,12 @@
     "src"
   ],
   "devDependencies": {
-    "tape-six": "^1.4.3",
-    "tape-six-proc": "^1.1.4"
+    "tape-six": "^1.4.4",
+    "tape-six-proc": "^1.1.5"
   },
   "dependencies": {
     "commander": "^14.0.2",
-    "console-toolkit": "^1.2.5"
+    "console-toolkit": "^1.2.6"
   },
   "tape6": {
     "tests": [
