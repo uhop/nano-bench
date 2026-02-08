@@ -1,6 +1,6 @@
 {
   "name": "nano-benchmark",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Small utilities to benchmark code with Node.",
   "type": "module",
   "main": "src/index.js",
@@ -17,8 +17,11 @@
     "test:bun": "tape6-bun --flags FO",
     "test:deno": "tape6-deno --flags FO",
     "test:proc": "tape6-proc --flags FO",
-    "test:proc:bun": "bun run `npx tape6-proc --self` --flags FO",
-    "test:proc:deno": "deno run -A `npx tape6-proc --self` --flags FO -r -A"
+    "test:proc:bun": "bun run `tape6-proc --self` --flags FO",
+    "test:proc:deno": "deno run -A `tape6-proc --self` --flags FO -r -A",
+    "test:seq": "tape6-seq --flags FO",
+    "test:seq:bun": "bun run `tape6-seq --self` --flags FO",
+    "test:seq:deno": "deno run -A `tape6-seq --self` --flags FO -r -A"
   },
   "repository": {
     "type": "git",
@@ -43,12 +46,12 @@
     "src"
   ],
   "devDependencies": {
-    "tape-six": "^1.5.1",
-    "tape-six-proc": "^1.2.1"
+    "tape-six": "^1.7.0",
+    "tape-six-proc": "^1.2.2"
   },
   "dependencies": {
-    "commander": "^14.0.2",
-    "console-toolkit": "^1.2.8"
+    "commander": "^14.0.3",
+    "console-toolkit": "^1.2.9"
   },
   "tape6": {
     "tests": [
