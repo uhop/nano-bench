@@ -1,7 +1,7 @@
 {
   "name": "nano-benchmark",
   "version": "1.0.9",
-  "description": "Small utilities to benchmark code with Node.",
+  "description": "CLI micro-benchmarking with nonparametric statistics and significance testing.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -29,8 +29,16 @@
   },
   "keywords": [
     "benchmark",
+    "micro-benchmark",
     "performance",
-    "statistics"
+    "profiling",
+    "statistics",
+    "significance",
+    "bootstrap",
+    "mann-whitney",
+    "kruskal-wallis",
+    "cli",
+    "compare"
   ],
   "author": "Eugene Lazutkin <eugene.lazutkin@gmail.com> (https://www.lazutkin.com/)",
   "license": "BSD-3-Clause",
@@ -43,7 +51,10 @@
   },
   "homepage": "https://github.com/uhop/nano-bench#readme",
   "files": [
-    "src"
+    "src",
+    "bin",
+    "llms.txt",
+    "llms-full.txt"
   ],
   "devDependencies": {
     "tape-six": "^1.7.0",

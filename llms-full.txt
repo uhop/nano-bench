@@ -1,0 +1,208 @@
+# nano-benchmark
+
+> Command-line utilities for micro-benchmarking JavaScript code with nonparametric statistics and significance testing.
+
+- NPM: https://npmjs.org/package/nano-benchmark
+- GitHub: https://github.com/uhop/nano-bench
+- Wiki: https://github.com/uhop/nano-bench/wiki
+- License: BSD-3-Clause
+- Runtime: Node.js 20+, Bun, Deno
+- Module system: ESM only (`"type": "module"`)
+
+## Installation
+
+```bash
+npm install nano-benchmark
+```
+
+## CLI tool: nano-bench
+
+Benchmarks multiple functions, compares them with bootstrap confidence intervals and significance tests, outputs a styled table.
+
+### Usage
+
+```
+nano-bench [options] <file>
+```
+
+### Arguments
+
+- `file` — JavaScript module to benchmark. If `"self"`, prints its own file path and exits.
+
+### Options
+
+- `-m, --ms <ms>` — measurement time in milliseconds per sample (default: 50). The tool auto-discovers the batch size where one call takes at least this long.
+- `-i, --iterations <iterations>` — fixed iteration count per sample (overrides `--ms`).
+- `--min-iterations <n>` — minimum iterations per sample (default: 1).
+- `-s, --samples <samples>` — number of samples to collect (default: 100).
+- `-b, --bootstrap <bootstrap>` — number of bootstrap resamples for CI estimation (default: 1000).
+- `-a, --alpha <alpha>` — significance level for confidence interval and tests (default: 0.05 = 95% CI).
+- `-p, --parallel` — collect samples in parallel (useful for async benchmarks).
+- `-e, --export <name>` — name of the export to use from the file (default: `"default"`).
+- `--self` — print the script's file path to stdout and exit (for Deno/Bun usage).
+
+### Output
+
+A styled table with columns:
+
+| Column | Description |
+|--------|-------------|
+| name | Function name |
+| median | Median execution time |
+| + | Upper bound of confidence interval (median to high) |
+| − | Lower bound of confidence interval (median to low) |
+| op/s | Operations per second (1000 / median) |
+| batch | Iterations per sample (batch size) |
+
+If differences are statistically significant, a significance matrix is printed showing pairwise comparisons with percentage or ratio differences. The fastest function is marked with 🐇 and the slowest with 🐢.
+
+### How it works
+
+1. **Find level**: auto-discovers batch size `n` where `fn(n)` takes ≥ `--ms` milliseconds.
+2. **Collect samples**: runs `fn(n)` `--samples` times, collecting timing data.
+3. **Bootstrap CI**: uses bootstrap resampling to estimate median and confidence interval.
+4. **Significance test**: Mann-Whitney U (2 functions) or Kruskal-Wallis with post-hoc tests (3+ functions).
+
+### Example
+
+```bash
+npx nano-bench bench/bench-string-concat.js
+npx nano-bench -s 200 -b 2000 -a 0.01 bench/bench-string-concat.js
+```
+
+---
+
+## CLI tool: nano-watch
+
+Continuously benchmarks a single function in streaming mode, showing live statistics and memory usage. Runs indefinitely until stopped with Ctrl+C (or until `--iterations` is reached).
+
+### Usage
+
+```
+nano-watch [options] <file> [method]
+```
+
+### Arguments
+
+- `file` — JavaScript module to benchmark. If `"self"`, prints its own file path and exits.
+- `method` — optional method name if the export is an object of functions (same format as nano-bench).
+
+### Options
+
+- `-m, --ms <ms>` — milliseconds per measurement iteration (default: 500).
+- `-i, --iterations <number>` — number of iterations to run (default: Infinity).
+- `-e, --export <name>` — name of the export to use from the file (default: `"default"`).
+- `--self` — print the script's file path to stdout and exit.
+
+### Output
+
+A live-updating styled table with:
+
+| Row | Columns |
+|-----|---------|
+| Stats | #, time, mean, stdDev, median, skewness, kurtosis |
+| op/s | operations per second for time, mean, median |
+| memory | heapUsed, heapTotal, rss |
+
+All statistics are computed using online/streaming algorithms (constant memory):
+- **StatCounter**: streaming mean, variance, skewness, kurtosis (Welford's algorithm).
+- **MedianCounter**: approximate streaming median (median-of-medians).
+
+### Example
+
+```bash
+npx nano-watch bench/watch-sample.js
+npx nano-watch bench/bench-string-concat.js backticks
+npx nano-watch -i 50 bench/watch-sample.js
+```
+
+---
+
+## Benchmark file format
+
+Both tools import a JavaScript module. The module should export (default or named) either:
+
+### Object of functions (for nano-bench, or nano-watch with method argument)
+
+```js
+export default {
+  variant1: n => {
+    const a = 'a', b = 'b';
+    for (let i = 0; i < n; ++i) {
+      const x = a + '-' + b;
+    }
+  },
+  variant2: n => {
+    const a = 'a', b = 'b';
+    for (let i = 0; i < n; ++i) {
+      const x = `${a}-${b}`;
+    }
+  }
+};
+```
+
+### Single function (for nano-watch without method argument)
+
+```js
+export default n => {
+  const a = 'a', b = 'b';
+  for (let i = 0; i < n; ++i) {
+    const x = a + '-' + b;
+  }
+};
+```
+
+### Key design principle
+
+Each function takes `n` (iteration count) and runs the measured code in a `for` loop. This amortizes function-call overhead over `n` iterations, which is critical for micro-benchmarks where the measured code is faster than the overhead of calling a function.
+
+The batch size `n` is either specified via `--iterations` or auto-discovered by the tool so that one call takes at least `--ms` milliseconds.
+
+### Async functions
+
+Benchmark functions can return a Promise (be async). The tools detect thenables and measure the time until resolution.
+
+---
+
+## Deno and Bun support
+
+Use `--self` to get the script path, then run with the alternative interpreter:
+
+```bash
+# nano-bench
+bun `npx nano-bench --self` benchmark.js
+deno run -A `npx nano-bench --self` benchmark.js
+
+# nano-watch
+bun `npx nano-watch --self` benchmark.js methodName
+deno run -A `npx nano-watch --self` benchmark.js methodName
+```
+
+For Deno, `--allow-read` is required and `--allow-hrtime` is recommended. Use `-A` for convenience in safe environments.
+
+---
+
+## Statistical methods
+
+### Bootstrap resampling
+
+Used by nano-bench to estimate confidence intervals. Resamples the collected timing data `--bootstrap` times, computing the median of each resample, then takes the mean of those medians for the final estimate.
+
+### Mann-Whitney U test
+
+Nonparametric two-sample test used when comparing exactly 2 functions. Tests whether the two timing distributions are significantly different at the given `--alpha` level. Does not assume normal distribution.
+
+### Kruskal-Wallis test
+
+Nonparametric k-sample test used when comparing 3+ functions. Uses beta approximation for the critical value. If significant, performs post-hoc pairwise comparisons to identify which specific pairs differ.
+
+### Kolmogorov-Smirnov test
+
+Two-sample distribution comparison test. Available in the internal API (`src/significance/kstest.js`).
+
+### Online/streaming algorithms
+
+Used by nano-watch for indefinite monitoring with constant memory:
+
+- **StatCounter** — Welford's online algorithm for streaming mean, variance (M2), skewness (M3), and kurtosis (M4). Numerically stable single-pass computation.
+- **MedianCounter** — approximate streaming median using a hierarchical median-of-three structure. Provides O(1) memory approximate median without storing all values.

@@ -1,0 +1,80 @@
+# nano-benchmark
+
+> Command-line utilities for micro-benchmarking JavaScript code with nonparametric statistics and significance testing.
+
+## Overview
+
+nano-benchmark provides two CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U, Kruskal-Wallis) to produce statistically rigorous results. Designed for micro-benchmarks where function-call overhead matters.
+
+- NPM: https://npmjs.org/package/nano-benchmark
+- GitHub: https://github.com/uhop/nano-bench
+- Wiki: https://github.com/uhop/nano-bench/wiki
+- License: BSD-3-Clause
+- Runtime: Node.js 20+, Bun, Deno
+- Module system: ESM only (`"type": "module"`)
+
+## Installation
+
+```bash
+npm install nano-benchmark
+```
+
+## CLI tools
+
+### nano-bench
+
+Benchmarks multiple functions, compares them with bootstrap confidence intervals and significance tests, outputs a styled table.
+
+```bash
+npx nano-bench benchmark.js
+npx nano-bench -s 200 -b 2000 -a 0.01 benchmark.js
+```
+
+Options: `--ms` (measurement time, default 50), `--iterations` (overrides --ms), `--samples` (default 100), `--bootstrap` (default 1000), `--alpha` (significance level, default 0.05), `--parallel`, `--export` (default "default"), `--self`.
+
+### nano-watch
+
+Continuously benchmarks a single function in streaming mode, showing live stats (mean, stdDev, median, skewness, kurtosis, ops/sec) and memory usage.
+
+```bash
+npx nano-watch benchmark.js
+npx nano-watch benchmark.js methodName
+```
+
+Options: `--ms` (measurement time, default 500), `--iterations` (default Infinity), `--export` (default "default"), `--self`.
+
+## Benchmark file format
+
+Both tools import a module. `nano-bench` expects an object of functions; `nano-watch` can use a single function or an object with a method name argument. Each function takes `n` (iteration count) and runs the measured code in a loop:
+
+```js
+export default {
+  variant1: n => {
+    for (let i = 0; i < n; ++i) {
+      // measured code
+    }
+  },
+  variant2: n => {
+    for (let i = 0; i < n; ++i) {
+      // measured code
+    }
+  }
+};
+```
+
+## Deno and Bun support
+
+Use `--self` to get the script path for running with alternative interpreters:
+
+```bash
+bun `npx nano-bench --self` benchmark.js
+deno run -A `npx nano-bench --self` benchmark.js
+```
+
+## Statistical methods
+
+- **Bootstrap resampling** for confidence intervals (median, percentiles).
+- **Mann-Whitney U test** for comparing two samples.
+- **Kruskal-Wallis test** with post-hoc pairwise tests for comparing 3+ samples.
+- **Kolmogorov-Smirnov test** for two-sample distribution comparison.
+- **Online algorithms** (streaming mean, variance, skewness, kurtosis, approximate median) for continuous monitoring.

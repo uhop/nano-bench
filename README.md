@@ -106,6 +106,18 @@ npx nano-watch bench-strings-concat.js backticks
 
 See [wiki](https://github.com/uhop/nano-bench/wiki) for more details.
 
+## AI agents and contributing
+
+If you are an AI agent or an AI-assisted developer working on this project, read
+[AGENTS.md](./AGENTS.md) first &mdash; it contains the project rules and conventions.
+
+Other useful files:
+
+* [ARCHITECTURE.md](./ARCHITECTURE.md) &mdash; module map, dependency graph, how benchmarking works.
+* [CONTRIBUTING.md](./CONTRIBUTING.md) &mdash; development workflow and coding conventions.
+* [llms.txt](./llms.txt) &mdash; project summary for LLMs.
+* [llms-full.txt](./llms-full.txt) &mdash; detailed CLI reference for LLMs.
+
 ## License
 
 BSD 3-Clause License
