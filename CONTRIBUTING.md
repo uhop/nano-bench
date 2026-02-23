@@ -37,6 +37,13 @@ npm run test:bun                                # Run with Bun
 npm run test:deno                               # Run with Deno
 ```
 
+### Linting
+
+```bash
+npm run lint                                    # Check formatting with Prettier
+npm run lint:fix                                # Fix formatting with Prettier
+```
+
 ### Manual tests
 
 ```bash

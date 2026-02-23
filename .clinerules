@@ -37,7 +37,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 
 - **`commander`** — CLI argument parsing for both binaries.
 - **`console-toolkit`** — styled terminal output, tables, ANSI sequences.
-- **Dev only:** `tape-six`, `tape-six-proc` for testing.
+- **Dev only:** `tape-six`, `tape-six-proc` for testing; `prettier` for formatting.
 
 ## Verification commands
 
@@ -45,6 +45,8 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - `node tests/test-<name>.js` — run a single test file directly
 - `npm run test:bun` — run tests with Bun
 - `npm run test:deno` — run tests with Deno
+- `npm run lint` — check formatting with Prettier
+- `npm run lint:fix` — fix formatting with Prettier
 
 ## File layout
 

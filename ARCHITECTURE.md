@@ -111,3 +111,4 @@ bin/nano-watch.js ──→ src/bench/runner.js
 - **Run single file**: `node tests/test-<name>.js`
 - **Test files**: `tests/test-*.js` — automated unit tests
 - **Manual tests**: `manual-tests/` — visual verification scripts (run individually with `node`)
+- **Lint**: `npm run lint` (check) / `npm run lint:fix` (auto-fix)
