@@ -57,7 +57,7 @@
     "llms-full.txt"
   ],
   "devDependencies": {
-    "tape-six": "^1.7.0",
+    "tape-six": "^1.7.2",
     "tape-six-proc": "^1.2.2"
   },
   "dependencies": {
