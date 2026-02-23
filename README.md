@@ -116,6 +116,7 @@ BSD 3-Clause License
 
 ## Release history
 
+- 1.0.10: _Added Prettier lint scripts, GitHub issue templates, Copilot instructions, and Windsurf workflows._
 - 1.0.9: _Updated dependencies._
 - 1.0.8: _Updated dependencies._
 - 1.0.7: _Updated dependencies._
