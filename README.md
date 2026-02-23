@@ -3,18 +3,17 @@
 [npm-img]:      https://img.shields.io/npm/v/nano-benchmark.svg
 [npm-url]:      https://npmjs.org/package/nano-benchmark
 
-`nano-benchmark` provides command-line utilities for benchmarking code and related statistical modules.
+`nano-benchmark` provides command-line utilities for micro-benchmarking code
+with nonparametric statistics and significance testing.
 
 Two utilities are available:
 
-* `nano-watch` &mdash; provides statistics in a streaming mode continuously running your code,
-  watching memory usage and updating the output.
-* `nano-bench` &mdash; runs benchmark tests on your code, calculating statistics and
-  statistical significance, and presenting them in a tabular format.
+* `nano-watch` &mdash; continuously benchmarks a single function, showing live statistics
+  and memory usage.
+* `nano-bench` &mdash; benchmarks and compares multiple functions, calculating confidence
+  intervals and statistical significance.
 
-The utilities are mostly used to measure performance of your code and compare it with other variants.
-It is geared toward benchmarking and performance tuning of small fast snippets of code, e.g.,
-used in tight loops.
+Designed for performance tuning of small, fast code snippets used in tight loops.
 
 ## Visual samples
 
@@ -29,19 +28,14 @@ used in tight loops.
 ## Installation
 
 ```bash
-npm install --save nano-benchmark
+npm install nano-benchmark
 ```
 
 ### Deno and Bun support
 
 Both [deno](https://deno.land/) and [bun](https://bun.sh/) are supported.
 
-If you want to run the benchmark in Deno, Bun, etc. you can specify `self` as the `file` argument
-or the `--self` option.
-In this case the utility will print out its file name to `stdout` and exit. It allows running
-the utility with alternative JavaScript interpreters.
-
-Examples with `bash`:
+Use `--self` to get the script path for running with alternative interpreters:
 
 ```bash
 npx nano-bench benchmark.js
@@ -51,9 +45,8 @@ deno run -A `npx nano-bench --self` benchmark.js
 node `npx nano-bench --self` benchmark.js
 ```
 
-Don't forget to specify the appropriate permissions for Deno to run the benchmark scripts:
-`--allow-read` (required) and `--allow-hrtime` (optional but recommended). Or consider using
-`-A` or `--allow-all` to allow all permissions (used it only in safe environments!).
+For Deno, `--allow-read` is required and `--allow-hrtime` is recommended.
+Use `-A` for convenience in safe environments.
 
 ## Documentation
 
@@ -64,10 +57,9 @@ your `package.json` file or from the command line by prefixing them with `npx`, 
 
 Utilities are self-documented &mdash; run them with `--help` flag to learn about arguments.
 
-Both utilities import a module to benchmark using its (default) export.
-`nano-bench` assumes that it is an object with functional properties,
-which should be benchmarked and compared. `nano-watch` can use the same file format
-as `nano-bench` or it can use a single function.
+Both utilities import a module and benchmark its (default) export.
+`nano-bench` expects an object whose properties are the functions to compare.
+`nano-watch` accepts the same format or a single function.
 
 Example of a module for `nano-bench` called `bench-strings-concat.js`:
 
@@ -97,7 +89,7 @@ export default {
 };
 ```
 
-The way to use it:
+Usage:
 
 ```bash
 npx nano-bench bench-strings-concat.js
