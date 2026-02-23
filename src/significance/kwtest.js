@@ -37,7 +37,7 @@ export const rankData = groups => {
   for (let i = 0; i < t.length; ++i) {
     const x = t[i].rank - avgRank;
     denominator += x * x;
-    S2 = t[i].rank * t[i].rank - avgRankC;
+    S2 += t[i].rank * t[i].rank - avgRankC;
   }
 
   S2 /= N - 1;

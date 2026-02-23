@@ -1,8 +1,5 @@
 import erf from './erf.js';
 
-const LIMIT = 1000;
-const EPSILON = 1e-30;
-
 const SQRT_2 = Math.sqrt(2),
   SQRT_2_PI = Math.sqrt(2 * Math.PI);
 

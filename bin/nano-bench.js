@@ -299,8 +299,6 @@ if (results.length > 1) {
   if (significance) {
     const sortedStats = stats.slice().sort((a, b) => a.median - b.median),
       tableData = [['  ', bold('#'), bold('name')]];
-    let rabbitIndex = -1,
-      turtleIndex = -1;
     for (let i = 0; i < names.length; ++i) {
       tableData[0].push({value: bold(formatInteger(i + 1)), align: 'c'});
       const row = [null, formatInteger(i + 1), bold(names[i])],
