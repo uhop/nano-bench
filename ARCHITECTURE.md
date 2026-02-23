@@ -52,8 +52,16 @@ Users write a module that default-exports an object of functions. Each function 
 
 ```js
 export default {
-  variant1: n => { for (let i = 0; i < n; ++i) { /* code */ } },
-  variant2: n => { for (let i = 0; i < n; ++i) { /* code */ } }
+  variant1: n => {
+    for (let i = 0; i < n; ++i) {
+      /* code */
+    }
+  },
+  variant2: n => {
+    for (let i = 0; i < n; ++i) {
+      /* code */
+    }
+  }
 };
 ```
 

@@ -17,7 +17,8 @@ const isPalindromeSubstring = s => {
 const isPalindromeIndex = s => {
   if (s.length <= 1) return true;
 
-  let l = 0, r = s.length - 1;
+  let l = 0,
+    r = s.length - 1;
   while (l < r) {
     if (s[l] !== s[r]) break;
     ++l;

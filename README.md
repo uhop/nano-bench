@@ -1,16 +1,16 @@
 # nano-benchmark [![NPM version][npm-img]][npm-url]
 
-[npm-img]:      https://img.shields.io/npm/v/nano-benchmark.svg
-[npm-url]:      https://npmjs.org/package/nano-benchmark
+[npm-img]: https://img.shields.io/npm/v/nano-benchmark.svg
+[npm-url]: https://npmjs.org/package/nano-benchmark
 
 `nano-benchmark` provides command-line utilities for micro-benchmarking code
 with nonparametric statistics and significance testing.
 
 Two utilities are available:
 
-* `nano-watch` &mdash; continuously benchmarks a single function, showing live statistics
+- `nano-watch` &mdash; continuously benchmarks a single function, showing live statistics
   and memory usage.
-* `nano-bench` &mdash; benchmarks and compares multiple functions, calculating confidence
+- `nano-bench` &mdash; benchmarks and compares multiple functions, calculating confidence
   intervals and statistical significance.
 
 Designed for performance tuning of small, fast code snippets used in tight loops.
@@ -105,10 +105,10 @@ If you are an AI agent or an AI-assisted developer working on this project, read
 
 Other useful files:
 
-* [ARCHITECTURE.md](./ARCHITECTURE.md) &mdash; module map, dependency graph, how benchmarking works.
-* [CONTRIBUTING.md](./CONTRIBUTING.md) &mdash; development workflow and coding conventions.
-* [llms.txt](./llms.txt) &mdash; project summary for LLMs.
-* [llms-full.txt](./llms-full.txt) &mdash; detailed CLI reference for LLMs.
+- [ARCHITECTURE.md](./ARCHITECTURE.md) &mdash; module map, dependency graph, how benchmarking works.
+- [CONTRIBUTING.md](./CONTRIBUTING.md) &mdash; development workflow and coding conventions.
+- [llms.txt](./llms.txt) &mdash; project summary for LLMs.
+- [llms-full.txt](./llms-full.txt) &mdash; detailed CLI reference for LLMs.
 
 ## License
 
@@ -116,13 +116,13 @@ BSD 3-Clause License
 
 ## Release history
 
-* 1.0.9: *Updated dependencies.*
-* 1.0.8: *Updated dependencies.*
-* 1.0.7: *Updated dependencies.*
-* 1.0.6: *Updated dependencies.*
-* 1.0.5: *Updated dependencies.*
-* 1.0.4: *Updated dependencies + added more tests.*
-* 1.0.3: *Updated dependencies.*
-* 1.0.2: *Added the `--self` option.*
-* 1.0.1: *Added "self" argument to utilities so it can be used with Deno, Bun, etc.*
-* 1.0.0: *Initial release.*
+- 1.0.9: _Updated dependencies._
+- 1.0.8: _Updated dependencies._
+- 1.0.7: _Updated dependencies._
+- 1.0.6: _Updated dependencies._
+- 1.0.5: _Updated dependencies._
+- 1.0.4: _Updated dependencies + added more tests._
+- 1.0.3: _Updated dependencies._
+- 1.0.2: _Added the `--self` option._
+- 1.0.1: _Added "self" argument to utilities so it can be used with Deno, Bun, etc._
+- 1.0.0: _Initial release._

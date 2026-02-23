@@ -33,7 +33,8 @@ export const rank = groups => {
     }
     i = ahead;
   }
-  const avgRank = (N + 1) / 2, avgGroupRank = groupRank.map((rank, i) => rank / groups[i].length);
+  const avgRank = (N + 1) / 2,
+    avgGroupRank = groupRank.map((rank, i) => rank / groups[i].length);
 
   return {ranked: t, N, k, avgRank, groupRank, avgGroupRank, groups};
 };

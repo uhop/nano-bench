@@ -1,11 +1,11 @@
-import bsearch from "nano-benchmark/utils/bsearch.js";
+import bsearch from 'nano-benchmark/utils/bsearch.js';
 
 const testArray = [1, 2, 3, 3, 3, 4, 4];
 
 const test = (value, sortedArray = testArray) => {
   const index = bsearch(sortedArray, x => x < value);
   console.log(value, index, '[' + sortedArray.join(', ') + ']');
-}
+};
 
 test(0);
 test(0.5);

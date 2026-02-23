@@ -66,8 +66,16 @@ Benchmark files default-export an object of functions. Each function takes `n` (
 
 ```js
 export default {
-  variant1: n => { for (let i = 0; i < n; ++i) { /* measured code */ } },
-  variant2: n => { for (let i = 0; i < n; ++i) { /* measured code */ } }
+  variant1: n => {
+    for (let i = 0; i < n; ++i) {
+      /* measured code */
+    }
+  },
+  variant2: n => {
+    for (let i = 0; i < n; ++i) {
+      /* measured code */
+    }
+  }
 };
 ```
 

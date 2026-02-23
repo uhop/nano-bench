@@ -24,7 +24,7 @@ export const rk23 = (fn, {a = 0, b = 1, tolerance = 1e-6, initialValue = 0} = {}
 
     if (error < maxError) {
       ts.push((t += h));
-      us.push(u = uNew);
+      us.push((u = uNew));
       s1 = s4;
     }
 

@@ -22,7 +22,10 @@ const compare = async (inputs, options = {}, report) => {
   report?.('calculating-significance', {stats, options});
   let results;
   if (keys.length > 2) {
-    results = kwtest(stats.map(stat => stat.data), options.alpha);
+    results = kwtest(
+      stats.map(stat => stat.data),
+      options.alpha
+    );
   } else {
     results = mwtest(stats[0].data, stats[1].data, options.alpha);
   }
