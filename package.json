@@ -60,12 +60,12 @@
   ],
   "devDependencies": {
     "prettier": "^3.8.1",
-    "tape-six": "^1.7.2",
-    "tape-six-proc": "^1.2.3"
+    "tape-six": "^1.7.8",
+    "tape-six-proc": "^1.2.5"
   },
   "dependencies": {
     "commander": "^14.0.3",
-    "console-toolkit": "^1.2.11"
+    "console-toolkit": "^1.2.12"
   },
   "tape6": {
     "tests": [
