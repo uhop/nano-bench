@@ -28,4 +28,29 @@ test('median()', t => {
   t.test('uniform values', t => {
     t.equal(median([7, 7, 7, 7, 7, 7, 7, 7, 7]), 7);
   });
+
+  t.test('two elements', t => {
+    const data = [10, 20];
+    const result = median(data);
+    t.ok(data.includes(result));
+  });
+
+  t.test('even-length array', t => {
+    const data = [4, 2, 6, 8];
+    const result = median(data);
+    t.ok(data.includes(result));
+  });
+
+  t.test('larger array returns a value from input', t => {
+    const data = [15, 3, 9, 21, 7, 12, 18, 1, 6, 24, 30, 2, 11, 5, 27];
+    const original = data.slice();
+    const result = median(data);
+    t.ok(original.includes(result));
+  });
+
+  t.test('descending sequence', t => {
+    const data = [9, 8, 7, 6, 5, 4, 3, 2, 1];
+    const result = median(data);
+    t.ok(result >= 1 && result <= 9);
+  });
 });

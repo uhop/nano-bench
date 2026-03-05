@@ -54,6 +54,22 @@ test('StatCounter', t => {
   });
 });
 
+test('StatCounter sampleVariance', t => {
+  t.test('sampleVariance = M2 / (n - 1)', t => {
+    const data = [2, 4, 6, 8, 10];
+    const counter = new StatCounter();
+    for (const v of data) counter.add(v);
+    t.ok(approx(counter.sampleVariance, counter.variance * (data.length / (data.length - 1))));
+  });
+
+  t.test('sampleVariance > variance for n > 1', t => {
+    const counter = new StatCounter();
+    counter.add(1);
+    counter.add(10);
+    t.ok(counter.sampleVariance > counter.variance);
+  });
+});
+
 test('streamStats()', t => {
   t.test('matches batch stats', t => {
     const data = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20];
@@ -61,5 +77,19 @@ test('streamStats()', t => {
     t.ok(approx(result.mean, mean(data)));
     t.ok(approx(result.variance, variance(data)));
     t.equal(result.count, data.length);
+  });
+
+  t.test('returns skewness and kurtosis', t => {
+    const data = [1, 1, 1, 2, 5, 8, 12, 15, 20];
+    const result = streamStats(data);
+    t.ok(approx(result.skewness, skewness(data), 1e-6));
+    t.ok(approx(result.kurtosis, kurtosis(data) - 3, 1e-6));
+  });
+
+  t.test('returns sampleVariance', t => {
+    const data = [2, 4, 6, 8, 10];
+    const result = streamStats(data);
+    t.equal(typeof result.sampleVariance, 'number');
+    t.ok(result.sampleVariance > result.variance);
   });
 });

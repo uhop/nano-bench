@@ -56,6 +56,32 @@ test('MedianCounter', t => {
     const second = mc.get();
     t.equal(first, second);
   });
+
+  t.test('many values exercises hierarchy', t => {
+    const mc = new MedianCounter();
+    for (let i = 0; i < 100; ++i) mc.add(i);
+    const result = mc.get();
+    t.equal(typeof result, 'number');
+    t.ok(result >= 0 && result < 100);
+  });
+
+  t.test('custom limit constrains array depth', t => {
+    const mc = new MedianCounter(3);
+    for (let i = 0; i < 50; ++i) mc.add(i);
+    const result = mc.get();
+    t.equal(typeof result, 'number');
+    t.ok(mc.array.length <= 3);
+  });
+
+  t.test('add after get is stable', t => {
+    const mc = new MedianCounter();
+    for (let i = 1; i <= 9; ++i) mc.add(i);
+    const before = mc.get();
+    mc.add(5);
+    const after = mc.get();
+    t.equal(typeof before, 'number');
+    t.equal(typeof after, 'number');
+  });
 });
 
 test('streamMedian()', t => {
