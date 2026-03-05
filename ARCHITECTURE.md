@@ -28,7 +28,7 @@ src/                          # Internal source (shipped via npm)
 │   ├── zeta.js                     # Riemann zeta function
 │   ├── gamma.js                    # Gamma function (log-gamma)
 │   ├── erf.js                      # Error function
-│   ├── ppf.js                      # Generic PPF via bisection
+│   ├── ppf.js                      # Generic PPF via Runge-Kutta integration
 │   └── rank.js                     # Ranking with tie correction
 └── utils/
     ├── bsearch.js                  # Binary search

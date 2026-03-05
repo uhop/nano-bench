@@ -50,10 +50,9 @@ Use `-A` for convenience in safe environments.
 
 ## Documentation
 
-Both utilities are available by name if you installed `nano-benchmark` globally
-(`npm install -g nano-benchmark`).
-If it is installed as a dependency, you can use utilities by name in the `scripts` section of
-your `package.json` file or from the command line by prefixing them with `npx`, e.g., `npx nano-watch`.
+Both utilities are available by name with a global install (`npm install -g nano-benchmark`).
+Otherwise, prefix with `npx` (e.g., `npx nano-watch`) or use them in the `scripts` section of
+your `package.json`.
 
 Utilities are self-documented &mdash; run them with `--help` flag to learn about arguments.
 
