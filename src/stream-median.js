@@ -74,7 +74,7 @@ export class MedianCounter {
   }
 
   clone() {
-    const newMedian = new MedianCounter();
+    const newMedian = new MedianCounter(this.limit);
     for (const counter of this.array) {
       newMedian.array.push(counter.slice());
     }
