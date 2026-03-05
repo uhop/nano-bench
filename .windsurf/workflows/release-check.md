@@ -18,8 +18,8 @@ Run through this checklist before publishing a new version.
    - `exports` map covers any new modules added since the last release.
 7. Bump `version` in `package.json`.
 8. Update release history in `README.md`.
-9. Run `npm install` to regenerate `package-lock.json`.
-   // turbo
+9.  Run `npm install` to regenerate `package-lock.json`.
+    // turbo
 10. Run the full test suite with Node: `npm test`
     // turbo
 11. Run tests with Bun: `npm run test:bun`
