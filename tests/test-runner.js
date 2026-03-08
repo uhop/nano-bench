@@ -1,6 +1,6 @@
 import test from 'tape-six';
 
-import {Stats, wrapper, benchmark} from 'nano-benchmark/bench/runner.js';
+import {Stats, wrapper, benchmark, findLevel} from 'nano-benchmark/bench/runner.js';
 
 test('Stats', t => {
   t.test('ensureSorted sorts data', t => {
@@ -58,6 +58,50 @@ test('wrapper()', t => {
   t.test('returns undefined', t => {
     const wrapped = wrapper(() => 42);
     t.equal(wrapped(3), undefined);
+  });
+});
+
+test('findLevel()', t => {
+  t.test('returns a positive number for a sync function', async t => {
+    const fn = n => {
+      let s = 0;
+      for (let i = 0; i < n; ++i) s += i;
+    };
+    const level = await findLevel(fn, {threshold: 1});
+    t.equal(typeof level, 'number');
+    t.ok(level >= 1);
+  });
+
+  t.test('works with an async function', async t => {
+    const fn = async n => {
+      let s = 0;
+      for (let i = 0; i < n; ++i) s += i;
+    };
+    const level = await findLevel(fn, {threshold: 1});
+    t.equal(typeof level, 'number');
+    t.ok(level >= 1);
+  });
+
+  t.test('respects startFrom option', async t => {
+    const fn = n => {
+      let s = 0;
+      for (let i = 0; i < n; ++i) s += i;
+    };
+    const level = await findLevel(fn, {threshold: 1, startFrom: 1000});
+    t.ok(level >= 1000);
+  });
+
+  t.test('invokes the report callback', async t => {
+    const fn = n => {
+      let s = 0;
+      for (let i = 0; i < n; ++i) s += i;
+    };
+    const events = [];
+    await findLevel(fn, {threshold: 1}, (name, data) => {
+      events.push(name);
+    });
+    t.ok(events.length > 0);
+    t.ok(events.includes('finding-level'));
   });
 });
 
