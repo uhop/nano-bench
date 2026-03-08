@@ -55,6 +55,7 @@
   "files": [
     "src",
     "bin",
+    "skills",
     "llms.txt",
     "llms-full.txt"
   ],

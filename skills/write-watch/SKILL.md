@@ -1,4 +1,5 @@
 ---
+name: write-watch
 description: Write a benchmark file for nano-watch (continuous single-function monitoring). Use when asked to create a watch benchmark, monitor performance over time, or check for memory leaks.
 ---
 

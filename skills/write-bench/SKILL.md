@@ -1,4 +1,5 @@
 ---
+name: write-bench
 description: Write a benchmark file for nano-bench (comparing multiple functions). Use when asked to create a benchmark, compare implementations, or measure performance of code variants.
 ---
 
