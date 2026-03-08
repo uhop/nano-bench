@@ -22,8 +22,8 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for a detailed module map and dependenc
 - `bin/` — CLI entry points (`nano-bench`, `nano-watch`)
 - `src/` — internal source (stats, significance, bench runner, streaming counters, utils)
 - `tests/` — automated tests (`test-*.js`)
-- `manual-tests/` — manual/visual test scripts
 - `bench/` — example benchmark files
+- `skills/` — AI coding skills (shipped via npm)
 - `wiki/` — GitHub wiki (git submodule)
 
 ## Development workflow
@@ -42,12 +42,6 @@ npm run test:deno                               # Run with Deno
 ```bash
 npm run lint                                    # Check formatting with Prettier
 npm run lint:fix                                # Fix formatting with Prettier
-```
-
-### Manual tests
-
-```bash
-node manual-tests/test-<name>.js
 ```
 
 ### Running the CLIs locally
@@ -97,7 +91,7 @@ export default {
 ### New significance test
 
 1. Create `src/significance/<name>.js`.
-2. Add tests and/or a manual test in `manual-tests/`.
+2. Add tests in `tests/`.
 3. Run `npm test`.
 
 ### New CLI option

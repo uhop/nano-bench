@@ -1,6 +1,6 @@
 {
   "name": "nano-benchmark",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "CLI micro-benchmarking with nonparametric statistics and significance testing.",
   "type": "module",
   "main": "src/index.js",

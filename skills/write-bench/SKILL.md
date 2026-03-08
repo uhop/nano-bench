@@ -92,8 +92,12 @@ By default the tool uses the `default` export. To use a named export:
 
 ```js
 export const myBench = {
-  a: n => { /* ... */ },
-  b: n => { /* ... */ }
+  a: n => {
+    // ...
+  },
+  b: n => {
+    // ...
+  }
 };
 ```
 

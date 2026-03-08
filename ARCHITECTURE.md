@@ -39,8 +39,10 @@ bench/                        # Example benchmark files
 ├── bench-string2-concat.js         # Example: another string comparison
 ├── bench-substrings.js             # Example: substring extraction methods
 └── watch-sample.js                 # Example: single function for nano-watch
+skills/                       # AI coding skills (shipped via npm)
+├── write-bench/SKILL.md           # How to write nano-bench benchmark files
+└── write-watch/SKILL.md           # How to write nano-watch benchmark files
 tests/                        # Automated tests (tape-six)
-manual-tests/                 # Manual/visual test scripts
 wiki/                         # GitHub wiki (git submodule)
 ```
 
@@ -110,5 +112,4 @@ bin/nano-watch.js ──→ src/bench/runner.js
 - **Run**: `npm test` (also supports Bun and Deno variants)
 - **Run single file**: `node tests/test-<name>.js`
 - **Test files**: `tests/test-*.js` — automated unit tests
-- **Manual tests**: `manual-tests/` — visual verification scripts (run individually with `node`)
 - **Lint**: `npm run lint` (check) / `npm run lint:fix` (auto-fix)
