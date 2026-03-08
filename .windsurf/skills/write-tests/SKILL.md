@@ -1,5 +1,6 @@
 ---
-description: Write or update tape-six tests for a module or feature
+name: write-tests
+description: Write or update tape-six tests for a module or feature. Use when asked to write tests, add test coverage, or create test files.
 ---
 
 # Write Tests
