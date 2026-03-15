@@ -89,7 +89,7 @@ nano-watch [options] <file> [method]
 
 ### Options
 
-- `-m, --ms <ms>` — milliseconds per measurement iteration (default: 500).
+- `-m, --ms <ms>` — measurement time in milliseconds per sample (default: 500).
 - `-i, --iterations <number>` — number of iterations to run (default: Infinity).
 - `-e, --export <name>` — name of the export to use from the file (default: `"default"`).
 - `--self` — print the script's file path to stdout and exit.

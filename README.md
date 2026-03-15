@@ -111,6 +111,7 @@ BSD 3-Clause License
 
 ## Release history
 
+- 1.0.13: _Improved CLI help texts and documentation for brevity and clarity._
 - 1.0.12: _Added AI coding skills for writing benchmark files (write-bench, write-watch), shipped via npm. Added findLevel() tests. Expanded test suite._
 - 1.0.11: _Fixed MedianCounter.clone() bug, expanded test suite (204 tests), added CodeQL workflow, multi-OS CI matrix, and new Windsurf workflows._
 - 1.0.10: _Added Prettier lint scripts, GitHub issue templates, Copilot instructions, and Windsurf workflows._
