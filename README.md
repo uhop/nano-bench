@@ -33,9 +33,7 @@ npm install nano-benchmark
 
 ### Deno and Bun support
 
-Both [deno](https://deno.land/) and [bun](https://bun.sh/) are supported.
-
-Use `--self` to get the script path for running with alternative interpreters:
+Use `--self` to get the script path for [Deno](https://deno.land/) and [Bun](https://bun.sh/):
 
 ```bash
 npx nano-bench benchmark.js
@@ -50,17 +48,15 @@ Use `-A` for convenience in safe environments.
 
 ## Documentation
 
-Both utilities are available by name with a global install (`npm install -g nano-benchmark`).
-Otherwise, prefix with `npx` (e.g., `npx nano-watch`) or use them in the `scripts` section of
-your `package.json`.
-
-Utilities are self-documented &mdash; run them with `--help` flag to learn about arguments.
+With a global install (`npm install -g nano-benchmark`) both utilities are available by name.
+Otherwise, prefix with `npx` (e.g., `npx nano-watch`) or add them to your `package.json` scripts.
+Run with `--help` for details on arguments.
 
 Both utilities import a module and benchmark its (default) export.
 `nano-bench` expects an object whose properties are the functions to compare.
 `nano-watch` accepts the same format or a single function.
 
-Example of a module for `nano-bench` called `bench-strings-concat.js`:
+Example module for `nano-bench` (`bench-strings-concat.js`):
 
 ```js
 export default {
@@ -99,8 +95,8 @@ See [wiki](https://github.com/uhop/nano-bench/wiki) for more details.
 
 ## AI agents and contributing
 
-If you are an AI agent or an AI-assisted developer working on this project, read
-[AGENTS.md](./AGENTS.md) first &mdash; it contains the project rules and conventions.
+AI agents and AI-assisted developers: read [AGENTS.md](./AGENTS.md) first for project rules
+and conventions.
 
 Other useful files:
 

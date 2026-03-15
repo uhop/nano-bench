@@ -48,7 +48,7 @@ const showSelf = () => {
 program
   .name('nano-bench')
   .version(pkg.version)
-  .description('Small utility to benchmark and compare code.')
+  .description('Benchmark and compare code.')
   .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits')
   .option('-m, --ms <ms>', 'measurement time in milliseconds', toInt, 50)
   .addOption(
@@ -57,12 +57,12 @@ program
       .argParser(toInt)
   )
   .option('--min-iterations <min-iterations>', 'minimum number of iterations', toInt, 1)
-  .option('-e, --export <name>', 'name of the export in the file', 'default')
+  .option('-e, --export <name>', 'name of the export', 'default')
   .option('-a, --alpha <alpha>', 'significance level', toFloat, 0.05)
   .option('-s, --samples <samples>', 'number of samples', toInt, 100)
-  .option('-p, --parallel', 'take samples in parallel asynchronously')
+  .option('-p, --parallel', 'collect samples in parallel')
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
-  .option('--self', 'returns the file name to stdout and exits')
+  .option('--self', 'print the file name to stdout and exit')
   .showHelpAfterError('(add --help to see available options)');
 
 program.on('option:self', showSelf);

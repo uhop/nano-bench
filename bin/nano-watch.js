@@ -42,15 +42,15 @@ const showSelf = () => {
 
 program
   .name('nano-watch')
-  .description('Small utility to continuously benchmark code.')
+  .description('Continuously benchmark code.')
   .version(pkg.version)
-  .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits')
+  .argument('<file>', 'File to benchmark.\nIf "self", prints its file name to stdout and exits')
   .argument('[method]', 'Method name to benchmark')
-  .option('-m, --ms <ms>', 'milliseconds per iteration', value => parseInt(value), 500)
+  .option('-m, --ms <ms>', 'measurement time in milliseconds', value => parseInt(value), 500)
   .option('-i, --iterations <number>', 'number of iterations (default: Infinity)', value =>
     parseInt(value)
   )
-  .option('-e, --export <name>', 'name of the export in the file', 'default')
+  .option('-e, --export <name>', 'name of the export', 'default')
   .option('--self', 'print the file name to stdout and exit')
   .showHelpAfterError('(add --help to see available options)');
 
