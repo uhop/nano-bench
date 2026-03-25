@@ -1,9 +1,12 @@
 // Kruskal-Wallis significance test
-// based on https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_one-way_analysis_of_variance
-// beta approximation: https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.661.7863&rep=rep1&type=pdf
+// https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_one-way_analysis_of_variance
+// beta approximation for H: https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.661.7863&rep=rep1&type=pdf
+// Conover-Iman post-hoc pairwise comparisons (Fisher's LSD on ranks):
+//   https://www.statsdirect.com/help/nonparametric_methods/kruskal_wallis.htm
+//   uses Student t(N-k) critical value, approximated here by z for large df
 
 import betaPpf from '../stats/beta-ppf.js';
-import chiSquaredPpf from '../stats/chi-squared-ppf.js';
+import zPpf from '../stats/z-ppf.js';
 import rank, {getTotal} from '../stats/rank.js';
 
 export const getParameters = (groups, N = getTotal(groups)) => {
@@ -29,18 +32,18 @@ export const rankData = groups => {
   for (let i = 0; i < avgGroupRank.length; ++i) {
     const x = avgGroupRank[i] - avgRank;
     numerator += groups[i].length * x * x;
-    T += (groupRank[i] * groupRank[i]) / groups[i].length - avgRankC;
+    T += (groupRank[i] * groupRank[i]) / groups[i].length;
   }
+  T -= avgRankC;
 
   let denominator = 0,
     S2 = 0;
   for (let i = 0; i < t.length; ++i) {
     const x = t[i].rank - avgRank;
     denominator += x * x;
-    S2 += t[i].rank * t[i].rank - avgRankC;
+    S2 += t[i].rank * t[i].rank;
   }
-
-  S2 /= N - 1;
+  S2 = (S2 - avgRankC) / (N - 1);
   T /= S2;
 
   // calculate and return H statistics
@@ -57,10 +60,11 @@ export const kwtest = (sortedArrays, alpha = 0.05) => {
 
   if (!results.different || k < 3) return results;
 
-  // post-hoc tests
+  // Conover-Iman post-hoc: pairwise significance using t(N-k), approximated by z.
+  // groupDifference[i][j] is true when pair (i,j) is significantly different.
 
   const m = new Array(k),
-    C = chiSquaredPpf(1 - alpha / 2, N - k) * Math.sqrt((S2 * (N - 1 - T)) / (N - k));
+    C = zPpf(1 - alpha / 2) * Math.sqrt((S2 * (N - 1 - T)) / (N - k));
 
   for (let i = 0; i < k; ++i) {
     m[i] = new Array(k);

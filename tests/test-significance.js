@@ -62,6 +62,19 @@ test('kwtest()', t => {
     }
   });
 
+  t.test('post-hoc detects pairwise differences for distinct groups', t => {
+    const result = kwtest(
+      [sort([1, 2, 3, 4, 5]), sort([50, 60, 70, 80, 90]), sort([200, 300, 400, 500, 600])],
+      0.05
+    );
+    t.equal(result.different, true);
+    t.ok(result.groupDifference);
+    const m = result.groupDifference;
+    t.equal(m[0][1], true);
+    t.equal(m[0][2], true);
+    t.equal(m[1][2], true);
+  });
+
   t.test('throws with fewer than 2 groups', t => {
     t.throws(() => kwtest([sort([1, 2, 3])], 0.05));
   });
