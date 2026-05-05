@@ -1,6 +1,16 @@
+import {performance} from 'node:perf_hooks';
+
 import test from 'tape-six';
 
-import {Stats, wrapper, benchmark, findLevel} from 'nano-benchmark/bench/runner.js';
+import {
+  Stats,
+  wrapper,
+  benchmark,
+  findLevel,
+  benchmarkSeries,
+  benchmarkSeriesPar,
+  measure
+} from 'nano-benchmark/bench/runner.js';
 
 test('Stats', t => {
   t.test('ensureSorted sorts data', t => {
@@ -97,7 +107,7 @@ test('findLevel()', t => {
       for (let i = 0; i < n; ++i) s += i;
     };
     const events = [];
-    await findLevel(fn, {threshold: 1}, (name, data) => {
+    await findLevel(fn, {threshold: 1}, name => {
       events.push(name);
     });
     t.ok(events.length > 0);
@@ -125,4 +135,92 @@ test('benchmark()', t => {
     t.equal(typeof time, 'number');
     t.ok(time >= 0);
   });
+});
+
+test('observe option (User Timing API)', t => {
+  const noop = n => {
+    let s = 0;
+    for (let i = 0; i < n; ++i) s += i;
+  };
+
+  const namesOf = entries => entries.map(e => e.name);
+
+  t.test('findLevel emits no marks by default', async t => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    await findLevel(noop, {threshold: 1});
+    t.equal(performance.getEntriesByType('mark').length, 0);
+    t.equal(performance.getEntriesByType('measure').length, 0);
+  });
+
+  t.test('findLevel with observe emits one mark and one measure', async t => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    await findLevel(noop, {threshold: 1, observe: 'unit-test'});
+    t.deepEqual(namesOf(performance.getEntriesByType('mark')), [
+      'nano-bench/unit-test/find-level:start'
+    ]);
+    t.deepEqual(namesOf(performance.getEntriesByType('measure')), [
+      'nano-bench/unit-test/find-level'
+    ]);
+  });
+
+  t.test('benchmarkSeries with observe emits a series mark/measure', async t => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    await benchmarkSeries(noop, 1, {nSeries: 2, observe: 'series-test'});
+    t.deepEqual(namesOf(performance.getEntriesByType('mark')), [
+      'nano-bench/series-test/series:start'
+    ]);
+    t.deepEqual(namesOf(performance.getEntriesByType('measure')), [
+      'nano-bench/series-test/series'
+    ]);
+  });
+
+  t.test('benchmarkSeriesPar with observe emits a series-par mark/measure', async t => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    await benchmarkSeriesPar(noop, 1, {nSeries: 2, observe: 'par-test'});
+    t.deepEqual(namesOf(performance.getEntriesByType('mark')), [
+      'nano-bench/par-test/series-par:start'
+    ]);
+    t.deepEqual(namesOf(performance.getEntriesByType('measure')), [
+      'nano-bench/par-test/series-par'
+    ]);
+  });
+
+  t.test('measure() with observe threads through to find-level + series', async t => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    await measure(noop, {nSeries: 2, threshold: 1, observe: 'thread-test'});
+    t.deepEqual(namesOf(performance.getEntriesByType('mark')).sort(), [
+      'nano-bench/thread-test/find-level:start',
+      'nano-bench/thread-test/series:start'
+    ]);
+    t.deepEqual(namesOf(performance.getEntriesByType('measure')).sort(), [
+      'nano-bench/thread-test/find-level',
+      'nano-bench/thread-test/series'
+    ]);
+  });
+
+  t.test('observe: true uses default label', async t => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    await findLevel(noop, {threshold: 1, observe: true});
+    t.deepEqual(namesOf(performance.getEntriesByType('mark')), [
+      'nano-bench/default/find-level:start'
+    ]);
+  });
+
+  t.test('measure entries record positive duration', async t => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    await findLevel(noop, {threshold: 1, observe: 'duration-test'});
+    const measures = performance.getEntriesByType('measure');
+    t.equal(measures.length, 1);
+    t.ok(measures[0].duration >= 0);
+  });
+
+  performance.clearMarks();
+  performance.clearMeasures();
 });

@@ -30,7 +30,7 @@ npx nano-bench benchmark.js
 npx nano-bench -s 200 -b 2000 -a 0.01 benchmark.js
 ```
 
-Options: `--ms` (measurement time, default 50), `--iterations` (overrides --ms), `--samples` (default 100), `--bootstrap` (default 1000), `--alpha` (significance level, default 0.05), `--parallel`, `--export` (default "default"), `--self`.
+Options: `--ms` (measurement time, default 50), `--iterations` (overrides --ms), `--samples` (default 100), `--bootstrap` (default 1000), `--alpha` (significance level, default 0.05), `--parallel`, `--observe` (emit User Timing marks at phase boundaries), `--export` (default "default"), `--self`.
 
 ### nano-watch
 

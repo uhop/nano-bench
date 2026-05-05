@@ -93,6 +93,37 @@ npx nano-watch bench-strings-concat.js backticks
 
 See [wiki](https://github.com/uhop/nano-bench/wiki) for more details.
 
+## User Timing API integration
+
+Pass `-o` / `--observe` to `nano-bench` to emit
+[User Timing](https://developer.mozilla.org/en-US/docs/Web/API/Performance_API/User_timing)
+marks at calibration and sampling phase boundaries. Marks are written to the
+standard performance timeline and are observable via `PerformanceObserver` or
+visible in DevTools / `node --inspect` traces &mdash; useful for correlating
+benchmark variability with GC pauses, V8 optimization events, etc.
+
+Mark / measure names follow `nano-bench/<function-name>/<phase>`, where phase is
+`find-level` (calibration) or `series` / `series-par` (sample collection).
+
+```js
+import {PerformanceObserver} from 'node:perf_hooks';
+
+const obs = new PerformanceObserver(list => {
+  for (const e of list.getEntries()) {
+    console.log(e.name, e.duration.toFixed(2), 'ms');
+  }
+});
+obs.observe({entryTypes: ['measure']});
+```
+
+Marks have a small fixed cost per phase (no per-sample overhead), so leaving
+`--observe` on does not affect measurement accuracy. Default is off.
+
+Library users can opt in directly: `findLevel` / `benchmarkSeries` /
+`benchmarkSeriesPar` / `measure` / `measurePar` all accept an `observe` option
+(`boolean | string`) &mdash; `false` / unset for no marks, `true` for the default
+label, or a string for a custom label.
+
 ## AI agents and contributing
 
 AI agents and AI-assisted developers: read [AGENTS.md](./AGENTS.md) first for project rules

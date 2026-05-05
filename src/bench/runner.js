@@ -1,5 +1,21 @@
 import {performance} from 'node:perf_hooks';
 
+/**
+ * @typedef {boolean | string} Observe
+ *   false / undefined — no instrumentation; true — emit marks with label "default";
+ *   string — emit marks with the given label.
+ */
+
+const makeObserver = (observe, defaultLabel) => {
+  if (!observe) return null;
+  const label = typeof observe === 'string' ? observe : defaultLabel;
+  const prefix = `nano-bench/${label}`;
+  return {
+    mark: phase => performance.mark(`${prefix}/${phase}:start`),
+    measure: phase => performance.measure(`${prefix}/${phase}`, `${prefix}/${phase}:start`)
+  };
+};
+
 export const nextLevel = n => {
   if (n < 1) return 1;
   let exp = 0;
@@ -20,33 +36,45 @@ export const nextLevel = n => {
   return n;
 };
 
-export const findLevel = (fn, {threshold = 20, startFrom = 1, timeout = 5} = {}, report) =>
-  new Promise((resolve, reject) => {
-    const bench = async n => {
-      report && (await report('finding-level', {n}));
-      try {
-        const start = performance.now(),
-          result = fn(n),
-          finish = performance.now();
-        if (result && typeof result.then == 'function') {
-          // thenable
-          result.then(async () => {
-            const finish = performance.now();
-            if (finish - start >= threshold) return resolve(n);
-            report && (await report('finding-level-next', {n, time: finish - start}));
-            setTimeout(bench, timeout, nextLevel(n));
-          }, reject);
-          return;
+/**
+ * @param {{threshold?: number, startFrom?: number, timeout?: number, observe?: Observe}} [opts]
+ * @param {Function} [report]
+ */
+export const findLevel = async (fn, opts = {}, report) => {
+  const {threshold = 20, startFrom = 1, timeout = 5, observe} = opts;
+  const obs = makeObserver(observe, 'default');
+  obs?.mark('find-level');
+  try {
+    return await new Promise((resolve, reject) => {
+      const bench = async n => {
+        report && (await report('finding-level', {n}));
+        try {
+          const start = performance.now(),
+            result = fn(n),
+            finish = performance.now();
+          if (result && typeof result.then == 'function') {
+            // thenable
+            result.then(async () => {
+              const finish = performance.now();
+              if (finish - start >= threshold) return resolve(n);
+              report && (await report('finding-level-next', {n, time: finish - start}));
+              setTimeout(bench, timeout, nextLevel(n));
+            }, reject);
+            return;
+          }
+          if (finish - start >= threshold) return resolve(n);
+          report && (await report('finding-level-next', {n, time: finish - start}));
+          setTimeout(bench, timeout, nextLevel(n));
+        } catch (error) {
+          reject(error);
         }
-        if (finish - start >= threshold) return resolve(n);
-        report && (await report('finding-level-next', {n, time: finish - start}));
-        setTimeout(bench, timeout, nextLevel(n));
-      } catch (error) {
-        reject(error);
-      }
-    };
-    bench(startFrom);
-  });
+      };
+      bench(startFrom);
+    });
+  } finally {
+    obs?.measure('find-level');
+  }
+};
 
 export const benchmark = (fn, n) =>
   new Promise((resolve, reject) => {
@@ -68,37 +96,54 @@ export const benchmark = (fn, n) =>
     }
   });
 
-export const benchmarkSeries = async (
-  fn,
-  n,
-  {nSeries = 100, timeout = 5, DataArray = Array} = {}
-) => {
-  const data = new DataArray(nSeries);
+/**
+ * @param {{nSeries?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe}} [opts]
+ */
+export const benchmarkSeries = async (fn, n, opts = {}) => {
+  const {nSeries = 100, timeout = 5, DataArray = Array, observe} = opts;
+  const obs = makeObserver(observe, 'default');
+  obs?.mark('series');
+  try {
+    const data = new DataArray(nSeries);
 
-  const bench = async (nSeries, resolve, reject) => {
-    --nSeries;
-    try {
-      data[nSeries] = await benchmark(fn, n);
-      if (nSeries) {
-        setTimeout(bench, timeout, nSeries, resolve, reject);
-      } else {
-        resolve();
+    const bench = async (nSeries, resolve, reject) => {
+      --nSeries;
+      try {
+        data[nSeries] = await benchmark(fn, n);
+        if (nSeries) {
+          setTimeout(bench, timeout, nSeries, resolve, reject);
+        } else {
+          resolve();
+        }
+      } catch (error) {
+        reject(error);
       }
-    } catch (error) {
-      reject(error);
-    }
-  };
+    };
 
-  await new Promise((resolve, reject) => bench(nSeries, resolve, reject));
+    await new Promise((resolve, reject) => bench(nSeries, resolve, reject));
 
-  return data;
+    return data;
+  } finally {
+    obs?.measure('series');
+  }
 };
 
-export const benchmarkSeriesPar = async (fn, n, {nSeries = 100, DataArray = Array} = {}) => {
-  const benchmarks = [];
-  for (; nSeries > 0; --nSeries) benchmarks.push(benchmark(fn, n));
-  const results = await Promise.all(benchmarks);
-  return DataArray === Array ? results : DataArray.from(results);
+/**
+ * @param {{nSeries?: number, DataArray?: ArrayConstructor, observe?: Observe}} [opts]
+ */
+export const benchmarkSeriesPar = async (fn, n, opts = {}) => {
+  let {nSeries = 100} = opts;
+  const {DataArray = Array, observe} = opts;
+  const obs = makeObserver(observe, 'default');
+  obs?.mark('series-par');
+  try {
+    const benchmarks = [];
+    for (; nSeries > 0; --nSeries) benchmarks.push(benchmark(fn, n));
+    const results = await Promise.all(benchmarks);
+    return DataArray === Array ? results : DataArray.from(results);
+  } finally {
+    obs?.measure('series-par');
+  }
 };
 
 /**
@@ -147,34 +192,52 @@ export class Stats {
   }
 }
 
-export const measure = async (
-  fn,
-  {nSeries = 100, threshold = 20, startFrom = 1, timeout = 5, DataArray = Array} = {},
-  report
-) => {
+/**
+ * @param {{nSeries?: number, threshold?: number, startFrom?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe}} [opts]
+ * @param {Function} [report]
+ */
+export const measure = async (fn, opts = {}, report) => {
+  const {
+    nSeries = 100,
+    threshold = 20,
+    startFrom = 1,
+    timeout = 5,
+    DataArray = Array,
+    observe
+  } = opts;
   report?.('finding-reps');
-  const reps = startFrom < 0 ? -startFrom : await findLevel(fn, {threshold, startFrom, timeout});
+  const reps =
+    startFrom < 0 ? -startFrom : await findLevel(fn, {threshold, startFrom, timeout, observe});
   report?.('found-reps', {reps});
   report?.('starting-benchmarks', {nSeries, reps});
   const start = performance.now(),
-    data = await benchmarkSeries(fn, reps, {nSeries, timeout, DataArray}),
+    data = await benchmarkSeries(fn, reps, {nSeries, timeout, DataArray, observe}),
     finish = performance.now(),
     result = {data, reps, time: finish - start};
   report?.('finished-benchmarks', {...result, nSeries});
   return new Stats(result);
 };
 
-export const measurePar = async (
-  fn,
-  {nSeries = 100, threshold = 20, startFrom = 1, timeout = 5, DataArray = Array} = {},
-  report
-) => {
+/**
+ * @param {{nSeries?: number, threshold?: number, startFrom?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe}} [opts]
+ * @param {Function} [report]
+ */
+export const measurePar = async (fn, opts = {}, report) => {
+  const {
+    nSeries = 100,
+    threshold = 20,
+    startFrom = 1,
+    timeout = 5,
+    DataArray = Array,
+    observe
+  } = opts;
   report?.('finding-reps');
-  const reps = startFrom < 0 ? -startFrom : await findLevel(fn, {threshold, startFrom, timeout});
+  const reps =
+    startFrom < 0 ? -startFrom : await findLevel(fn, {threshold, startFrom, timeout, observe});
   report?.('found-reps', {reps});
   report?.('starting-benchmarks', {nSeries, reps});
   const start = performance.now(),
-    data = await benchmarkSeriesPar(fn, reps, {nSeries, DataArray}),
+    data = await benchmarkSeriesPar(fn, reps, {nSeries, DataArray, observe}),
     finish = performance.now(),
     result = {data, reps, time: finish - start};
   report?.('finished-benchmarks', {...result, nSeries});

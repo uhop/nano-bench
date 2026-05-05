@@ -38,6 +38,7 @@ nano-bench [options] <file>
 - `-b, --bootstrap <bootstrap>` — number of bootstrap resamples for CI estimation (default: 1000).
 - `-a, --alpha <alpha>` — significance level for confidence interval and tests (default: 0.05 = 95% CI).
 - `-p, --parallel` — collect samples in parallel (useful for async benchmarks).
+- `-o, --observe` — emit User Timing marks at calibration and sampling phase boundaries, observable via `PerformanceObserver` or DevTools / `node --inspect` traces. Mark names follow `nano-bench/<function-name>/<phase>`. Default: off.
 - `-e, --export <name>` — name of the export to use from the file (default: `"default"`).
 - `--self` — print the script's file path to stdout and exit (for Deno/Bun usage).
 
@@ -206,3 +207,58 @@ Used by nano-watch for indefinite monitoring with constant memory:
 
 - **StatCounter** — Welford's online algorithm for streaming mean, variance (M2), skewness (M3), and kurtosis (M4). Numerically stable single-pass computation.
 - **MedianCounter** — approximate streaming median using a hierarchical median-of-three structure. Provides O(1) memory approximate median without storing all values.
+
+---
+
+## User Timing API integration
+
+The `nano-bench` CLI accepts `-o` / `--observe`. When set, calibration and sampling phases emit `performance.mark` and `performance.measure` entries to the standard performance timeline. Observers can subscribe via `PerformanceObserver`; the entries are also visible in DevTools / `node --inspect` traces.
+
+Mark and measure names follow the convention `nano-bench/<label>/<phase>`:
+
+- Start mark: `nano-bench/<label>/<phase>:start`
+- Measure: `nano-bench/<label>/<phase>` (with the start mark as its start)
+
+Phases are:
+
+- `find-level` — calibration (auto-discovery of batch size).
+- `series` — sequential sample collection.
+- `series-par` — parallel sample collection (when `--parallel` is set).
+
+The CLI uses each function's exported name as the label, so multiple benchmarks in one run produce distinct entries (e.g., `nano-bench/strings/find-level`, `nano-bench/backticks/series`, etc.).
+
+### Consumer example
+
+```js
+import {PerformanceObserver} from 'node:perf_hooks';
+
+const obs = new PerformanceObserver(list => {
+  for (const e of list.getEntries()) {
+    console.log(`${e.name}: ${e.duration.toFixed(2)} ms`);
+  }
+});
+obs.observe({entryTypes: ['measure']});
+```
+
+### Library API
+
+The orchestrating runner functions accept an `observe` option (`boolean | string`):
+
+- `false` / `undefined` — no instrumentation (default).
+- `true` — emit marks with the default label `"default"`.
+- string — emit marks with the given label.
+
+The option is supported by `findLevel`, `benchmarkSeries`, `benchmarkSeriesPar`, `measure`, and `measurePar`. `measure` / `measurePar` thread it through to the inner `findLevel` and `benchmarkSeries` / `benchmarkSeriesPar` calls so a single `observe` argument produces both calibration and sample-collection entries.
+
+```js
+import {measure} from 'nano-benchmark/bench/runner.js';
+
+const fn = n => { let s = 0; for (let i = 0; i < n; ++i) s += i; };
+const stats = await measure(fn, {nSeries: 50, observe: 'sum-loop'});
+```
+
+### Cost
+
+Marks have a small fixed cost per phase (one `performance.mark` + one `performance.measure` per phase boundary, not per sample). Per-sample timing remains pure `performance.now()` deltas, so observe-mode does not measurably affect benchmark accuracy. The default is off purely to keep the perf timeline buffer empty for users who don't need the integration.
+
+The `nano-watch` CLI deliberately does **not** expose `--observe` because its sample loop is unbounded by default; library users who want to instrument continuous monitoring should manage their own buffer (e.g., `performance.clearMarks()` periodically) via the library API.

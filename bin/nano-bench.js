@@ -62,6 +62,10 @@ program
   .option('-s, --samples <samples>', 'number of samples', toInt, 100)
   .option('-p, --parallel', 'collect samples in parallel')
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
+  .option(
+    '-o, --observe',
+    'emit User Timing marks at phase boundaries (PerformanceObserver/DevTools)'
+  )
   .option('--self', 'print the file name to stdout and exit')
   .showHelpAfterError('(add --help to see available options)');
 
@@ -246,7 +250,11 @@ while (iterations.length < names.length) {
 
   const batchSize = await findLevel(
     fn,
-    {threshold: options.ms, startFrom: options.minIterations},
+    {
+      threshold: options.ms,
+      startFrom: options.minIterations,
+      observe: options.observe ? names[index] : undefined
+    },
     async (name, data) => {
       if (name === 'finding-level-next') {
         iterations[index] = data.n;
@@ -264,7 +272,10 @@ while (iterations.length < names.length) {
 
 for (let i = 0; i < iterations.length; ++i) {
   const batchSize = iterations[i],
-    samples = await benchSeries(fns[names[i]], batchSize, {nSeries: options.samples});
+    samples = await benchSeries(fns[names[i]], batchSize, {
+      nSeries: options.samples,
+      observe: options.observe ? names[i] : undefined
+    });
   normalizeSamples(samples, batchSize);
   results.push(samples);
   stats.push(getStats(samples));
