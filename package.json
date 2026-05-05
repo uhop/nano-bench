@@ -1,7 +1,7 @@
 {
   "name": "nano-benchmark",
   "version": "1.0.15",
-  "description": "CLI micro-benchmarking with nonparametric statistics and significance testing.",
+  "description": "CLI micro-benchmarking for Node, Deno, and Bun with nonparametric statistics and significance testing.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -33,14 +33,20 @@
     "benchmark",
     "micro-benchmark",
     "performance",
-    "profiling",
     "statistics",
+    "nonparametric",
     "significance",
+    "confidence-interval",
     "bootstrap",
     "mann-whitney",
     "kruskal-wallis",
     "cli",
-    "compare"
+    "watch",
+    "compare",
+    "cross-runtime",
+    "nodejs",
+    "deno",
+    "bun"
   ],
   "author": "Eugene Lazutkin <eugene.lazutkin@gmail.com> (https://www.lazutkin.com/)",
   "license": "BSD-3-Clause",
