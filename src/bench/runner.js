@@ -101,9 +101,22 @@ export const benchmarkSeriesPar = async (fn, n, {nSeries = 100, DataArray = Arra
   return DataArray === Array ? results : DataArray.from(results);
 };
 
+/**
+ * @typedef {object} StatsInit
+ * @property {number[]} data
+ * @property {number} reps
+ * @property {number} [time]
+ * @property {boolean} [sorted]
+ */
+
 export class Stats {
+  /** @param {StatsInit} object */
   constructor(object) {
-    Object.assign(this, object);
+    /** @type {number[]} */
+    this.data = object.data;
+    this.reps = object.reps;
+    this.time = object.time;
+    this.sorted = object.sorted ?? false;
   }
 
   static sortNumbersAsc = (a, b) => a - b;
