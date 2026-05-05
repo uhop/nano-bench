@@ -142,6 +142,7 @@ BSD 3-Clause License
 
 ## Release history
 
+- 1.0.16: _Added User Timing API integration: `--observe` flag._
 - 1.0.15: _Updated dependencies._
 - 1.0.14: _Fixed Kruskal-Wallis post-hoc (Conover-Iman) pairwise comparison bug: corrected rank variance computation and critical value distribution. Added regression test._
 - 1.0.13: _Improved CLI help texts and documentation for brevity and clarity._
@@ -158,3 +159,5 @@ BSD 3-Clause License
 - 1.0.2: _Added the `--self` option._
 - 1.0.1: _Added "self" argument to utilities so it can be used with Deno, Bun, etc._
 - 1.0.0: _Initial release._
+
+The full release notes are in the wiki: [Release notes](https://github.com/uhop/nano-bench/wiki/Release-notes).

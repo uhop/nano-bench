@@ -1,6 +1,6 @@
 {
   "name": "nano-benchmark",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "CLI micro-benchmarking for Node, Deno, and Bun with nonparametric statistics and significance testing.",
   "type": "module",
   "main": "src/index.js",
@@ -68,14 +68,14 @@
   ],
   "devDependencies": {
     "@types/node": "^25.6.0",
-    "prettier": "^3.8.1",
-    "tape-six": "^1.7.13",
-    "tape-six-proc": "^1.2.8",
+    "prettier": "^3.8.3",
+    "tape-six": "^1.9.0",
+    "tape-six-proc": "^1.2.9",
     "typescript": "^6.0.3"
   },
   "dependencies": {
     "commander": "^14.0.3",
-    "console-toolkit": "^1.2.15"
+    "console-toolkit": "^1.3.0"
   },
   "tape6": {
     "tests": [
