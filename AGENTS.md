@@ -2,7 +2,7 @@
 
 ## Project identity
 
-nano-benchmark is an ESM JavaScript package providing command-line utilities (`nano-bench`, `nano-watch`) for micro-benchmarking code with proper nonparametric statistics and significance testing. Node.js 20+, Bun, Deno. The `src/` modules (stats, significance tests, streaming counters) are internal — the user-facing surface is the two CLI tools in `bin/`.
+nano-benchmark is an ESM JavaScript package providing command-line utilities (`nano-bench`, `nano-watch`) for micro-benchmarking code with proper nonparametric statistics and significance testing. Node.js 22+, Bun, Deno. The `src/` modules (stats, significance tests, streaming counters) are internal — the user-facing surface is the two CLI tools in `bin/`.
 
 ## Critical rules
 
