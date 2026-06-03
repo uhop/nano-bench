@@ -27,11 +27,11 @@ in the output, not just the source.
 
 ## What actually runs today
 
-| Functions compared | Test | Implementation | Returns |
-|---|---|---|---|
-| exactly 2 | **Mann–Whitney U**, normal approximation, two-sided, tie-corrected | `src/significance/mwtest.js` | `{value: z, alpha, limit: zc, different}` |
-| 3 or more | **Kruskal–Wallis H**, beta approximation for the null distribution of H | `src/significance/kwtest.js` (`kwtest`) | `{value: H, alpha, limit: Hc, different, groupDifference}` |
-| 3+ post-hoc | **Conover–Iman** pairwise (Fisher's LSD on ranks), `t(N-k)` approximated by `z` | `src/significance/kwtest.js` (the `groupDifference` matrix) | boolean matrix |
+| Functions compared | Test                                                                            | Implementation                                              | Returns                                                    |
+| ------------------ | ------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| exactly 2          | **Mann–Whitney U**, normal approximation, two-sided, tie-corrected              | `src/significance/mwtest.js`                                | `{value: z, alpha, limit: zc, different}`                  |
+| 3 or more          | **Kruskal–Wallis H**, beta approximation for the null distribution of H         | `src/significance/kwtest.js` (`kwtest`)                     | `{value: H, alpha, limit: Hc, different, groupDifference}` |
+| 3+ post-hoc        | **Conover–Iman** pairwise (Fisher's LSD on ranks), `t(N-k)` approximated by `z` | `src/significance/kwtest.js` (the `groupDifference` matrix) | boolean matrix                                             |
 
 The confidence interval shown per row is a **bootstrap percentile** CI of the
 median (`getBootstrapStats`, `bin/nano-bench.js:131`), or a direct weighted
@@ -50,7 +50,7 @@ Make the method legible without turning the output into a stats dump.
 ### Default output (always shown)
 
 Add a single line naming the test and its parameters wherever the verdict is
-printed — significant *or not*. The user's framing was "show what algorithm was
+printed — significant _or not_. The user's framing was "show what algorithm was
 used, **if it is not mentioned**" → so the fix is: always mention it.
 
 Sketch (2 functions):
@@ -97,7 +97,7 @@ report.
 
 ## Decisions
 
-- **D1 — always vs. verbose-only naming:** *always* show the one-line method
+- **D1 — always vs. verbose-only naming:** _always_ show the one-line method
   name (cheap, directly answers the request). Reserve numeric detail for `-V`.
 - **D2 — how much detail by default:** test name + α only. Statistic values
   (z, H, critical values) behind `-V`.

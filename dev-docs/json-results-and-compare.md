@@ -12,7 +12,7 @@ The user's open questions, answered in order at the end:
 - Save a baseline, run a different version/implementation, compare before/after.
   - What to save in the JSON?
   - Log CPU type? Hash of the test file? Anything else?
-  - Can we save two benchmarks, run two more, and compare *recomputing*
+  - Can we save two benchmarks, run two more, and compare _recomputing_
     significance?
 
 ## 1. What to persist (and what not to)
@@ -33,7 +33,7 @@ is fine, no external blob store needed.
 
 ### Persist derived summaries too — for cheap viewing
 
-A viewer that only wants to *show* a saved run shouldn't have to re-bootstrap.
+A viewer that only wants to _show_ a saved run shouldn't have to re-bootstrap.
 Store `median`, `lo`, `hi`, `mean`, `stdDev`, `opsPerSec` alongside the samples.
 They are redundant with the samples (and a recompute can ignore them), but they
 make a read-only render free.
@@ -56,16 +56,20 @@ make a read-only render free.
   },
 
   "environment": {
-    "runtime": { "name": "node", "version": "22.11.0", "engine": "v8 12.4" },
-    "os": { "platform": "linux", "release": "7.0.0", "arch": "x64" },
-    "cpu": { "model": "AMD Ryzen 9 …", "count": 16, "speedMHz": 3600 },
+    "runtime": {"name": "node", "version": "22.11.0", "engine": "v8 12.4"},
+    "os": {"platform": "linux", "release": "7.0.0", "arch": "x64"},
+    "cpu": {"model": "AMD Ryzen 9 …", "count": 16, "speedMHz": 3600},
     "loadavg": [0.3, 0.4, 0.5],
     "totalmemMB": 64000
   },
 
   "params": {
-    "ms": 50, "minIterations": 1, "samples": 100,
-    "bootstrap": 1000, "alpha": 0.05, "parallel": false,
+    "ms": 50,
+    "minIterations": 1,
+    "samples": 100,
+    "bootstrap": 1000,
+    "alpha": 0.05,
+    "parallel": false,
     "unit": "ms-per-iteration"
   },
 
@@ -75,8 +79,12 @@ make a read-only render free.
       "reps": 100000,
       "samples": [0.000123, 0.000125, "… 100 values …"],
       "summary": {
-        "median": 0.000124, "lo": 0.000119, "hi": 0.000131,
-        "mean": 0.000126, "stdDev": 0.0000044, "opsPerSec": 8064516,
+        "median": 0.000124,
+        "lo": 0.000119,
+        "hi": 0.000131,
+        "mean": 0.000126,
+        "stdDev": 0.0000044,
+        "opsPerSec": 8064516,
         "ci": "bootstrap-percentile"
       }
     }
@@ -88,7 +96,10 @@ make a read-only render free.
     "statistic": -3.42,
     "limit": -1.959,
     "different": true,
-    "matrix": [[false, true], [true, false]]
+    "matrix": [
+      [false, true],
+      [true, false]
+    ]
   }
 }
 ```
@@ -97,18 +108,18 @@ Field rationale:
 
 - `schemaVersion` — lets future viewers migrate; bump on any breaking change.
 - `label` — free-form human tag ("before-opt", "after-opt", a version string, or
-  a commit SHA *if the user happens to use git*). This is the **primary** way a
-  person says *which* run is which when comparing, and it assumes nothing about
+  a commit SHA _if the user happens to use git_). This is the **primary** way a
+  person says _which_ run is which when comparing, and it assumes nothing about
   the environment. nano-bench is used outside git too, so we deliberately do
   **not** auto-capture a VCS revision — a user who wants the SHA recorded simply
   passes it as the label.
 - `source.fileHash` — `sha256` of the bench file bytes. Dual purpose: provenance,
   and a guard against accidentally comparing against a stale baseline of a
-  *different* file. Note the limitation under § metadata.
+  _different_ file. Note the limitation under § metadata.
 - `environment.*` — comparability guards, **not** test inputs (see § metadata).
 - `params.unit` — names the sample unit explicitly so a future change can't
   silently reinterpret old files.
-- `significance` — the *result* of the in-run test, with the structured test
+- `significance` — the _result_ of the in-run test, with the structured test
   identity that [`significance-reporting.md`](./significance-reporting.md) also
   uses. Present only when ≥2 series were measured (a single baseline omits it).
 
@@ -136,7 +147,7 @@ whether that verdict means "the code changed" or "the machine changed."
 - **`loadavg` / free memory** — a loaded machine inflates variance and shifts the
   median; worth recording so an anomalous baseline can be explained.
 - **Bench-file hash** — answers "are we benchmarking the same harness?" Its
-  limitation: if the code under test is an *imported module* (not inlined in the
+  limitation: if the code under test is an _imported module_ (not inlined in the
   bench file), the file hash is unchanged while the real subject changed. That is
   precisely the "v1 vs v2 implementation" case. So the hash is necessary but not
   sufficient — the `label` carries the real "which version" answer (a user on git
@@ -154,7 +165,7 @@ results, so an environment-confounded comparison is never read as a clean one.
 
 **Yes — exactly, and at no cost.** This is the property the whole design is built
 to exploit. A saved run holds the raw sample arrays. Recomputing significance is
-just calling the *existing* `mwtest`/`kwtest` on the chosen arrays. No re-running,
+just calling the _existing_ `mwtest`/`kwtest` on the chosen arrays. No re-running,
 no live process, no approximation beyond what an in-run test already does. The
 math does not care that the arrays came from different files at different times —
 which is the power, and (via § 2) the hazard.
@@ -165,7 +176,7 @@ Given baseline `B = {A, …}` and a new run `N = {A', …}`:
 
 1. **Paired same-name before/after** (the common case): `B.A` vs `N.A` as an
    independent two-sample Mann–Whitney; one test per shared name. Answers "did
-   `A` get faster between versions?" These are *independent* samples (run i of
+   `A` get faster between versions?" These are _independent_ samples (run i of
    `A` and run i of `A'` are unrelated), so Mann–Whitney is correct — **not**
    Wilcoxon signed-rank, which assumes matched pairs.
 2. **Pooled k-sample**: throw `{B.A, B.B, N.A, N.B}` into Kruskal–Wallis for one
@@ -175,7 +186,7 @@ Given baseline `B = {A, …}` and a new run `N = {A', …}`:
    files and compare them. Mode 1 and 2 are conveniences over this.
 
 All three are thin layers over the unchanged significance functions. The renderer
-is the *same* significance table the CLI already builds (`bin/nano-bench.js:310`),
+is the _same_ significance table the CLI already builds (`bin/nano-bench.js:310`),
 plus a metadata-diff banner.
 
 ### Statistical caveats to document
@@ -192,7 +203,7 @@ plus a metadata-diff banner.
 - **Environment confound** — restated from § 2; the banner is the mitigation.
 - **Bootstrap CI is RNG-dependent** — recomputed CIs differ slightly run to run
   unless seeded. Optional: record/accept a seed for reproducible CIs. The rank
-  *test* is deterministic; only the CI wiggles.
+  _test_ is deterministic; only the CI wiggles.
 
 ## 4. A viewer (Decision D6)
 
@@ -207,7 +218,7 @@ A heavy web viewer fights that. Tiered plan, lightest first:
    environment-diff banner (§ 2). Also zero new deps.
 3. **Static HTML viewer (deferred — filed as its own future queue item)** — a
    single self-contained `.html` the user opens locally and drops a results JSON
-   onto, plotting the sample *distributions* (histogram / violin) as **inline SVG
+   onto, plotting the sample _distributions_ (histogram / violin) as **inline SVG
    generated from the JSON**. A terminal table can't show distribution shape;
    this fills that gap. No build step, no charting dependency — hand-written
    vanilla JS emitting SVG markup. Explicitly **not** part of this round; kept
@@ -233,7 +244,7 @@ Consumers — two open shapes:
 - **Flags on `nano-bench`** (Decision D5, leaning): `--view <file>`,
   `--compare <baseline> [current]`. Branch early before the file-import/measure
   path. Pro: one binary, discoverable. Con: complicates the arg model — `--view`
-  takes a JSON, the positional normally takes a *bench* file.
+  takes a JSON, the positional normally takes a _bench_ file.
 - **A third `bin/`** (`nano-bench-compare`): matches the existing
   "several small binaries" pattern (`nano-bench` + `nano-watch`). Cleaner arg
   model, more `package.json#bin` surface. Reach for this only if the flag
@@ -252,7 +263,7 @@ add a binary preemptively.
 - **What to save?** Raw samples (required) + derived summaries (convenience) +
   source/env/params metadata (§ 1).
 - **Log CPU type? Hash of test file? Anything else?** Yes to all, as
-  *comparability guards*, not test inputs (§ 2): CPU model/speed, runtime +
+  _comparability guards_, not test inputs (§ 2): CPU model/speed, runtime +
   engine version, OS/arch, loadavg/memory, bench-file `sha256`, plus a `label`
   for the real "which version" signal (a file hash misses changes in imported
   code under test; we don't assume git, so the label carries the version).

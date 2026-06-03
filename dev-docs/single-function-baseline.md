@@ -5,7 +5,7 @@ in [`json-results-and-compare.md`](./json-results-and-compare.md).
 
 ## Problem
 
-The user wants to benchmark *one* function to establish a baseline, with no
+The user wants to benchmark _one_ function to establish a baseline, with no
 significance test (there is nothing to compare it against in isolation). Two
 sub-problems hide here:
 
@@ -26,7 +26,7 @@ That behavior is currently **implicit and undocumented** — it falls out of the
 guards rather than being a designed mode. Two gaps:
 
 - It is not documented or tested as a supported path, so it can regress silently.
-- There is no way to benchmark *one* function from a file that exports *several*.
+- There is no way to benchmark _one_ function from a file that exports _several_.
   `nano-watch` has a `[method]` positional for exactly this (`bin/nano-watch.js:47,77`);
   `nano-bench` has no equivalent — it's all-or-nothing on the export object.
 
@@ -70,7 +70,7 @@ Edge cases to specify:
 
 - A requested method name that isn't a function on the object → clear error
   listing the available names (reuse the message style at line 104).
-- `--export` still selects *which object*; method names select *within* it.
+- `--export` still selects _which object_; method names select _within_ it.
   Document the two-level addressing (export → method), same model as
   `nano-watch`.
 
@@ -84,7 +84,7 @@ statistical significance calculations":
   significance, correct.
 - **The saved samples are not wasted.** Because the rank tests consume raw
   samples (see [`README.md`](./README.md) § the one principle), a baseline JSON
-  of function `A` can later be compared against a *new* run of `A` with a full
+  of function `A` can later be compared against a _new_ run of `A` with a full
   Mann–Whitney test — recomputed offline from the two saved sample arrays. So
   "no significance now" does not mean "no significance ever"; it means
   significance is deferred to the moment a second series exists to compare.
