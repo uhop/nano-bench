@@ -11,7 +11,6 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - **No build step.** Source JS in `src/` and CLI scripts in `bin/` are shipped directly. Do not create build scripts or compiled output.
 - **No TypeScript.** No `.ts` files, no `.d.ts` files. This is a pure JS project.
 - **Do not modify or delete test expectations** without understanding why they changed.
-- **Do not add comments or remove comments** unless explicitly asked.
 - **CLI-only project.** The two binaries (`bin/nano-bench.js`, `bin/nano-watch.js`) are the user-facing interface. The `src/` modules are internal implementation details.
 
 ## Code style
@@ -19,6 +18,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - Prettier: 100 char width, single quotes, no bracket spacing, no trailing commas, arrow parens "avoid".
 - 2-space indentation (`.editorconfig`).
 - Imports at top of file. No dynamic imports unless necessary.
+- **No comments that narrate the code.** Don't write a comment that restates *what* the code does. Allowed, each as the shortest possible marker: JSDoc when requested or required; a reference for a non-trivial algorithm; a non-trivial *decision* or constraint — *why* it's this way, including footgun/ordering caveats that have a real reason. The bar is *why*, never *what*. Strip narrating comments opportunistically in files you're already editing.
 
 ## Architecture quick reference
 
