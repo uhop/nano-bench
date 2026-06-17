@@ -56,6 +56,10 @@ Both utilities import a module and benchmark its (default) export.
 `nano-bench` expects an object whose properties are the functions to compare.
 `nano-watch` accepts the same format or a single function.
 
+Name one or more methods after the file to benchmark just those. A single method
+runs as a baseline — its statistics are reported with no significance test (there
+is nothing to compare it against in isolation).
+
 Example module for `nano-bench` (`bench-strings-concat.js`):
 
 ```js
@@ -87,7 +91,9 @@ export default {
 Usage:
 
 ```bash
-npx nano-bench bench-strings-concat.js
+npx nano-bench bench-strings-concat.js                 # compare all three
+npx nano-bench bench-strings-concat.js strings join    # compare just these two
+npx nano-bench bench-strings-concat.js strings         # baseline one (no significance test)
 npx nano-watch bench-strings-concat.js backticks
 ```
 

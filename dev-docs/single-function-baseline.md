@@ -96,6 +96,16 @@ This is the bridge to doc 3: item 2 produces baselines; item 3 consumes them.
 - **D3 — selection mechanism:** variadic positional `[methods...]`, parity with
   `nano-watch`, doubling as a comparison narrower.
 
+**As implemented (2026-06-16):** the variadic `[methods...]` positional ships.
+Name resolution + validation is extracted to `src/bench/select-functions.js`
+(pure: returns the requested subset in requested order, all functions when none
+are named, or throws — an unknown name lists the available functions). That
+helper is unit-tested in `tests/test-select-functions.js` — the route to a real
+test for part (c), since `bin/` has no unit harness. The single-series →
+no-significance behaviour is unchanged: it still falls out of the
+`results.length > 1` guard, so naming one method (or a one-function file) prints
+stats with no significance section.
+
 ## Effort / risk
 
 Small–medium. The measurement path is unchanged; the work is (a) a positional

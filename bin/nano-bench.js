@@ -27,6 +27,7 @@ import {findLevel, benchmarkSeries, benchmarkSeriesPar} from '../src/bench/runne
 import {bootstrap, getWeightedValue, mean} from '../src/stats.js';
 import mwtest from '../src/significance/mwtest.js';
 import kwtest from '../src/significance/kwtest.js';
+import selectFunctions from '../src/bench/select-functions.js';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
   toInt = value => parseInt(value),
@@ -50,6 +51,10 @@ program
   .version(pkg.version)
   .description('Benchmark and compare code.')
   .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits')
+  .argument(
+    '[methods...]',
+    'function names to benchmark; omit to run all (one name = baseline, no significance test)'
+  )
   .option('-m, --ms <ms>', 'measurement time in milliseconds', toInt, 50)
   .addOption(
     new Option('-i, --iterations <iterations>', 'measurement iterations (overrides --ms)')
@@ -101,9 +106,11 @@ try {
 
 if (!fns) program.error(`Export not found: ${options.export}`);
 
-const names = Object.keys(fns).filter(name => typeof fns[name] == 'function');
-if (names.length < 1) {
-  program.error('The exported object has no functions to measure');
+let names;
+try {
+  names = selectFunctions(fns, args.slice(1));
+} catch (error) {
+  program.error(error.message);
 }
 
 // set up the writer and the updater
