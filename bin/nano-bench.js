@@ -310,7 +310,6 @@ if (results.length > 1) {
       : testResult.groupDifference;
   }
 
-  // name the test that ran — always, significant or not (Decision D1)
   const methodName = isPair
       ? 'Mann–Whitney U test (two-sided, tie-corrected)'
       : 'Kruskal–Wallis H test',
@@ -319,7 +318,6 @@ if (results.length > 1) {
     c`\n{{save.bold}}Significance:{{restore}} ${methodName}, α = {{save.bright.yellow}}${options.alpha}{{restore}}${postHoc}\n`
   );
 
-  // verbose: surface the statistic and critical value the test already computed (Decision D2)
   if (options.verbose) {
     const arrow = testResult.different ? 'reject H₀' : 'fail to reject H₀',
       rel = testResult.different ? '>' : '≤';
@@ -335,6 +333,12 @@ if (results.length > 1) {
       writer.writeString(
         `  H = ${H.toFixed(2)} ${rel} H_crit = ${HCrit.toFixed(2)} (β-approx) → ${arrow}\n`
       );
+      if (testResult.C !== undefined) {
+        const threshold = testResult.C * Math.sqrt(1 / results[0].length + 1 / results[1].length);
+        writer.writeString(
+          `  post-hoc threshold (Conover–Iman): C·√(1/nᵢ+1/nⱼ) = ${threshold.toFixed(2)} (C = ${testResult.C.toFixed(2)})\n`
+        );
+      }
     }
   }
 

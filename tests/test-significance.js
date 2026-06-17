@@ -45,6 +45,7 @@ test('kwtest()', t => {
       0.05
     );
     t.equal(result.different, false);
+    t.equal(result.C, undefined);
   });
 
   t.test('post-hoc groupDifference matrix is symmetric', t => {
@@ -69,6 +70,7 @@ test('kwtest()', t => {
     );
     t.equal(result.different, true);
     t.ok(result.groupDifference);
+    t.ok(typeof result.C === 'number');
     const m = result.groupDifference;
     t.equal(m[0][1], true);
     t.equal(m[0][2], true);

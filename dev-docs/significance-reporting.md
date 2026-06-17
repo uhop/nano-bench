@@ -97,10 +97,11 @@ report.
 
 **As implemented (2026-06-16):** the flag is `-v`, not `-V` — `-V` is
 commander's built-in `--version` shortcut. The headline statistic + critical
-value ship for both tests (`z`/`z_crit` for MW, `H`/`H_crit` for KW). The
-per-pair Conover–Iman threshold `C·√(1/nᵢ+1/nⱼ)` is **deferred**: `C` is local
-to `kwtest` and not in its return object, so surfacing it needs a one-line
-return-shape change — out of scope for this output-only pass.
+value ship for both tests (`z`/`z_crit` for MW, `H`/`H_crit` for KW), and for KW
+the Conover–Iman post-hoc threshold `C·√(1/nᵢ+1/nⱼ)` is shown too: `kwtest` now
+returns its critical constant `C` (a minimal additive return-shape change), and
+the CLI resolves the per-pair threshold — equal sample sizes across functions,
+so one value covers every pair.
 
 ## Decisions
 

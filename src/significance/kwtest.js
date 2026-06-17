@@ -79,6 +79,7 @@ export const kwtest = (sortedArrays, alpha = 0.05) => {
   }
 
   results.groupDifference = m;
+  results.C = C;
   return results;
 };
 
