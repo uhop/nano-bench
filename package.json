@@ -55,6 +55,8 @@
     "type": "github",
     "url": "https://github.com/sponsors/uhop"
   },
+  "llms": "https://raw.githubusercontent.com/uhop/nano-bench/main/llms.txt",
+  "llmsFull": "https://raw.githubusercontent.com/uhop/nano-bench/main/llms-full.txt",
   "bugs": {
     "url": "https://github.com/uhop/nano-bench/issues"
   },
