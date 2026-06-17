@@ -66,6 +66,7 @@ program
     '-o, --observe',
     'emit User Timing marks at phase boundaries (PerformanceObserver/DevTools)'
   )
+  .option('-v, --verbose', 'show significance test statistics and critical values')
   .option('--self', 'print the file name to stdout and exit')
   .showHelpAfterError('(add --help to see available options)');
 
@@ -162,10 +163,10 @@ await writer.write([
   '',
   c`Confidence interval: {{save.bright.yellow}}${formatNumber(100 * (1 - options.alpha), {
     precision: 2
-  })}%{{restore}}, samples: {{save.bright.yellow}}${formatInteger(
-    options.samples
-  )}{{restore}}, bootstrap samples: {{save.bright.yellow}}${formatInteger(
+  })}%{{restore}} bootstrap-percentile of the median ({{save.bright.yellow}}${formatInteger(
     options.bootstrap
+  )}{{restore}} resamples), samples: {{save.bright.yellow}}${formatInteger(
+    options.samples
   )}{{restore}}`,
   iterations.length
     ? c`Measuring {{save.bright.yellow}}${formatInteger(
@@ -292,19 +293,49 @@ updater = null;
 // calculate significance
 
 if (results.length > 1) {
-  let significance = null;
-
   for (const samples of results) samples.sort(numericSortingAsc);
-  if (results.length == 2) {
-    const result = mwtest(results[0], results[1], options.alpha);
-    if (result.different)
-      significance = [
-        [false, result.different],
-        [result.different, false]
-      ];
-  } else {
-    const result = kwtest(results, options.alpha);
-    if (result.different) significance = result.groupDifference;
+
+  const isPair = results.length == 2,
+    testResult = isPair
+      ? mwtest(results[0], results[1], options.alpha)
+      : kwtest(results, options.alpha);
+
+  let significance = null;
+  if (testResult.different) {
+    significance = isPair
+      ? [
+          [false, true],
+          [true, false]
+        ]
+      : testResult.groupDifference;
+  }
+
+  // name the test that ran — always, significant or not (Decision D1)
+  const methodName = isPair
+      ? 'Mann–Whitney U test (two-sided, tie-corrected)'
+      : 'Kruskal–Wallis H test',
+    postHoc = isPair ? '' : '; post-hoc: Conover–Iman pairwise';
+  writer.writeString(
+    c`\n{{save.bold}}Significance:{{restore}} ${methodName}, α = {{save.bright.yellow}}${options.alpha}{{restore}}${postHoc}\n`
+  );
+
+  // verbose: surface the statistic and critical value the test already computed (Decision D2)
+  if (options.verbose) {
+    const arrow = testResult.different ? 'reject H₀' : 'fail to reject H₀',
+      rel = testResult.different ? '>' : '≤';
+    if (isPair) {
+      const z = testResult.value,
+        zCrit = Math.abs(testResult.limit);
+      writer.writeString(
+        `  z = ${z.toFixed(2)}, |z| ${rel} z_crit = ${zCrit.toFixed(2)} → ${arrow}\n`
+      );
+    } else {
+      const H = testResult.value,
+        HCrit = testResult.limit;
+      writer.writeString(
+        `  H = ${H.toFixed(2)} ${rel} H_crit = ${HCrit.toFixed(2)} (β-approx) → ${arrow}\n`
+      );
+    }
   }
 
   if (significance) {
@@ -345,13 +376,13 @@ if (results.length > 1) {
     const table = makeTable(tableData, lineTheme);
     table.vAxis[1] = 2;
     writer.writeString(
-      c`\n{{save.bright.cyan.bold}}The difference is statistically significant:{{restore}}\n\n`
+      c`{{save.bright.cyan.bold}}The difference is statistically significant:{{restore}}\n\n`
     );
     const tableStrings = table
       .toStrings()
       .map(line => line.replace(/\t(1|2)/g, m => (m[1] == '2' ? turtle : rabbit)));
     writer.write(tableStrings);
   } else {
-    writer.writeString('\nThe difference is not statistically significant.\n');
+    writer.writeString('The difference is not statistically significant.\n');
   }
 }

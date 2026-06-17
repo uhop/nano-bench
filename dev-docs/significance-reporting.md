@@ -81,7 +81,7 @@ The header block (line 160-184) should likewise label the CI method, e.g.
 "Confidence interval: 95%". This ties the already-printed bootstrap count to the
 CI it produces.
 
-### Verbose output (`-V` / `--verbose`, opt-in) — Decision D2
+### Verbose output (`-v` / `--verbose`, opt-in) — Decision D2
 
 Under a verbose flag, print the actual statistic and critical value the test
 already computes and returns but currently discards:
@@ -95,12 +95,19 @@ throws them away today (`bin/nano-bench.js:299,306` destructure only
 `different`/`groupDifference`). No new computation — only plumbing into the
 report.
 
+**As implemented (2026-06-16):** the flag is `-v`, not `-V` — `-V` is
+commander's built-in `--version` shortcut. The headline statistic + critical
+value ship for both tests (`z`/`z_crit` for MW, `H`/`H_crit` for KW). The
+per-pair Conover–Iman threshold `C·√(1/nᵢ+1/nⱼ)` is **deferred**: `C` is local
+to `kwtest` and not in its return object, so surfacing it needs a one-line
+return-shape change — out of scope for this output-only pass.
+
 ## Decisions
 
 - **D1 — always vs. verbose-only naming:** _always_ show the one-line method
-  name (cheap, directly answers the request). Reserve numeric detail for `-V`.
+  name (cheap, directly answers the request). Reserve numeric detail for `-v`.
 - **D2 — how much detail by default:** test name + α only. Statistic values
-  (z, H, critical values) behind `-V`.
+  (z, H, critical values) behind `-v`.
 
 ## Effort / risk
 

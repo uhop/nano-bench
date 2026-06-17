@@ -19,6 +19,15 @@ Three queued features, designed together because they share one data model:
    results as JSON; reload/compare a saved baseline against a later run,
    recomputing significance; what to persist; a viewer.
 
+Plus a fourth note — lower priority, independent of the trio above, but reusing
+the same sample data model:
+
+- [`terminal-histogram.md`](./terminal-histogram.md) — opt-in terminal histogram
+  of each function's sample distribution via `console-toolkit`'s charts. Future /
+  optional (queue Priority −1); sibling to the deferred HTML/SVG viewer (D6), same
+  goal by a lighter, terminal-first means. Requires binning the raw samples into
+  buckets before charting.
+
 ## The one principle the whole design rests on
 
 nano-bench's significance tests are **nonparametric and rank-based**:
@@ -61,14 +70,17 @@ iteration**. Two runs with different auto-discovered batch sizes (`reps`) produc
 directly comparable sample arrays. The JSON format stores the normalized values;
 `reps` is kept only as provenance.
 
-## Open decisions (tracked across the three docs)
+## Open decisions (tracked across the design docs)
 
-| #   | Decision                                                       | Doc | Leaning                                                                                  |
-| --- | -------------------------------------------------------------- | --- | ---------------------------------------------------------------------------------------- |
-| D1  | Always name the test, or only under a verbose flag?            | 1   | Always (one line)                                                                        |
-| D2  | How much statistic detail in default output (z/H/limit)?       | 1   | Test name + α default; full stats behind `-V`                                            |
-| D3  | Select one method from a multi-fn object — positional or flag? | 2   | Variadic positional, parity with `nano-watch`                                            |
-| D4  | Produce JSON via flag on `nano-bench`, or a separate concern?  | 3   | `--json <file>` flag                                                                     |
-| D5  | View/compare: flags on `nano-bench`, or a third `bin/`?        | 3   | Flags first; third bin only if the arg model gets ugly                                   |
-| D6  | Web viewer at all, given "no build step / CLI-only"?           | 3   | CLI re-render first; static inline-SVG HTML viewer deferred to its own future queue item |
-| D7  | Multiple-comparison correction for many before/after tests?    | 3   | Document; offer Holm as opt-in                                                           |
+| #   | Decision                                                        | Doc | Leaning                                                                                     |
+| --- | --------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------- |
+| D1  | Always name the test, or only under a verbose flag?             | 1   | Always (one line)                                                                           |
+| D2  | How much statistic detail in default output (z/H/limit)?        | 1   | Test name + α default; full stats behind `-v`                                               |
+| D3  | Select one method from a multi-fn object — positional or flag?  | 2   | Variadic positional, parity with `nano-watch`                                               |
+| D4  | Produce JSON via flag on `nano-bench`, or a separate concern?   | 3   | `--json <file>` flag                                                                        |
+| D5  | View/compare: flags on `nano-bench`, or a third `bin/`?         | 3   | Flags first; third bin only if the arg model gets ugly                                      |
+| D6  | Web viewer at all, given "no build step / CLI-only"?            | 3   | CLI re-render first; static inline-SVG HTML viewer deferred to its own future queue item    |
+| D7  | Multiple-comparison correction for many before/after tests?     | 3   | Document; offer Holm as opt-in                                                              |
+| D8  | Histogram binning rule (fixed k / Sturges / Freedman–Diaconis)? | 4   | Freedman–Diaconis default + `--bins N`; cap to render width; clamp outliers to overflow bin |
+| D9  | Default histogram orientation — columns or bars?                | 4   | `--chart` option, default columns; opt-in bars for stacking many runs                       |
+| D10 | Histogram sizing / overflow when too wide or too tall?          | 4   | Fit terminal width; cap bins to width; columns max height; side-by-side → vertical stack    |
