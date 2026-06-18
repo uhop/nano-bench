@@ -3,7 +3,7 @@
 import process from 'node:process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import path from 'node:path';
-import {readFile} from 'node:fs/promises';
+import {readFile, writeFile} from 'node:fs/promises';
 
 import {Option, program} from 'commander';
 
@@ -19,12 +19,15 @@ import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
 import {findLevel, benchmarkSeries, benchmarkSeriesPar} from '../src/bench/runner.js';
-import {exactSummary, bootstrapSummary} from '../src/stats.js';
+import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {mulberry32} from '../src/utils/prng.js';
 import {summaryTable} from '../src/bench/render/summary-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import selectFunctions from '../src/bench/select-functions.js';
+import {bodyHash} from '../src/utils/body-hash.js';
+import {captureEnvironment} from '../src/bench/results/environment.js';
+import {buildResultsObject} from '../src/bench/results/build.js';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
   toInt = value => parseInt(value),
@@ -65,6 +68,10 @@ program
   .option('-p, --parallel', 'collect samples in parallel')
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
   .option('--seed <seed>', 'bootstrap RNG seed (32-bit integer; default: random)', toInt)
+  .option('--json <file>', 'write results to a JSON file')
+  .option('--label <label>', 'free-form run label recorded in the JSON')
+  .option('-H, --host', 'record os.hostname() in the JSON')
+  .option('--host-name <name>', 'record a custom machine name in the JSON (overrides --host)')
   .option(
     '-o, --observe',
     'emit User Timing marks at phase boundaries (PerformanceObserver/DevTools)'
@@ -225,9 +232,11 @@ for (let i = 0; i < iterations.length; ++i) {
 await updater.final();
 updater = null;
 
+let significance = null;
 if (results.length > 1) {
   const testResult = computeSignificance(results, options.alpha),
     matrix = significanceMatrix(testResult);
+  significance = testResult;
   writeSignificance(writer, {
     testResult,
     matrix,
@@ -237,4 +246,40 @@ if (results.length > 1) {
     alpha: options.alpha,
     verbose: options.verbose
   });
+}
+
+if (options.json) {
+  const obj = buildResultsObject({
+    pkg,
+    createdAt: new Date().toISOString(),
+    label: options.label,
+    source: {file: args[0], export: options.export, methods: names},
+    environment: captureEnvironment({host: options.host, hostName: options.hostName}),
+    params: {
+      ...(options.iterations > 0 ? {iterations: options.iterations} : {ms: options.ms}),
+      minIterations: options.minIterations,
+      samples: options.samples,
+      bootstrap: options.bootstrap,
+      seed,
+      alpha: options.alpha,
+      parallel: Boolean(options.parallel)
+    },
+    series: names.map((name, i) => ({
+      name,
+      bodyHash: bodyHash(fns[name]),
+      reps: iterations[i],
+      samples: results[i],
+      summary: {
+        median: stats[i].median,
+        lo: stats[i].lo,
+        hi: stats[i].hi,
+        mean: mean(results[i]),
+        stdDev: stdDev(results[i]),
+        opsPerSec: 1000 / stats[i].median,
+        ci: 'bootstrap-percentile'
+      }
+    })),
+    significance
+  });
+  await writeFile(options.json, JSON.stringify(obj, null, 2) + '\n');
 }
