@@ -1,0 +1,116 @@
+#!/usr/bin/env node
+
+import path from 'node:path';
+import {readFile} from 'node:fs/promises';
+
+import {program} from 'commander';
+
+import {c} from 'console-toolkit/style';
+import Writer from 'console-toolkit/output/writer.js';
+
+import {bootstrapSummary} from '../src/stats.js';
+import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
+import {mulberry32} from '../src/utils/prng.js';
+import {summaryTable} from '../src/bench/render/summary-table.js';
+import {writeSignificance} from '../src/bench/render/significance-table.js';
+import {loadResults} from '../src/bench/results/load.js';
+import {diffEnvironments} from '../src/bench/results/environment.js';
+
+const toFloat = value => parseFloat(value);
+
+const pkgUrl = new URL('../package.json', import.meta.url),
+  pkg = JSON.parse(await readFile(pkgUrl, {encoding: 'utf8'}));
+
+program
+  .name('nano-bench-compare')
+  .version(pkg.version)
+  .description('View and compare nano-bench results JSON files.')
+  .argument('<files...>', 'one or more results JSON files')
+  .option(
+    '-a, --alpha <alpha>',
+    'significance level for the recompute (default: the first file’s α)',
+    toFloat
+  )
+  .option('-v, --verbose', 'show significance test statistics and critical values')
+  .showHelpAfterError('(add --help to see available options)');
+
+program.parse();
+
+const options = program.opts();
+
+let files;
+try {
+  files = program.args.map(file => ({file, results: loadResults(file)}));
+} catch (error) {
+  program.error(error.message);
+}
+
+const alpha = options.alpha ?? files[0].results.params.alpha ?? 0.05;
+
+const nameCounts = {};
+for (const {results} of files) {
+  for (const series of results.results)
+    nameCounts[series.name] = (nameCounts[series.name] ?? 0) + 1;
+}
+
+const tagOf = ({file, results}) => results.label ?? path.basename(file).replace(/\.json$/, '');
+
+const series = [];
+for (const f of files) {
+  const tag = tagOf(f),
+    {seed, bootstrap} = f.results.params;
+  f.results.results.forEach((s, j) => {
+    const random = mulberry32((seed + Math.imul(j, 0x9e3779b9)) >>> 0);
+    series.push({
+      label: nameCounts[s.name] > 1 ? `${tag}/${s.name}` : s.name,
+      name: s.name,
+      reps: s.reps,
+      bodyHash: s.bodyHash,
+      samples: s.samples,
+      summary: bootstrapSummary(s.samples, {alpha, bootstrap, random})
+    });
+  });
+}
+
+const writer = new Writer();
+const warn = message => writer.writeString(c`{{save.bright.yellow}}⚠ ${message}{{restore}}\n`);
+
+for (const {path: p, values} of diffEnvironments(files.map(f => f.results.environment))) {
+  warn(`environment differs — ${p}: ${values.map(v => JSON.stringify(v)).join(' vs ')}`);
+}
+
+for (const key of ['alpha', 'samples', 'bootstrap']) {
+  const values = files.map(f => f.results.params[key]);
+  if (new Set(values).size > 1) warn(`params.${key} differs across files: ${values.join(' vs ')}`);
+}
+
+for (const name of Object.keys(nameCounts)) {
+  if (nameCounts[name] < 2) continue;
+  const hashes = files.flatMap(f =>
+    f.results.results.filter(s => s.name === name).map(s => s.bodyHash)
+  );
+  if (new Set(hashes).size > 1) {
+    warn(`"${name}" body differs across runs — a measured delta may be code, not noise`);
+  }
+}
+
+const names = series.map(s => s.label),
+  stats = series.map(s => s.summary),
+  iterations = series.map(s => s.reps),
+  sampleArrays = series.map(s => s.samples);
+
+await writer.write(summaryTable(names, stats, iterations));
+
+if (series.length > 1) {
+  const testResult = computeSignificance(sampleArrays, alpha),
+    matrix = significanceMatrix(testResult);
+  writeSignificance(writer, {
+    testResult,
+    matrix,
+    stats,
+    names,
+    results: sampleArrays,
+    alpha,
+    verbose: options.verbose
+  });
+}

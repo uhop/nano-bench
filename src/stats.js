@@ -1,3 +1,5 @@
+import {numericAsc} from './utils/numeric-asc.js';
+
 export const mean = data => {
   let m = 0;
   const size = data.length;
@@ -113,8 +115,6 @@ export const bootstrap = (fn, data, n = 1000, random = Math.random) => {
 
   return results;
 };
-
-const numericAsc = (a, b) => a - b;
 
 export const exactSummary = (data, {alpha = 0.05} = {}) => {
   const sorted = data.slice().sort(numericAsc);

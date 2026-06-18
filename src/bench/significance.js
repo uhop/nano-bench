@@ -1,7 +1,6 @@
 import mwtest from '../significance/mwtest.js';
 import kwtest from '../significance/kwtest.js';
-
-const numericAsc = (a, b) => a - b;
+import {numericAsc} from '../utils/numeric-asc.js';
 
 export const computeSignificance = (seriesArrays, alpha = 0.05) => {
   const sorted = seriesArrays.map(series => series.slice().sort(numericAsc));

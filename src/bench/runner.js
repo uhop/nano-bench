@@ -1,5 +1,7 @@
 import {performance} from 'node:perf_hooks';
 
+import {numericAsc} from '../utils/numeric-asc.js';
+
 /**
  * @typedef {boolean | string} Observe
  *   false / undefined — no instrumentation; true — emit marks with label "default";
@@ -164,7 +166,7 @@ export class Stats {
     this.sorted = object.sorted ?? false;
   }
 
-  static sortNumbersAsc = (a, b) => a - b;
+  static sortNumbersAsc = numericAsc;
 
   ensureSorted() {
     if (!this.sorted) {
