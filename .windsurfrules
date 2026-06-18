@@ -18,7 +18,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - Prettier: 100 char width, single quotes, no bracket spacing, no trailing commas, arrow parens "avoid".
 - 2-space indentation (`.editorconfig`).
 - Imports at top of file. No dynamic imports unless necessary.
-- **No comments that narrate the code.** Don't write a comment that restates *what* the code does. Allowed, each as the shortest possible marker: JSDoc when requested or required; a reference for a non-trivial algorithm; a non-trivial *decision* or constraint — *why* it's this way, including footgun/ordering caveats that have a real reason. The bar is *why*, never *what*. Strip narrating comments opportunistically in files you're already editing.
+- **No comments that narrate the code.** Don't write a comment that restates _what_ the code does. Allowed, each as the shortest possible marker: JSDoc when requested or required; a reference for a non-trivial algorithm; a non-trivial _decision_ or constraint — _why_ it's this way, including footgun/ordering caveats that have a real reason. The bar is _why_, never _what_. Strip narrating comments opportunistically in files you're already editing.
 
 ## Architecture quick reference
 
