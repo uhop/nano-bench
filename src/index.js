@@ -6,7 +6,9 @@ export {
   kurtosis,
   excessKurtosis,
   bootstrap,
-  getWeightedValue
+  getWeightedValue,
+  exactSummary,
+  bootstrapSummary
 } from './stats.js';
 export {median} from './median.js';
 export {StatCounter, streamStats} from './stream-stats.js';
@@ -25,3 +27,5 @@ export {default as compare} from './bench/compare.js';
 export {default as mwtest} from './significance/mwtest.js';
 export {default as kwtest} from './significance/kwtest.js';
 export {default as kstest} from './significance/kstest.js';
+export {computeSignificance} from './bench/significance.js';
+export {mulberry32} from './utils/prng.js';

@@ -2,7 +2,7 @@
 
 ## Project identity
 
-nano-benchmark is an ESM JavaScript package providing command-line utilities (`nano-bench`, `nano-watch`) for micro-benchmarking code with proper nonparametric statistics and significance testing. Node.js 22+, Bun, Deno. The `src/` modules (stats, significance tests, streaming counters) are internal — the user-facing surface is the two CLI tools in `bin/`.
+nano-benchmark is an ESM JavaScript package providing command-line utilities (`nano-bench`, `nano-watch`, `nano-bench-compare`) for micro-benchmarking code with proper nonparametric statistics and significance testing. Node.js 22+, Bun, Deno. The `src/` modules (stats, significance tests, streaming counters) are internal — the user-facing surface is the three CLI tools in `bin/`.
 
 ## Critical rules
 
@@ -10,7 +10,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - **No build step.** Source JS in `src/` and CLI scripts in `bin/` are shipped directly. Do not create build scripts or compiled output.
 - **No TypeScript.** No `.ts` files, no `.d.ts` files. This is a pure JS project.
 - **Do not modify or delete test expectations** without understanding why they changed.
-- **CLI-only project.** The two binaries (`bin/nano-bench.js`, `bin/nano-watch.js`) are the user-facing interface. The `src/` modules are internal implementation details.
+- **CLI-only project.** The three binaries (`bin/nano-bench.js`, `bin/nano-watch.js`, `bin/nano-bench-compare.js`) are the user-facing interface. The `src/` modules are internal implementation details.
 
 ## Code style
 
@@ -21,8 +21,9 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 
 ## Architecture quick reference
 
-- **`bin/nano-bench.js`** — benchmarks multiple functions, compares them with bootstrap CI and significance tests, outputs a styled table.
+- **`bin/nano-bench.js`** — benchmarks multiple functions, compares them with bootstrap CI and significance tests, outputs a styled table; `--json` writes a results file.
 - **`bin/nano-watch.js`** — continuously benchmarks a single function in streaming mode, showing live stats and memory usage.
+- **`bin/nano-bench-compare.js`** — reads results JSON, recomputes significance, and renders view/compare tables with an environment-diff banner; no benchmarking.
 - **`src/bench/runner.js`** — core benchmark engine: `findLevel`, `benchmark`, `benchmarkSeries`, `measure`, `Stats`. The orchestrating functions (`findLevel`, `benchmarkSeries`, `benchmarkSeriesPar`, `measure`, `measurePar`) accept an `observe: boolean | string` option that emits User Timing marks at phase boundaries (`nano-bench/<label>/<phase>`).
 - **`src/bench/compare.js`** — high-level `compare()` that measures multiple functions and runs significance tests.
 - **`src/stats.js`** — batch statistics: `mean`, `variance`, `stdDev`, `skewness`, `kurtosis`, `bootstrap`, `getWeightedValue`.
@@ -49,7 +50,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 
 ## File layout
 
-- CLI binaries: `bin/nano-bench.js`, `bin/nano-watch.js`
+- CLI binaries: `bin/nano-bench.js`, `bin/nano-watch.js`, `bin/nano-bench-compare.js`
 - Internal source: `src/` (stats, significance, bench runner, streaming counters, utils)
 - Tests: `tests/test-*.js`
 - Example benchmarks: `bench/bench-*.js`, `bench/watch-*.js`
