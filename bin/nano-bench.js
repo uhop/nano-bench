@@ -24,9 +24,8 @@ import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
 import {findLevel, benchmarkSeries, benchmarkSeriesPar} from '../src/bench/runner.js';
-import {bootstrap, getWeightedValue, mean} from '../src/stats.js';
-import mwtest from '../src/significance/mwtest.js';
-import kwtest from '../src/significance/kwtest.js';
+import {exactSummary, bootstrapSummary} from '../src/stats.js';
+import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import selectFunctions from '../src/bench/select-functions.js';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
@@ -121,27 +120,6 @@ let updater;
 process.once('exit', () => updater?.done());
 process.once('SIGINT', async () => process.exit(130));
 process.once('SIGTERM', () => process.exit(143));
-
-// setup running the benchmark
-
-const numericSortingAsc = (a, b) => a - b;
-const getPercentile = weight => samples =>
-  getWeightedValue(samples.sort(numericSortingAsc), weight);
-
-const getStats = samples => {
-  samples.sort(numericSortingAsc);
-  const median = getWeightedValue(samples, 0.5),
-    lo = getWeightedValue(samples, options.alpha / 2),
-    hi = getWeightedValue(samples, 1 - options.alpha / 2);
-  return {median, lo, hi, bootstrap: false};
-};
-
-const getBootstrapStats = samples => {
-  const median = mean(bootstrap(getPercentile(0.5), samples, options.bootstrap)),
-    lo = mean(bootstrap(getPercentile(options.alpha / 2), samples, options.bootstrap)),
-    hi = mean(bootstrap(getPercentile(1 - options.alpha / 2), samples, options.bootstrap));
-  return {median, lo, hi, bootstrap: true};
-};
 
 const normalizeSamples = (samples, batchSize) => {
   for (let i = 0; i < samples.length; ++i) {
@@ -286,10 +264,13 @@ for (let i = 0; i < iterations.length; ++i) {
     });
   normalizeSamples(samples, batchSize);
   results.push(samples);
-  stats.push(getStats(samples));
+  stats.push({...exactSummary(samples, {alpha: options.alpha}), bootstrap: false});
   await updater.update();
   await sleep(5);
-  stats[i] = getBootstrapStats(samples);
+  stats[i] = {
+    ...bootstrapSummary(samples, {alpha: options.alpha, bootstrap: options.bootstrap}),
+    bootstrap: true
+  };
   await updater.update();
   await sleep(5);
 }
@@ -297,25 +278,10 @@ for (let i = 0; i < iterations.length; ++i) {
 await updater.final();
 updater = null;
 
-// calculate significance
-
 if (results.length > 1) {
-  for (const samples of results) samples.sort(numericSortingAsc);
-
   const isPair = results.length == 2,
-    testResult = isPair
-      ? mwtest(results[0], results[1], options.alpha)
-      : kwtest(results, options.alpha);
-
-  let significance = null;
-  if (testResult.different) {
-    significance = isPair
-      ? [
-          [false, true],
-          [true, false]
-        ]
-      : testResult.groupDifference;
-  }
+    testResult = computeSignificance(results, options.alpha),
+    significance = significanceMatrix(testResult);
 
   const methodName = isPair
       ? 'Mann–Whitney U test (two-sided, tie-corrected)'

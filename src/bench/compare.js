@@ -1,6 +1,5 @@
 import {measure, measurePar} from './runner.js';
-import kwtest from '../significance/kwtest.js';
-import mwtest from '../significance/mwtest.js';
+import {computeSignificance} from './significance.js';
 
 const ALPHA = 0.05;
 
@@ -20,17 +19,14 @@ const compare = async (inputs, options = {}, report) => {
   stats.forEach(stat => stat.normalizeReps());
 
   report?.('calculating-significance', {stats, options});
-  let results;
-  if (keys.length > 2) {
-    results = kwtest(
+  const results = {
+    ...computeSignificance(
       stats.map(stat => stat.data),
       options.alpha
-    );
-  } else {
-    results = mwtest(stats[0].data, stats[1].data, options.alpha);
-  }
-  results.data = stats.map(stat => stat.data);
-  results.reps = reps;
+    ),
+    data: stats.map(stat => stat.data),
+    reps
+  };
   report?.('significance-results', results);
   return results;
 };

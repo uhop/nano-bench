@@ -99,18 +99,40 @@ export const getWeightedValue = (sortedArray, weight = 0.5) => {
   );
 };
 
-export const bootstrap = (fn, data, n = 1000) => {
+export const bootstrap = (fn, data, n = 1000, random = Math.random) => {
   const size = data.length,
     samples = new Array(data.length),
     results = new Array(n);
 
   for (let i = 0; i < n; ++i) {
-    // resample
     for (let j = 0; j < size; ++j) {
-      samples[j] = data[Math.floor(Math.random() * size)];
+      samples[j] = data[Math.floor(random() * size)];
     }
     results[i] = fn(samples);
   }
 
   return results;
+};
+
+const numericAsc = (a, b) => a - b;
+
+export const exactSummary = (data, {alpha = 0.05} = {}) => {
+  const sorted = data.slice().sort(numericAsc);
+  return {
+    median: getWeightedValue(sorted, 0.5),
+    lo: getWeightedValue(sorted, alpha / 2),
+    hi: getWeightedValue(sorted, 1 - alpha / 2)
+  };
+};
+
+export const bootstrapSummary = (
+  data,
+  {alpha = 0.05, bootstrap: n = 1000, random = Math.random} = {}
+) => {
+  const percentile = weight => sample => getWeightedValue(sample.sort(numericAsc), weight);
+  return {
+    median: mean(bootstrap(percentile(0.5), data, n, random)),
+    lo: mean(bootstrap(percentile(alpha / 2), data, n, random)),
+    hi: mean(bootstrap(percentile(1 - alpha / 2), data, n, random))
+  };
 };
