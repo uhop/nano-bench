@@ -8,24 +8,21 @@ import {readFile} from 'node:fs/promises';
 import {Option, program} from 'commander';
 
 import {CURSOR_NORMAL, CURSOR_INVISIBLE, CLEAR_EOL} from 'console-toolkit/ansi';
-import {infinity, minus, multiplication} from 'console-toolkit/symbols.js';
 import {
-  abbrNumber,
-  compareDifference,
   formatInteger,
   formatNumber,
   formatTime,
   prepareTimeFormat
 } from 'console-toolkit/alphanumeric/number-formatters.js';
-import style, {c} from 'console-toolkit/style';
-import makeTable from 'console-toolkit/table';
-import lineTheme from 'console-toolkit/themes/lines/unicode-rounded.js';
+import {c} from 'console-toolkit/style';
 import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
 import {findLevel, benchmarkSeries, benchmarkSeriesPar} from '../src/bench/runner.js';
 import {exactSummary, bootstrapSummary} from '../src/stats.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
+import {summaryTable} from '../src/bench/render/summary-table.js';
+import {writeSignificance} from '../src/bench/render/significance-table.js';
 import selectFunctions from '../src/bench/select-functions.js';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
@@ -97,7 +94,7 @@ const fileName = pathToFileURL(path.join(process.cwd(), args[0]));
 
 let fns;
 try {
-  const file = await import(fileName);
+  const file = await import(fileName.href);
   fns = file[options.export];
 } catch (error) {
   program.error(`File not found: ${args[0]} (${fileName})`);
@@ -130,14 +127,6 @@ const normalizeSamples = (samples, batchSize) => {
 
 const benchSeries = options.parallel ? benchmarkSeriesPar : benchmarkSeries;
 
-const bold = s => style.bold.text(s),
-  num = s => style.bright.yellow.text(s),
-  faster = s => style.bright.green.text(bold(s) + ' faster'),
-  slower = s => style.bright.red.text(bold(s) + ' slower');
-
-const rabbit = '\u{1f407}',
-  turtle = '\u{1f422}';
-
 let iterations = [];
 if (options.iterations > 0) {
   iterations = new Array(names.length).fill(Math.max(options.iterations, options.minIterations));
@@ -146,9 +135,7 @@ if (options.iterations > 0) {
 await writer.write([
   c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: ${program.description()}`,
   '',
-  c`Confidence interval: {{save.bright.yellow}}${formatNumber(100 * (1 - options.alpha), {
-    precision: 2
-  })}%{{restore}} bootstrap-percentile of the median ({{save.bright.yellow}}${formatInteger(
+  c`Confidence interval: {{save.bright.yellow}}${formatNumber(100 * (1 - options.alpha), /** @type {any} */ ({precision: 2}))}%{{restore}} bootstrap-percentile of the median ({{save.bright.yellow}}${formatInteger(
     options.bootstrap
   )}{{restore}} resamples), samples: {{save.bright.yellow}}${formatInteger(
     options.samples
@@ -172,55 +159,7 @@ await writer.write([
 const results = [],
   stats = [];
 
-const tableHeader1 = [
-    {value: 'name', height: 2, align: 'dc'},
-    {value: 'time', width: 3, align: 'c'},
-    null,
-    null,
-    {value: 'op/s', height: 2, align: 'dc'},
-    {value: 'batch', height: 2, align: 'dc'}
-  ].map(cell => (cell ? {...cell, value: bold(cell.value)} : null)),
-  tableHeader2 = [
-    null,
-    {value: 'median', align: 'c'},
-    {value: '+', align: 'c'},
-    {value: minus, align: 'c'},
-    null,
-    null
-  ].map(cell => (cell ? {...cell, value: bold(cell.value)} : null));
-
-const makeTableData = () => {
-  const tableData = [tableHeader1, tableHeader2];
-  for (let i = 0; i < names.length; ++i) {
-    const row = [bold(names[i])],
-      s = stats[i];
-    if (s) {
-      const format = prepareTimeFormat([s.median - s.lo, s.median, s.hi - s.median], 1000);
-      row.push(
-        {value: bold(num(formatTime(s.median, format))), align: 'r'},
-        {value: num('+' + formatTime(s.hi - s.median, format)), align: 'r'},
-        {value: num(minus + formatTime(s.median - s.lo, format)), align: 'r'},
-        {value: num(abbrNumber(1000 / s.median)), align: 'r'}
-      );
-    } else if (i == stats.length) {
-      row.push({value: 'measuring...', width: 4}, null, null, null);
-    } else {
-      row.push(null, null, null, null);
-    }
-    row.push(i < iterations.length ? {value: num(abbrNumber(iterations[i])), align: 'r'} : null);
-    tableData.push(row);
-  }
-  return tableData;
-};
-
-// find the level
-
-const report = () => {
-  const tableData = makeTableData(),
-    table = makeTable(tableData, lineTheme);
-  table.vAxis[2] = 2;
-  return table.toStrings();
-};
+const report = () => summaryTable(names, stats, iterations);
 
 updater = new Updater(
   report,
@@ -279,87 +218,15 @@ await updater.final();
 updater = null;
 
 if (results.length > 1) {
-  const isPair = results.length == 2,
-    testResult = computeSignificance(results, options.alpha),
-    significance = significanceMatrix(testResult);
-
-  const methodName = isPair
-      ? 'Mann–Whitney U test (two-sided, tie-corrected)'
-      : 'Kruskal–Wallis H test',
-    postHoc = isPair ? '' : '; post-hoc: Conover–Iman pairwise';
-  writer.writeString(
-    c`\n{{save.bold}}Significance:{{restore}} ${methodName}, α = {{save.bright.yellow}}${options.alpha}{{restore}}${postHoc}\n`
-  );
-
-  if (options.verbose) {
-    const arrow = testResult.different ? 'reject H₀' : 'fail to reject H₀',
-      rel = testResult.different ? '>' : '≤';
-    if (isPair) {
-      const z = testResult.value,
-        zCrit = Math.abs(testResult.limit);
-      writer.writeString(
-        `  z = ${z.toFixed(2)}, |z| ${rel} z_crit = ${zCrit.toFixed(2)} → ${arrow}\n`
-      );
-    } else {
-      const H = testResult.value,
-        HCrit = testResult.limit;
-      writer.writeString(
-        `  H = ${H.toFixed(2)} ${rel} H_crit = ${HCrit.toFixed(2)} (β-approx) → ${arrow}\n`
-      );
-      if (testResult.C !== undefined) {
-        const threshold = testResult.C * Math.sqrt(1 / results[0].length + 1 / results[1].length);
-        writer.writeString(
-          `  post-hoc threshold (Conover–Iman): C·√(1/nᵢ+1/nⱼ) = ${threshold.toFixed(2)} (C = ${testResult.C.toFixed(2)})\n`
-        );
-      }
-    }
-  }
-
-  if (significance) {
-    const sortedStats = stats.slice().sort((a, b) => a.median - b.median),
-      tableData = [['  ', bold('#'), bold('name')]];
-    for (let i = 0; i < names.length; ++i) {
-      tableData[0].push({value: bold(formatInteger(i + 1)), align: 'c'});
-      const row = [null, formatInteger(i + 1), bold(names[i])],
-        signRow = significance[i];
-      for (let j = 0; j < signRow.length; ++j) {
-        if (signRow[j]) {
-          const result = compareDifference(stats[i].median, stats[j].median);
-          let text = '';
-          if (result.infinity) {
-            text = infinity;
-          } else if (result.percentage) {
-            text = result.percentage + '%';
-          } else if (result.ratio) {
-            text = result.ratio + multiplication;
-          }
-          if (text) {
-            text = result.less ? faster(text) : slower(text);
-            row.push({value: text, align: 'c'});
-          } else {
-            row.push(null);
-          }
-        } else {
-          row.push(null);
-        }
-      }
-      if (stats[i] === sortedStats[0]) {
-        row[0] = {value: '\t1', align: 'c'};
-      } else if (stats[i] === sortedStats[sortedStats.length - 1]) {
-        row[0] = {value: '\t2', align: 'c'};
-      }
-      tableData.push(row);
-    }
-    const table = makeTable(tableData, lineTheme);
-    table.vAxis[1] = 2;
-    writer.writeString(
-      c`{{save.bright.cyan.bold}}The difference is statistically significant:{{restore}}\n\n`
-    );
-    const tableStrings = table
-      .toStrings()
-      .map(line => line.replace(/\t(1|2)/g, m => (m[1] == '2' ? turtle : rabbit)));
-    writer.write(tableStrings);
-  } else {
-    writer.writeString('The difference is not statistically significant.\n');
-  }
+  const testResult = computeSignificance(results, options.alpha),
+    matrix = significanceMatrix(testResult);
+  writeSignificance(writer, {
+    testResult,
+    matrix,
+    stats,
+    names,
+    results,
+    alpha: options.alpha,
+    verbose: options.verbose
+  });
 }

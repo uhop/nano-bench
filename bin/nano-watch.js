@@ -67,7 +67,7 @@ const fileName = pathToFileURL(path.join(process.cwd(), args[0]));
 
 let fn;
 try {
-  const file = await import(fileName);
+  const file = await import(fileName.href);
   fn = file[options.export];
 } catch (error) {
   program.error(`File not found: ${args[0]} (${fileName})`);
@@ -89,6 +89,7 @@ await writer.writeString(
   c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: ${program.description()}\n\n`
 );
 
+/** @type {any} */
 let updater;
 
 process.once('exit', () => updater?.done());
@@ -151,7 +152,7 @@ const showData = time => {
         )
         .concat(
           [statCounter.skewness, statCounter.kurtosis]
-            .map(value => formatNumber(value, {precision: 3}))
+            .map(value => formatNumber(value, /** @type {any} */ ({precision: 3})))
             .map(value => style.bright.yellow.text(value))
         ),
       [
@@ -182,7 +183,10 @@ const showData = time => {
         null
       ]
     ],
-    table = makeTable(tableData, lineTheme, {hAlignDefault: 'r', states: {rowFirst: style.bold}});
+    table = makeTable(tableData, lineTheme, {
+      hAlignDefault: 'r',
+      states: {rowFirst: /** @type {any} */ (style.bold)}
+    });
 
   table.vAxis[3] = 2;
 
