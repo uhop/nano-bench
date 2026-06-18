@@ -21,6 +21,7 @@ import Updater from 'console-toolkit/output/updater.js';
 import {findLevel, benchmarkSeries, benchmarkSeriesPar} from '../src/bench/runner.js';
 import {exactSummary, bootstrapSummary} from '../src/stats.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
+import {mulberry32} from '../src/utils/prng.js';
 import {summaryTable} from '../src/bench/render/summary-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import selectFunctions from '../src/bench/select-functions.js';
@@ -63,6 +64,7 @@ program
   .option('-s, --samples <samples>', 'number of samples', toInt, 100)
   .option('-p, --parallel', 'collect samples in parallel')
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
+  .option('--seed <seed>', 'bootstrap RNG seed (32-bit integer; default: random)', toInt)
   .option(
     '-o, --observe',
     'emit User Timing marks at phase boundaries (PerformanceObserver/DevTools)'
@@ -126,6 +128,8 @@ const normalizeSamples = (samples, batchSize) => {
 };
 
 const benchSeries = options.parallel ? benchmarkSeriesPar : benchmarkSeries;
+
+const seed = (options.seed ?? Math.random() * 2 ** 32) >>> 0;
 
 let iterations = [];
 if (options.iterations > 0) {
@@ -207,7 +211,11 @@ for (let i = 0; i < iterations.length; ++i) {
   await updater.update();
   await sleep(5);
   stats[i] = {
-    ...bootstrapSummary(samples, {alpha: options.alpha, bootstrap: options.bootstrap}),
+    ...bootstrapSummary(samples, {
+      alpha: options.alpha,
+      bootstrap: options.bootstrap,
+      random: mulberry32((seed + Math.imul(i, 0x9e3779b9)) >>> 0)
+    }),
     bootstrap: true
   };
   await updater.update();
