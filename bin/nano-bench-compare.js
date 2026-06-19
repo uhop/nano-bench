@@ -34,6 +34,7 @@ program
   )
   .option('-v, --verbose', 'show significance test statistics and critical values')
   .option('--pooled', 'compare all series as one k-sample omnibus instead of pairing by name')
+  .option('--no-emoji', 'use ASCII fastest/slowest markers (F/S) instead of emoji')
   .showHelpAfterError('(add --help to see available options)');
 
 program.parse();
@@ -118,7 +119,8 @@ const renderBlock = (members, name) => {
     names: members.map(s => (name ? s.tag : s.label)),
     results: arrays,
     alpha,
-    verbose: options.verbose
+    verbose: options.verbose,
+    emoji: options.emoji
   });
 };
 

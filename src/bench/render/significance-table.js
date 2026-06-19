@@ -14,7 +14,7 @@ const rabbit = '\u{1f407}',
 
 export const writeSignificance = (
   writer,
-  {testResult, matrix, stats, names, results, alpha, verbose}
+  {testResult, matrix, stats, names, results, alpha, verbose, emoji = true}
 ) => {
   const isPair = results.length == 2;
   const methodName = isPair
@@ -51,7 +51,7 @@ export const writeSignificance = (
 
   if (matrix) {
     const sortedStats = stats.slice().sort((a, b) => a.median - b.median),
-      tableData = /** @type {any[]} */ ([['  ', bold('#'), bold('name')]]);
+      tableData = /** @type {any[]} */ ([[null, bold('#'), bold('name')]]);
     for (let i = 0; i < names.length; ++i) {
       tableData[0].push({value: bold(formatInteger(i + 1)), align: 'c'});
       const row = /** @type {any[]} */ ([null, formatInteger(i + 1), bold(names[i])]),
@@ -78,9 +78,9 @@ export const writeSignificance = (
         }
       }
       if (stats[i] === sortedStats[0]) {
-        row[0] = {value: rabbit, align: 'c'};
+        row[0] = {value: emoji ? rabbit : 'F', align: 'c'};
       } else if (stats[i] === sortedStats[sortedStats.length - 1]) {
-        row[0] = {value: turtle, align: 'c'};
+        row[0] = {value: emoji ? turtle : 'S', align: 'c'};
       }
       tableData.push(row);
     }

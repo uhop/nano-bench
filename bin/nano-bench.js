@@ -28,6 +28,8 @@ import selectFunctions from '../src/bench/select-functions.js';
 import {bodyHash} from '../src/utils/body-hash.js';
 import {captureEnvironment} from '../src/bench/results/environment.js';
 import {buildResultsObject} from '../src/bench/results/build.js';
+import {computeHistograms} from '../src/bench/histogram.js';
+import {writeHistograms} from '../src/bench/render/histogram-chart.js';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
   toInt = value => parseInt(value),
@@ -77,6 +79,14 @@ program
     'emit User Timing marks at phase boundaries (PerformanceObserver/DevTools)'
   )
   .option('-v, --verbose', 'show significance test statistics and critical values')
+  .option('--histogram', 'show a distribution histogram per function')
+  .addOption(
+    new Option('--chart <type>', 'histogram orientation')
+      .choices(['columns', 'bars'])
+      .default('columns')
+  )
+  .option('--bins <bins>', 'histogram bin count (default: auto, Freedman–Diaconis)', toInt)
+  .option('--no-emoji', 'use ASCII fastest/slowest markers (F/S) instead of emoji')
   .option('--self', 'print the file name to stdout and exit')
   .showHelpAfterError('(add --help to see available options)');
 
@@ -244,7 +254,18 @@ if (results.length > 1) {
     names,
     results,
     alpha: options.alpha,
-    verbose: options.verbose
+    verbose: options.verbose,
+    emoji: options.emoji
+  });
+}
+
+if (options.histogram) {
+  const maxBins = Math.max(8, Math.min(40, Math.floor(((process.stdout.columns || 80) - 4) / 2)));
+  writeHistograms(writer, {
+    names,
+    hist: computeHistograms(results, {bins: options.bins, maxBins}),
+    orientation: options.chart,
+    emoji: options.emoji
   });
 }
 
