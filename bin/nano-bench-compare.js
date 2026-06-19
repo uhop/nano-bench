@@ -15,6 +15,7 @@ import {summaryTable} from '../src/bench/render/summary-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {loadResults} from '../src/bench/results/load.js';
 import {diffEnvironments} from '../src/bench/results/environment.js';
+import {planComparison} from '../src/bench/pair-series.js';
 
 const toFloat = value => parseFloat(value);
 
@@ -32,6 +33,7 @@ program
     toFloat
   )
   .option('-v, --verbose', 'show significance test statistics and critical values')
+  .option('--pooled', 'compare all series as one k-sample omnibus instead of pairing by name')
   .showHelpAfterError('(add --help to see available options)');
 
 program.parse();
@@ -63,6 +65,7 @@ for (const f of files) {
     const random = mulberry32((seed + Math.imul(j, 0x9e3779b9)) >>> 0);
     series.push({
       label: nameCounts[s.name] > 1 ? `${tag}/${s.name}` : s.name,
+      tag,
       name: s.name,
       reps: s.reps,
       bodyHash: s.bodyHash,
@@ -94,23 +97,41 @@ for (const name of Object.keys(nameCounts)) {
   }
 }
 
-const names = series.map(s => s.label),
-  stats = series.map(s => s.summary),
-  iterations = series.map(s => s.reps),
-  sampleArrays = series.map(s => s.samples);
+await writer.write(
+  summaryTable(
+    series.map(s => s.label),
+    series.map(s => s.summary),
+    series.map(s => s.reps)
+  )
+);
 
-await writer.write(summaryTable(names, stats, iterations));
-
-if (series.length > 1) {
-  const testResult = computeSignificance(sampleArrays, alpha),
+const renderBlock = (members, name) => {
+  if (members.length < 2) return;
+  const arrays = members.map(s => s.samples),
+    testResult = computeSignificance(arrays, alpha),
     matrix = significanceMatrix(testResult);
+  if (name) writer.writeString(c`\n{{save.bold.cyan}}${name}{{restore}}\n`);
   writeSignificance(writer, {
     testResult,
     matrix,
-    stats,
-    names,
-    results: sampleArrays,
+    stats: members.map(s => s.summary),
+    names: members.map(s => (name ? s.tag : s.label)),
+    results: arrays,
     alpha,
     verbose: options.verbose
   });
+};
+
+const {blocks, unpaired, degraded} = planComparison(series, {pooled: options.pooled});
+
+for (const {name, members} of blocks) renderBlock(members, name);
+
+if (unpaired.length) {
+  writer.writeString(
+    c`\n{{save.dim}}Not compared (one series each): ${unpaired.join(', ')}{{restore}}\n`
+  );
+} else if (degraded && series.length > 1) {
+  writer.writeString(
+    c`\n{{save.dim}}No shared names; compared all series together — pass --pooled to silence.{{restore}}\n`
+  );
 }

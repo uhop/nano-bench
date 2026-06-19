@@ -263,6 +263,46 @@ is the _same_ significance table `nano-bench` builds (`bin/nano-bench.js:310`),
 shared with `nano-bench-compare` once it is lifted out of `bin/` (see Effort), plus
 a metadata-diff banner.
 
+### Default mode: paired by name; `--pooled` for the omnibus (D15)
+
+Modes 1 and 2 are **not** equally good defaults. The headline use case — "save a
+baseline, run a new version, compare" — is mode 1: one before/after test per
+shared name. Mode 2's pooled Kruskal–Wallis answers a different question ("which
+of these _k_ series differ from which") and, used as the default for a
+before/after, actively misleads. With two files of `{plus, template}` it builds a
+4×4 post-hoc grid whose only meaningful cells are the two same-name pairs — the
+cross-name cells (`base/plus` vs `new/template`) are noise, and the omnibus is
+dominated by the (already-known) `plus`-vs-`template` gap rather than the version
+change. Worse, Kruskal–Wallis ranks all observations _together_ and Conover–Iman
+divides by the pooled rank variance, so an unrelated series in the pool perturbs
+the verdict of the comparison you actually care about — same raw data, potentially
+different verdict.
+
+So **paired-by-name is the default; `--pooled` opts into the omnibus.** The
+resolution rule:
+
+- `--pooled` → one test over **all** series (the v1 behaviour), any file count.
+- default → partition series by `name`; **one test per name with ≥2 series**
+  (2 → Mann–Whitney before/after; 3+ versions of one name → Kruskal–Wallis within
+  that group). A name appearing once is shown in the summary table but not
+  significance-tested, with a one-line "not compared" note.
+- default with **no** shared name (a single file, or files with disjoint names) →
+  degrade to one omnibus over all series, with a note saying why. This keeps
+  `nano-bench-compare one-file.json` reproducing the in-run table (tier-1 render,
+  § 4) and stops the disjoint case from going silently empty.
+
+Note the boundary: two files each with one same-named series collapse to a single
+Mann–Whitney under _either_ mode, so the simplest before/after is identical; the
+modes diverge only once a run carries multiple methods or 3+ series are compared.
+
+The summary table stays global and descriptive in every mode; only the
+significance section forks. Both renderers (`summaryTable`, `writeSignificance`)
+are already pure functions over a _list_ of series, so paired mode is "call them
+once per name-group" — no renderer or schema change. Paired blocks label rows by
+source `tag` (the `--label` or file basename), since the shared `name` sits in the
+block heading; pooled blocks keep the qualified `tag/name` labels. The grouping is
+a pure, unit-tested `planComparison(series, {pooled})` in `src/bench/pair-series.js`.
+
 ### Identity, matching, and the recompute α
 
 - **A run is identified by the file path** passed to `nano-bench-compare`
@@ -372,16 +412,19 @@ Consumer — `nano-bench-compare`, reads JSON only, never benchmarks:
 
 ```
 nano-bench-compare results.json                  # render one
-nano-bench-compare base.json new.json            # before/after compare
+nano-bench-compare base.json new.json            # before/after, paired by name (default)
+nano-bench-compare base.json new.json --pooled   # one k-sample omnibus over all series
 nano-bench-compare a.json b.json c.json …        # k-way compare
 ```
 
 The arg model is clean because the split is clean (Decision D5): the runner owns
 the bench-file positional, the comparator owns JSON positionals; neither overloads
 the other. `nano-bench-compare --alpha <n>` overrides the recorded α for the
-recompute (default: the baseline file's α — § 3). A future `--select <name…>` can
-pick a subset of named series across the given files (§ 3 mode 3), but the default
-— compare all shared names — covers the common case.
+recompute (default: the baseline file's α — § 3). `--pooled` switches from the
+default paired-by-name significance to the all-series Kruskal–Wallis omnibus
+(§ 3, D15). A future `--select <name…>` can pick a subset of named series across
+the given files (§ 3 mode 3), but the default — pair all shared names — covers the
+common case.
 
 ## Direct answers to the user's questions
 
@@ -466,6 +509,16 @@ lives in the shared [`README.md`](./README.md) decision table.)
   new dependency (`Math.random` isn't seedable, and is used only to source the auto
   seed); `sfc32` / `xoshiro128**` are drop-in swaps behind the same `random()`
   interface if more quality is ever wanted.
+- **D15** — _resolved:_ `nano-bench-compare` defaults to **paired-by-name**
+  significance (one before/after test per shared name); `--pooled` opts into the
+  all-series Kruskal–Wallis omnibus. Rationale: the before/after the feature exists
+  for is mode 1 (§ 3), but the shipped v1 only did pooled mode 2, whose omnibus +
+  all-pairs grid buries the two meaningful same-name cells among meaningless
+  cross-name ones and lets unrelated series perturb the pooled ranks. Degrade
+  clause: with no shared name (single file / disjoint names) paired falls back to
+  one omnibus so tier-1 render still shows the in-run table. Grouping lifted to a
+  pure, unit-tested `planComparison` (`src/bench/pair-series.js`); renderers and
+  schema unchanged.
 
 ## Effort / risk
 
