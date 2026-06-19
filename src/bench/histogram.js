@@ -7,6 +7,10 @@ export const percentile = (sorted, p) => {
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
 };
 
+// default histogram bin count: scale with sample size, fit the screen, floor so it's not sparse
+export const binCount = (samples, width) =>
+  Math.max(12, Math.min(48, width, Math.round(samples / 3)));
+
 const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
 
 // Freedman–Diaconis: IQR-based bin width, robust to the right tails timing data has.

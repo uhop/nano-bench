@@ -28,7 +28,7 @@ import selectFunctions from '../src/bench/select-functions.js';
 import {bodyHash} from '../src/utils/body-hash.js';
 import {captureEnvironment} from '../src/bench/results/environment.js';
 import {buildResultsObject} from '../src/bench/results/build.js';
-import {computeHistograms} from '../src/bench/histogram.js';
+import {computeHistograms, binCount} from '../src/bench/histogram.js';
 import {writeHistograms} from '../src/bench/render/histogram-chart.js';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
@@ -264,7 +264,7 @@ if (options.histogram) {
   writeHistograms(writer, {
     names,
     hist: computeHistograms(results, {
-      bins: options.bins || Math.max(12, Math.min(48, width, Math.round(options.samples / 3))),
+      bins: options.bins || binCount(options.samples, width),
       maxBins: width
     }),
     orientation: options.chart,

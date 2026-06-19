@@ -3,7 +3,7 @@
 import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 
-import {program} from 'commander';
+import {Option, program} from 'commander';
 
 import {c} from 'console-toolkit/style';
 import Writer from 'console-toolkit/output/writer.js';
@@ -16,8 +16,11 @@ import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {loadResults} from '../src/bench/results/load.js';
 import {diffEnvironments} from '../src/bench/results/environment.js';
 import {planComparison} from '../src/bench/pair-series.js';
+import {computeHistograms, binCount} from '../src/bench/histogram.js';
+import {writeHistograms} from '../src/bench/render/histogram-chart.js';
 
-const toFloat = value => parseFloat(value);
+const toFloat = value => parseFloat(value),
+  toInt = value => parseInt(value);
 
 const pkgUrl = new URL('../package.json', import.meta.url),
   pkg = JSON.parse(await readFile(pkgUrl, {encoding: 'utf8'}));
@@ -35,6 +38,13 @@ program
   .option('-v, --verbose', 'show significance test statistics and critical values')
   .option('--pooled', 'compare all series as one k-sample omnibus instead of pairing by name')
   .option('--no-emoji', 'use ASCII fastest/slowest markers (F/S) instead of emoji')
+  .option('--histogram', 'show a distribution histogram per series')
+  .addOption(
+    new Option('--chart <type>', 'histogram orientation')
+      .choices(['columns', 'bars'])
+      .default('columns')
+  )
+  .option('--bins <bins>', 'histogram bin count (default: auto)', toInt)
   .showHelpAfterError('(add --help to see available options)');
 
 program.parse();
@@ -136,4 +146,18 @@ if (unpaired.length) {
   writer.writeString(
     c`\n{{save.dim}}No shared names; compared all series together — pass --pooled to silence.{{restore}}\n`
   );
+}
+
+if (options.histogram) {
+  const width = Math.max(16, (writer.columns || 80) - 2),
+    n = Math.min(...series.map(s => s.samples.length));
+  writeHistograms(writer, {
+    names: series.map(s => s.label),
+    hist: computeHistograms(
+      series.map(s => s.samples),
+      {bins: options.bins || binCount(n, width), maxBins: width}
+    ),
+    orientation: options.chart,
+    emoji: options.emoji
+  });
 }

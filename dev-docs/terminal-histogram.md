@@ -7,11 +7,14 @@ D6) — same goal (show distribution _shape_) by a lighter, terminal-first means
 The original design below stands; § "As implemented" records what shipped and the
 open follow-ups.
 
-## As implemented (2026-06-19, nano-bench only)
+## As implemented (2026-06-19)
 
-Behind `--histogram` on `nano-bench` (compare wiring deferred — the binning module
-is shared and ready). Surface: `--histogram` enables it, `--chart columns|bars`
-picks orientation (default `columns`), `--bins N` overrides the auto count.
+Behind `--histogram` on **both** `nano-bench` (in-run samples) and
+`nano-bench-compare` (reloaded series across files), reusing the same binning module
+and renderer; compare draws one chart per series on a shared axis (matching its
+summary table), with the bin count keyed to the smallest series' sample count.
+Surface (identical on both): `--histogram` enables it, `--chart columns|bars` picks
+orientation (default `columns`), `--bins N` overrides the auto count.
 
 - **Binning** — `src/bench/histogram.js`, pure + unit-tested (`tests/test-histogram.js`).
   **One shared range and bin set across all series** (global range, then each
@@ -63,8 +66,6 @@ multimodality, skew, or the tail.
   per-function panels** is the natural follow-up.
 - **Bars (`--chart bars`) is basic** — functional but tall/sparse for many bins on
   one function; it's meant for the grouped/stacking case, which is later polish.
-- **nano-bench only** — `nano-bench-compare` wiring is a follow-up (the binning
-  module is shared, so it's a small one).
 
 ## Problem
 
