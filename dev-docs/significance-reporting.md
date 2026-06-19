@@ -109,6 +109,20 @@ so one value covers every pair.
   name (cheap, directly answers the request). Reserve numeric detail for `-v`.
 - **D2 — how much detail by default:** test name + α only. Statistic values
   (z, H, critical values) behind `-v`.
+- **D16 — glyph widths in the significance table (fixed 2026-06-19):** render the
+  fastest/slowest markers (🐇/🐢) as real emoji placed directly in the cell, and let
+  `console-toolkit` measure widths — no placeholder or spacing hack.
+  `console-toolkit` imports `emoji-regex` and `get-east-asian-width` _softly_
+  (optional, squelched if absent), so with neither in the dependency tree every wide
+  glyph measures as 1 column — emoji markers (and East-Asian function names) then
+  overflow their cell and shift the rest of the row. Fix: declare **both** as direct
+  nano-bench dependencies so measurement is always faithful (emoji → 2 cols; CJK /
+  fullwidth / Hangul → 2). This retired the prior `\t1`/`\t2`
+  tab-placeholder-then-`replace` hack in the now-shared renderer
+  (`src/bench/render/significance-table.js`), which aligned only by accident of how
+  the table counted a tab. The defect surfaced in `nano-bench-compare`; plain
+  `nano-bench` had masked it because the placeholder happened to reserve the 2
+  columns the emoji needs.
 
 ## Effort / risk
 
@@ -116,7 +130,9 @@ Small. Output/wording only; no engine or data-model change. The names and α are
 deterministic from the branch already taken at `bin/nano-bench.js:298`/`305`.
 Watch the table-rendering width (console-toolkit) when adding header lines, and
 keep the new strings out of the JSON path (doc 3 stores the test identity as a
-structured field, not this prose).
+structured field, not this prose). Glyph-width correctness for the marker emoji
+and wide (East-Asian) names is settled by D16 — real measurement via deps, no
+spacing hacks.
 
 ## Cross-references
 
