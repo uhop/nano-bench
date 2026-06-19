@@ -1,9 +1,58 @@
 # Terminal histogram of sample distributions
 
-Status: **design**. Future / optional (queue Priority −1). Viewer-side, and a
-sibling to the deferred HTML/SVG viewer
+Status: **implemented (nano-bench, 2026-06-19)** — was queue Priority −1.
+Viewer-side, and a sibling to the deferred HTML/SVG viewer
 ([`json-results-and-compare.md`](./json-results-and-compare.md) § 4, Decision
 D6) — same goal (show distribution _shape_) by a lighter, terminal-first means.
+The original design below stands; § "As implemented" records what shipped and the
+open follow-ups.
+
+## As implemented (2026-06-19, nano-bench only)
+
+Behind `--histogram` on `nano-bench` (compare wiring deferred — the binning module
+is shared and ready). Surface: `--histogram` enables it, `--chart columns|bars`
+picks orientation (default `columns`), `--bins N` overrides the auto count.
+
+- **Binning** — `src/bench/histogram.js`, pure + unit-tested (`tests/test-histogram.js`).
+  Freedman–Diaconis default, capped by `--bins`/terminal width; **one shared range
+  and bin set computed across all series** (global range, then each counted into
+  it) so the shapes are comparable. Range is **percentile-clamped** (p1–p99 of the
+  pooled samples), and the clamp _produces_ the outlier list — D8's overflow
+  handling, but surfaced as **notes** (count + extent on each side), not a silent
+  bin. Refinement the prototype forced: clamp only the _sparse_ tail (>p99), never
+  a dense secondary mode — a 10%-of-samples second peak must stay visible, since
+  revealing multimodality is the whole point.
+- **Layout: ridgeline** — `src/bench/render/histogram-chart.js`. One histogram per
+  function, stacked, on a **shared axis with a shared y-scale** (console-toolkit's
+  `maxValue`), so a taller bar means more mass rather than per-chart auto-scaling
+  that flatters different shapes into looking alike.
+- **Median/mean markers** projected on the shared axis (`^` median, `+` mean):
+  when they separate, that gap _is_ the skew (symmetric → together; skewed → `+`
+  pulled right; bimodal → `+` floats in the empty valley). This is the visual that
+  ties the histogram back to the summary numbers.
+- **Multimodality nudge** — when the mean lands in a sparse bin (`meanSparse`), a
+  one-line "mean sits where few samples landed — distribution may be multimodal".
+- **Axis** — a notched baseline via console-toolkit's `turtle` + the **square**
+  line theme (`themes/lines/unicode.js`, _not_ rounded — an axis wants square
+  ticks): `└──┴──┘`, lo/mid/hi labels that degrade gracefully on narrow charts.
+- **`--no-emoji`** swaps the nudge glyph `⚠ → !` (and the significance table's
+  🐇/🐢 → `F`/`S`) for terminals with shaky emoji-width handling — see
+  [`significance-reporting.md`](./significance-reporting.md) D18.
+
+Motivation and the multimodality framing come from the companion essay "Statistics
+for programmers": plot the shape first — the median+CI line can't show
+multimodality, skew, or the tail.
+
+### Known limitations (deliberate; for a later pass)
+
+- **Shared _linear_ range collapses when functions differ by orders of magnitude**
+  — comparing a 350ps function with a 100ns one crushes each body to a spike. Fine
+  for similar-scale comparisons (the common case); a **log-scale axis or
+  per-function panels** is the natural follow-up.
+- **Bars (`--chart bars`) is basic** — functional but tall/sparse for many bins on
+  one function; it's meant for the grouped/stacking case, which is later polish.
+- **nano-bench only** — `nano-bench-compare` wiring is a follow-up (the binning
+  module is shared, so it's a small one).
 
 ## Problem
 
@@ -100,14 +149,24 @@ it.
 
 ## Decisions
 
-- **D8 — binning rule:** Freedman–Diaconis default (robust to timing outliers) +
-  `--bins N` override, capped by render width; clamp extreme outliers into an
-  overflow bin rather than dropping them.
-- **D9 — orientation:** user option `--chart columns|bars`, default `columns`;
-  bars for stacking many runs.
-- **D10 — sizing / overflow:** fit terminal width; cap bin count to width;
-  columns get a max height; bars cap bins or paginate; side-by-side falls back to
-  vertical stacking when too wide.
+- **D8 — binning rule:** _resolved (2026-06-19):_ Freedman–Diaconis default +
+  `--bins N` override, capped by terminal width. Range percentile-clamped (p1–p99
+  of the pooled samples); the clamp produces an **outlier list reported as notes**
+  (count + extent each side) rather than a silent overflow bin, and clamps only
+  the sparse tail so a dense secondary mode stays visible (§ As implemented).
+- **D9 — orientation:** _resolved (2026-06-19):_ `--chart columns|bars`, default
+  `columns`; bars shipped **basic** (the grouped/stacking polish is a follow-up).
+- **D10 — sizing / overflow:** _resolved (2026-06-19):_ bin count capped to
+  terminal width; columns a fixed 6-row height; **shared y-scale** across series
+  via console-toolkit `maxValue`. The shared-_linear_-range collapse for
+  orders-of-magnitude-different functions is a known limitation (log / per-panel =
+  follow-up).
+- **D17 — comparing shapes across functions:** _resolved (2026-06-19):_ a
+  **ridgeline** — per-function histograms stacked on one shared axis + shared
+  y-scale — with **median/mean markers** projected on the axis (the marker gap
+  renders skew) and a **`meanSparse` multimodality nudge**. Axis via the `turtle`
+  facility + the **square** line theme. Chosen over a grouped overlay (busier with
+  many functions) and over per-function auto-ranged charts (not comparable).
 
 ## Effort / risk
 

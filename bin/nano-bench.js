@@ -260,10 +260,13 @@ if (results.length > 1) {
 }
 
 if (options.histogram) {
-  const maxBins = Math.max(8, Math.min(40, Math.floor(((process.stdout.columns || 80) - 4) / 2)));
+  const width = Math.max(16, (writer.columns || 80) - 2);
   writeHistograms(writer, {
     names,
-    hist: computeHistograms(results, {bins: options.bins, maxBins}),
+    hist: computeHistograms(results, {
+      bins: options.bins || Math.max(12, Math.min(48, width, Math.round(options.samples / 3))),
+      maxBins: width
+    }),
     orientation: options.chart,
     emoji: options.emoji
   });

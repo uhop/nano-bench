@@ -123,6 +123,19 @@ so one value covers every pair.
   the table counted a tab. The defect surfaced in `nano-bench-compare`; plain
   `nano-bench` had masked it because the placeholder happened to reserve the 2
   columns the emoji needs.
+- **D18 — `--no-emoji` escape hatch (2026-06-19):** a `--no-emoji` flag on both
+  `nano-bench` and `nano-bench-compare` swaps the 🐇/🐢 fastest/slowest markers for
+  ASCII `F`/`S` (and the histogram's `⚠` nudge for `!`). Rationale: emoji terminal
+  width is genuinely terminal-dependent — some emulators draw 🐇 as 1 column, some
+  2 — and no Node-side measurement controls how a given terminal _paints_ the
+  glyph, so D16's emoji-regex fix aligns on conformant terminals but a
+  non-conformant one (observed: a scroll/reflow redraw that only misfires once the
+  taller `--histogram` output scrolls) can still shift the row. `--no-emoji` is the
+  predictable, single-width, every-terminal fallback. Default stays emoji
+  (commander's `--no-x` yields `emoji: true` by default; the renderers default
+  `emoji = true`, so library callers are unaffected). The marker column is **not**
+  width-hardcoded — the table auto-sizes it from an empty header cell, so it's 1
+  col for `F`/`S`, 2 for the emoji.
 
 ## Effort / risk
 
