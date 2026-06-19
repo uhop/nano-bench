@@ -8,6 +8,7 @@ const bold = s => style.bold.text(s),
   faster = s => style.bright.green.text(bold(s) + ' faster'),
   slower = s => style.bright.red.text(bold(s) + ' slower');
 
+// 2-col width needs the emoji-regex dep
 const rabbit = '\u{1f407}',
   turtle = '\u{1f422}';
 
@@ -77,9 +78,9 @@ export const writeSignificance = (
         }
       }
       if (stats[i] === sortedStats[0]) {
-        row[0] = {value: '\t1', align: 'c'};
+        row[0] = {value: rabbit, align: 'c'};
       } else if (stats[i] === sortedStats[sortedStats.length - 1]) {
-        row[0] = {value: '\t2', align: 'c'};
+        row[0] = {value: turtle, align: 'c'};
       }
       tableData.push(row);
     }
@@ -88,10 +89,7 @@ export const writeSignificance = (
     writer.writeString(
       c`{{save.bright.cyan.bold}}The difference is statistically significant:{{restore}}\n\n`
     );
-    const tableStrings = table
-      .toStrings()
-      .map(line => line.replace(/\t(1|2)/g, m => (m[1] == '2' ? turtle : rabbit)));
-    writer.write(tableStrings);
+    writer.write(table.toStrings());
   } else {
     writer.writeString('The difference is not statistically significant.\n');
   }
