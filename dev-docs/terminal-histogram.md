@@ -14,27 +14,39 @@ is shared and ready). Surface: `--histogram` enables it, `--chart columns|bars`
 picks orientation (default `columns`), `--bins N` overrides the auto count.
 
 - **Binning** — `src/bench/histogram.js`, pure + unit-tested (`tests/test-histogram.js`).
-  Freedman–Diaconis default, capped by `--bins`/terminal width; **one shared range
-  and bin set computed across all series** (global range, then each counted into
-  it) so the shapes are comparable. Range is **percentile-clamped** (p1–p99 of the
-  pooled samples), and the clamp _produces_ the outlier list — D8's overflow
-  handling, but surfaced as **notes** (count + extent on each side), not a silent
-  bin. Refinement the prototype forced: clamp only the _sparse_ tail (>p99), never
-  a dense secondary mode — a 10%-of-samples second peak must stay visible, since
-  revealing multimodality is the whole point.
+  **One shared range and bin set across all series** (global range, then each
+  counted into it) so shapes are comparable. Range is **percentile-clamped** (p1–p99
+  of the pooled samples); the clamp _produces_ the outlier list, surfaced as
+  **notes** (count + extent on each side), not a silent overflow bin — and it clamps
+  only the _sparse_ tail (>p99), never a dense secondary mode (a 10%-of-samples
+  second peak must stay visible, since revealing multimodality is the whole point).
+  **Bin count is screen-aware**, not Freedman–Diaconis: `round(samples/3)` bounded to
+  `[12, min(48, width)]`, where `width` is the terminal width from console-toolkit's
+  `Writer.columns` (no `process.stdout` poking); `--bins N` overrides. FD was the
+  first cut but underbinned multi-cluster data — 4 bins for `bench-string-concat` —
+  so it was dropped for a count that scales with sample size and fits the screen.
+- **Columns** — console-toolkit's `charts/columns/plain` (one solid `▉` per bin, no
+  gap; a zero-count bin keeps its slot as a space, so position stays honest). The
+  prettier `block-frac` variant (sub-character tops) **drops zero-value bins and
+  collapses the chart** — a console-toolkit bug, filed in `projects/console-toolkit`
+  queue, so we use `plain`.
 - **Layout: ridgeline** — `src/bench/render/histogram-chart.js`. One histogram per
-  function, stacked, on a **shared axis with a shared y-scale** (console-toolkit's
-  `maxValue`), so a taller bar means more mass rather than per-chart auto-scaling
-  that flatters different shapes into looking alike.
-- **Median/mean markers** projected on the shared axis (`^` median, `+` mean):
-  when they separate, that gap _is_ the skew (symmetric → together; skewed → `+`
-  pulled right; bimodal → `+` floats in the empty valley). This is the visual that
-  ties the histogram back to the summary numbers.
+  function, stacked, on a **shared y-scale** (console-toolkit `maxValue`) so a taller
+  bar means more mass, and a **shared time axis restacked under each chart** (rendered
+  once from the shared range).
+- **Median/mean markers** — `▾` median, `▿` mean, placed **above** the chart pointing
+  down at their column; the chart then sits directly on its axis. The glyphs double
+  as the **legend in the per-function values line** (`name  ▾ median X  ▿ mean Y`).
+  When the two coincide they merge to one cell (median wins) — both values remain in
+  the legend, and a single marker reads "symmetric, no skew". A marker floating above
+  a near-empty bin is the visible mean/median mismatch (skew / mean-in-the-valley).
+- **Axis** — a notched baseline via console-toolkit's `turtle` + the **square** line
+  theme (`themes/lines/unicode.js`, _not_ rounded), `┌──┬──┐` with **ticks pointing
+  down** to lo/mid/hi labels (labels degrade gracefully on narrow charts).
+- **Per-function order** — values line (legend) → markers → chart → axis → labels →
+  outliers notes → multimodality nudge.
 - **Multimodality nudge** — when the mean lands in a sparse bin (`meanSparse`), a
   one-line "mean sits where few samples landed — distribution may be multimodal".
-- **Axis** — a notched baseline via console-toolkit's `turtle` + the **square**
-  line theme (`themes/lines/unicode.js`, _not_ rounded — an axis wants square
-  ticks): `└──┴──┘`, lo/mid/hi labels that degrade gracefully on narrow charts.
 - **`--no-emoji`** swaps the nudge glyph `⚠ → !` (and the significance table's
   🐇/🐢 → `F`/`S`) for terminals with shaky emoji-width handling — see
   [`significance-reporting.md`](./significance-reporting.md) D18.
@@ -149,24 +161,31 @@ it.
 
 ## Decisions
 
-- **D8 — binning rule:** _resolved (2026-06-19):_ Freedman–Diaconis default +
-  `--bins N` override, capped by terminal width. Range percentile-clamped (p1–p99
-  of the pooled samples); the clamp produces an **outlier list reported as notes**
-  (count + extent each side) rather than a silent overflow bin, and clamps only
-  the sparse tail so a dense secondary mode stays visible (§ As implemented).
+- **D8 — binning rule:** _resolved (2026-06-19):_ one shared, percentile-clamped
+  (p1–p99) range and bin set across all series; the clamp produces an **outlier list
+  reported as notes** (count + extent each side) rather than a silent overflow bin,
+  and clamps only the sparse tail so a dense secondary mode stays visible. Bin
+  **count is screen-aware, not Freedman–Diaconis**: `round(samples/3)` bounded to
+  `[12, min(48, width)]` (FD underbinned multi-cluster data — 4 bins for
+  `bench-string-concat`); `--bins N` overrides (§ As implemented).
 - **D9 — orientation:** _resolved (2026-06-19):_ `--chart columns|bars`, default
   `columns`; bars shipped **basic** (the grouped/stacking polish is a follow-up).
-- **D10 — sizing / overflow:** _resolved (2026-06-19):_ bin count capped to
-  terminal width; columns a fixed 6-row height; **shared y-scale** across series
-  via console-toolkit `maxValue`. The shared-_linear_-range collapse for
-  orders-of-magnitude-different functions is a known limitation (log / per-panel =
-  follow-up).
+- **D10 — sizing / overflow:** _resolved (2026-06-19):_ terminal width from
+  console-toolkit's `Writer.columns` (no `process.stdout` poking) bounds the bin
+  count; columns a fixed 6-row height; **shared y-scale** across series via
+  `maxValue`. Drawn with `charts/columns/plain` (1 solid char per bin; zero bins keep
+  their slot) — `block-frac` drops zero bins (console-toolkit bug, filed). The
+  shared-_linear_-range collapse for orders-of-magnitude-different functions is a
+  known limitation (log / per-panel = follow-up).
 - **D17 — comparing shapes across functions:** _resolved (2026-06-19):_ a
-  **ridgeline** — per-function histograms stacked on one shared axis + shared
-  y-scale — with **median/mean markers** projected on the axis (the marker gap
-  renders skew) and a **`meanSparse` multimodality nudge**. Axis via the `turtle`
-  facility + the **square** line theme. Chosen over a grouped overlay (busier with
-  many functions) and over per-function auto-ranged charts (not comparable).
+  **ridgeline** — per-function histograms stacked on a shared y-scale, each on a copy
+  of the shared time axis (`turtle` + square line theme, ticks pointing **down** to
+  the labels). **Median (`▾`) / mean (`▿`) markers sit above each chart** pointing
+  down, the glyphs doubling as the legend in the values line (`▾ median X ▿ mean Y`);
+  coincident markers merge (median wins, both values stay in the legend), and a
+  marker over a near-empty bin flags the mean/median mismatch. Plus a **`meanSparse`
+  multimodality nudge**. Chosen over a grouped overlay (busier) and per-function
+  auto-ranged charts (not comparable).
 
 ## Effort / risk
 
