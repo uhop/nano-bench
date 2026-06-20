@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 
 import {Option, program} from 'commander';
 
-import {c} from 'console-toolkit/style';
+import {c} from 'console-toolkit/style.js';
 import Writer from 'console-toolkit/output/writer.js';
 
 import {bootstrapSummary} from '../src/stats.js';

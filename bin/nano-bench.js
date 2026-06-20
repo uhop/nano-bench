@@ -14,7 +14,7 @@ import {
   formatTime,
   prepareTimeFormat
 } from 'console-toolkit/alphanumeric/number-formatters.js';
-import {c} from 'console-toolkit/style';
+import {c} from 'console-toolkit/style.js';
 import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
@@ -156,7 +156,7 @@ if (options.iterations > 0) {
 await writer.write([
   c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: ${program.description()}`,
   '',
-  c`Confidence interval: {{save.bright.yellow}}${formatNumber(100 * (1 - options.alpha), /** @type {any} */ ({precision: 2}))}%{{restore}} bootstrap-percentile of the median ({{save.bright.yellow}}${formatInteger(
+  c`Confidence interval: {{save.bright.yellow}}${formatNumber(100 * (1 - options.alpha), {decimals: 2})}%{{restore}} bootstrap-percentile of the median ({{save.bright.yellow}}${formatInteger(
     options.bootstrap
   )}{{restore}} resamples), samples: {{save.bright.yellow}}${formatInteger(
     options.samples

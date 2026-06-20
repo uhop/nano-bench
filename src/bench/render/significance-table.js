@@ -1,6 +1,6 @@
 import {compareDifference, formatInteger} from 'console-toolkit/alphanumeric/number-formatters.js';
 import {infinity, multiplication} from 'console-toolkit/symbols.js';
-import style, {c} from 'console-toolkit/style';
+import style, {c} from 'console-toolkit/style.js';
 import makeTable from 'console-toolkit/table';
 import lineTheme from 'console-toolkit/themes/lines/unicode-rounded.js';
 

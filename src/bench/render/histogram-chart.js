@@ -1,5 +1,5 @@
 import {formatTime, prepareTimeFormat} from 'console-toolkit/alphanumeric/number-formatters.js';
-import style, {c} from 'console-toolkit/style';
+import style, {c} from 'console-toolkit/style.js';
 import drawColumns from 'console-toolkit/charts/columns/plain.js';
 import drawBars from 'console-toolkit/charts/bars/frac-grouped.js';
 import Turtle from 'console-toolkit/turtle/turtle.js';
@@ -20,7 +20,7 @@ const palette = [
   style.brightRed
 ];
 
-const themeFor = color => /** @type {any} */ ([{colorState: color.getState()}]);
+const themeFor = color => [{colorState: color.getState()}];
 const ftime = v => formatTime(v, prepareTimeFormat([v], 1000));
 const colOf = (value, lo, hi, width) =>
   Math.max(0, Math.min(width - 1, Math.round(((value - lo) / (hi - lo || 1)) * (width - 1))));

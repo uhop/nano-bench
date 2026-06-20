@@ -15,7 +15,7 @@ import {
   formatTime,
   prepareTimeFormat
 } from 'console-toolkit/alphanumeric/number-formatters.js';
-import style, {c} from 'console-toolkit/style';
+import style, {c} from 'console-toolkit/style.js';
 import makeTable from 'console-toolkit/table';
 import lineTheme from 'console-toolkit/themes/lines/unicode-rounded.js';
 import Writer from 'console-toolkit/output/writer.js';
@@ -152,7 +152,7 @@ const showData = time => {
         )
         .concat(
           [statCounter.skewness, statCounter.kurtosis]
-            .map(value => formatNumber(value, /** @type {any} */ ({precision: 3})))
+            .map(value => formatNumber(value, {decimals: 3}))
             .map(value => style.bright.yellow.text(value))
         ),
       [
