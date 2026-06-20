@@ -113,6 +113,13 @@ test('findLevel()', t => {
     t.ok(events.length > 0);
     t.ok(events.includes('finding-level'));
   });
+
+  t.test('terminates at the cap when the threshold is never reached', async t => {
+    // a no-op ignores n, so no batch ever hits the threshold; the ramp must stop
+    // at MAX_SAFE_INTEGER instead of growing unbounded / overflowing / hanging
+    const level = await findLevel(() => {}, {threshold: 1e9, timeout: 0});
+    t.equal(level, Number.MAX_SAFE_INTEGER);
+  });
 });
 
 test('benchmark()', t => {

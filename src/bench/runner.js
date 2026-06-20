@@ -18,6 +18,9 @@ const makeObserver = (observe, defaultLabel) => {
   };
 };
 
+// ramp cap — reps must stay exact integers (`<< 1` was mod-2^32, overflowing negative)
+export const MAX_REPS = Number.MAX_SAFE_INTEGER;
+
 export const nextLevel = n => {
   if (n < 1) return 1;
   let exp = 0;
@@ -30,12 +33,12 @@ export const nextLevel = n => {
   } else if (n < 10) {
     n = 10;
   } else {
-    n = n << 1;
+    n = n * 2;
   }
   while (exp--) {
     n *= 10;
   }
-  return n;
+  return n > MAX_REPS ? MAX_REPS : n;
 };
 
 /**
@@ -59,14 +62,18 @@ export const findLevel = async (fn, opts = {}, report) => {
             result.then(async () => {
               const finish = performance.now();
               if (finish - start >= threshold) return resolve(n);
+              const next = nextLevel(n);
+              if (next <= n) return resolve(n);
               report && (await report('finding-level-next', {n, time: finish - start}));
-              setTimeout(bench, timeout, nextLevel(n));
+              setTimeout(bench, timeout, next);
             }, reject);
             return;
           }
           if (finish - start >= threshold) return resolve(n);
+          const next = nextLevel(n);
+          if (next <= n) return resolve(n);
           report && (await report('finding-level-next', {n, time: finish - start}));
-          setTimeout(bench, timeout, nextLevel(n));
+          setTimeout(bench, timeout, next);
         } catch (error) {
           reject(error);
         }
