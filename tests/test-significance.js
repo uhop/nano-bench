@@ -77,6 +77,32 @@ test('kwtest()', t => {
     t.equal(m[1][2], true);
   });
 
+  t.test('records the correction method and comparison count', t => {
+    const data = [
+      sort([1, 2, 3, 4, 5]),
+      sort([50, 60, 70, 80, 90]),
+      sort([200, 300, 400, 500, 600])
+    ];
+    const holm = kwtest(data, 0.05, 'holm');
+    t.equal(holm.correction, 'holm', 'method recorded');
+    t.equal(holm.m, 3, 'k(k-1)/2 comparisons recorded');
+    t.equal(kwtest(data, 0.05, 'none').correction, 'none');
+    // well-separated groups → every method still flags all three pairs
+    for (const method of ['none', 'holm', 'bonferroni']) {
+      const g = kwtest(data, 0.05, method).groupDifference;
+      t.ok(g[0][1] && g[0][2] && g[1][2], method);
+    }
+  });
+
+  t.test('defaults to holm', t => {
+    const data = [
+      sort([1, 2, 3, 4, 5]),
+      sort([50, 60, 70, 80, 90]),
+      sort([200, 300, 400, 500, 600])
+    ];
+    t.equal(kwtest(data, 0.05).correction, 'holm');
+  });
+
   t.test('throws with fewer than 2 groups', t => {
     t.throws(() => kwtest([sort([1, 2, 3])], 0.05));
   });

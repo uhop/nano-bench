@@ -10,6 +10,7 @@ import Writer from 'console-toolkit/output/writer.js';
 
 import {bootstrapSummary} from '../src/stats.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
+import {corrections} from '../src/significance/correction.js';
 import {mulberry32} from '../src/utils/prng.js';
 import {summaryTable} from '../src/bench/render/summary-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
@@ -35,6 +36,12 @@ program
     'significance level for the recompute (default: the first file’s α)',
     toFloat
   )
+  .addOption(
+    new Option(
+      '--correction <method>',
+      'post-hoc correction (default: the first file’s method)'
+    ).choices(corrections)
+  )
   .option('-v, --verbose', 'show significance test statistics and critical values')
   .option('--pooled', 'compare all series as one k-sample omnibus instead of pairing by name')
   .option('--no-emoji', 'use ASCII fastest/slowest markers (F/S) instead of emoji')
@@ -59,6 +66,7 @@ try {
 }
 
 const alpha = options.alpha ?? files[0].results.params.alpha ?? 0.05;
+const correction = options.correction ?? files[0].results.params.correction ?? 'holm';
 
 const nameCounts = {};
 for (const {results} of files) {
@@ -93,7 +101,7 @@ for (const {path: p, values} of diffEnvironments(files.map(f => f.results.enviro
   warn(`environment differs — ${p}: ${values.map(v => JSON.stringify(v)).join(' vs ')}`);
 }
 
-for (const key of ['alpha', 'samples', 'bootstrap']) {
+for (const key of ['alpha', 'samples', 'bootstrap', 'correction']) {
   const values = files.map(f => f.results.params[key]);
   if (new Set(values).size > 1) warn(`params.${key} differs across files: ${values.join(' vs ')}`);
 }
@@ -119,7 +127,7 @@ await writer.write(
 const renderBlock = (members, name) => {
   if (members.length < 2) return;
   const arrays = members.map(s => s.samples),
-    testResult = computeSignificance(arrays, alpha),
+    testResult = computeSignificance(arrays, alpha, correction),
     matrix = significanceMatrix(testResult);
   if (name) writer.writeString(c`\n{{save.bold.cyan}}${name}{{restore}}\n`);
   writeSignificance(writer, {
@@ -129,6 +137,7 @@ const renderBlock = (members, name) => {
     names: members.map(s => (name ? s.tag : s.label)),
     results: arrays,
     alpha,
+    correction,
     verbose: options.verbose,
     emoji: options.emoji
   });

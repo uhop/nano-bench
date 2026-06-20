@@ -7,7 +7,7 @@ const compare = async (inputs, options = {}, report) => {
   const keys = Object.keys(inputs);
   if (keys.length < 2) throw new Error('The "inputs" is supposed to have 2 or more samples.');
 
-  options = Object.assign({alpha: ALPHA}, options);
+  options = Object.assign({alpha: ALPHA, correction: 'holm'}, options);
   const measureFn = options.usePar ? measurePar : measure;
 
   const stats = new Array(keys.length);
@@ -22,7 +22,8 @@ const compare = async (inputs, options = {}, report) => {
   const results = {
     ...computeSignificance(
       stats.map(stat => stat.data),
-      options.alpha
+      options.alpha,
+      options.correction
     ),
     data: stats.map(stat => stat.data),
     reps

@@ -332,9 +332,10 @@ a pure, unit-tested `planComparison(series, {pooled})` in `src/bench/pair-series
 - **Multiple comparisons** (Decision D7, **follow-up — not v1**): running many
   before/after tests inflates family-wise error. Kruskal–Wallis gates its post-hoc
   behind the omnibus, but that post-hoc is Fisher's LSD (no multiplicity correction
-  beyond the gate) and independent paired tests have none. v1 ships uncorrected and
-  documented; the opt-in correction (default Holm, opt-in Bonferroni) must stay
-  non-parametric — see D7.
+  beyond the gate) and independent paired tests have none. Implemented (D7):
+  `--correction` defaults to Holm-corrected, `none` reproduces the uncorrected
+  post-hoc; the correction is non-parametric and scoped to each omnibus's pairwise
+  family — see D7.
 - **Normalization** — only valid because samples are per-iteration normalized; a
   future raw-sample mode would have to renormalize before comparing.
 - **Environment confound** — restated from § 2; the banner is the mitigation.
@@ -462,8 +463,8 @@ lives in the shared [`README.md`](./README.md) decision table.)
   (bench-file positional vs. JSON positionals). No combined run-and-compare mode.
 - **D6** — `nano-bench-compare` (render + compare) first; static inline-SVG HTML
   viewer deferred to its own future queue item.
-- **D7** — _follow-up (not v1):_ v1 ships uncorrected pairwise, documented. The
-  opt-in correction is **`--correction holm|bonferroni|none` (default `holm`)**.
+- **D7** — _implemented:_ **`--correction holm|bonferroni|none`, default `holm`**
+  (corrected out of the box; `none` reproduces the old uncorrected post-hoc).
   Both are distribution-free FWER procedures acting on the α / p-values, assuming
   nothing about the data, valid under the _dependence_ of shared-group pairwise
   comparisons — so both are sound here. **Holm is the default** because it
@@ -471,14 +472,15 @@ lives in the shared [`README.md`](./README.md) decision table.)
   **Bonferroni stays opt-in** as the more recognizable / conservative name to cite.
   **Avoid Šidák-type** corrections (assume independent comparisons — violated here).
   α is the existing `--alpha`, not a new parameter — the correction splits that
-  single α across the _m_ rendered pairwise verdicts and touches the **significance /
-  critical-value path only** (the post-hoc `zPpf(1-α/2)` + compare-mode paired
-  tests), **not the bootstrap CI's α** (a CI is one interval, not a family). Note
-  α currently feeds _both_ the CI summary and `computeSignificance`, so the
-  corrected α must be derived inside the test path where _m_ is known, leaving the
-  CI α untouched. Mechanically just a corrected α fed to the existing `zPpf` /
-  critical-value path — no new distributional machinery; Holm adds a sort +
-  step-down loop.
+  single α across the **k(k-1)/2 Conover–Iman pairwise comparisons within one
+  omnibus** (the 2-series Mann–Whitney case and separate paired-by-name compare
+  blocks stay M=1, uncorrected) and touches the **significance / critical-value path
+  only** (the post-hoc `zPpf(1-α/2)`), **not the bootstrap CI's α** (a CI is one
+  interval, not a family). Note α currently feeds _both_ the CI summary and
+  `computeSignificance`, so the corrected α is derived inside the test path where
+  _m_ is known, leaving the CI α untouched. Mechanically just a corrected α fed to
+  the existing `zPpf` / critical-value path — no new distributional machinery; Holm
+  adds a sort + step-down loop. Lives in `src/significance/correction.js`.
 - **D11** — _resolved:_ `host` is opt-in, default absent — `-H, --host` (boolean)
   records `os.hostname()`, `--host-name <name>` records a chosen string. Two flags,
   not an optional-arg `--host [name]`, so commander can't eat the bench-file

@@ -21,6 +21,7 @@ import Updater from 'console-toolkit/output/updater.js';
 import {findLevel, benchmarkSeries, benchmarkSeriesPar} from '../src/bench/runner.js';
 import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
+import {corrections} from '../src/significance/correction.js';
 import {mulberry32} from '../src/utils/prng.js';
 import {summaryTable} from '../src/bench/render/summary-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
@@ -66,6 +67,11 @@ program
   .option('--min-iterations <min-iterations>', 'minimum number of iterations', toInt, 1)
   .option('-e, --export <name>', 'name of the export', 'default')
   .option('-a, --alpha <alpha>', 'significance level', toFloat, 0.05)
+  .addOption(
+    new Option('--correction <method>', 'post-hoc multiple-comparison correction')
+      .choices(corrections)
+      .default('holm')
+  )
   .option('-s, --samples <samples>', 'number of samples', toInt, 100)
   .option('-p, --parallel', 'collect samples in parallel')
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
@@ -244,7 +250,7 @@ updater = null;
 
 let significance = null;
 if (results.length > 1) {
-  const testResult = computeSignificance(results, options.alpha),
+  const testResult = computeSignificance(results, options.alpha, options.correction),
     matrix = significanceMatrix(testResult);
   significance = testResult;
   writeSignificance(writer, {
@@ -254,6 +260,7 @@ if (results.length > 1) {
     names,
     results,
     alpha: options.alpha,
+    correction: options.correction,
     verbose: options.verbose,
     emoji: options.emoji
   });
@@ -290,6 +297,7 @@ if (options.json) {
       bootstrap: options.bootstrap,
       seed,
       alpha: options.alpha,
+      correction: options.correction,
       parallel: Boolean(options.parallel)
     },
     series: names.map((name, i) => ({

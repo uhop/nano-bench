@@ -28,6 +28,13 @@ test('computeSignificance()', t => {
     t.equal(r.test, 'kruskal-wallis', 'names the test');
     t.ok('value' in r && 'limit' in r, 'has the statistic and critical value');
   });
+  t.test('threads the correction into the kruskal-wallis post-hoc', t => {
+    t.equal(computeSignificance([a, b, c], 0.05, 'bonferroni').correction, 'bonferroni');
+    t.equal(computeSignificance([a, b, c], 0.05).correction, 'holm', 'defaults to holm');
+  });
+  t.test('the mann-whitney pair path reports correction none (single comparison)', t => {
+    t.equal(computeSignificance([a, c], 0.05, 'holm').correction, 'none');
+  });
   t.test('does not mutate inputs', t => {
     const x = [5, 3, 1, 4, 2],
       before = x.join(',');

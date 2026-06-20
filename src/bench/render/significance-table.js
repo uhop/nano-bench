@@ -12,15 +12,22 @@ const bold = s => style.bold.text(s),
 const rabbit = '\u{1f407}',
   turtle = '\u{1f422}';
 
+const correctionLabel = method =>
+  ({none: 'uncorrected', holm: 'Holm-corrected', bonferroni: 'Bonferroni-corrected'})[method] ??
+  method;
+
 export const writeSignificance = (
   writer,
-  {testResult, matrix, stats, names, results, alpha, verbose, emoji = true}
+  {testResult, matrix, stats, names, results, alpha, correction, verbose, emoji = true}
 ) => {
-  const isPair = results.length == 2;
+  const isPair = results.length == 2,
+    method = correction ?? testResult.correction ?? 'none';
   const methodName = isPair
       ? 'Mann–Whitney U test (two-sided, tie-corrected)'
       : 'Kruskal–Wallis H test',
-    postHoc = isPair ? '' : '; post-hoc: Conover–Iman pairwise';
+    label = correctionLabel(method),
+    mPart = testResult.m ? `, m=${testResult.m}` : '',
+    postHoc = isPair ? '' : `; post-hoc: Conover–Iman pairwise (${label}${mPart})`;
   writer.writeString(
     c`\n{{save.bold}}Significance:{{restore}} ${methodName}, α = {{save.bright.yellow}}${alpha}{{restore}}${postHoc}\n`
   );
@@ -40,11 +47,15 @@ export const writeSignificance = (
       writer.writeString(
         `  H = ${H.toFixed(2)} ${rel} H_crit = ${HCrit.toFixed(2)} (β-approx) → ${arrow}\n`
       );
-      if (testResult.C !== undefined) {
-        const threshold = testResult.C * Math.sqrt(1 / results[0].length + 1 / results[1].length);
-        writer.writeString(
-          `  post-hoc threshold (Conover–Iman): C·√(1/nᵢ+1/nⱼ) = ${threshold.toFixed(2)} (C = ${testResult.C.toFixed(2)})\n`
-        );
+      if (testResult.groupDifference) {
+        const mm = testResult.m,
+          per =
+            method === 'bonferroni'
+              ? `per-comparison α = ${(alpha / mm).toPrecision(3)}`
+              : method === 'holm'
+                ? `per-comparison α ∈ [${(alpha / mm).toPrecision(3)}, ${alpha}] step-down`
+                : `α = ${alpha}`;
+        writer.writeString(`  post-hoc (Conover–Iman, ${label}): m = ${mm} comparisons, ${per}\n`);
       }
     }
   }

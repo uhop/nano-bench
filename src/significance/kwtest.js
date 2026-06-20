@@ -8,6 +8,7 @@
 import betaPpf from '../stats/beta-ppf.js';
 import zPpf from '../stats/z-ppf.js';
 import rank, {getTotal} from '../stats/rank.js';
+import {correctPairwise} from './correction.js';
 
 export const getParameters = (groups, N = getTotal(groups)) => {
   const k = groups.length,
@@ -50,36 +51,47 @@ export const rankData = groups => {
   return {H: ((N - 1) * numerator) / denominator, T, S2, groupRank, avgGroupRank, avgRank, k, N};
 };
 
-export const kwtest = (sortedArrays, alpha = 0.05) => {
+export const kwtest = (sortedArrays, alpha = 0.05, correction = 'holm') => {
   if (sortedArrays.length < 2) throw new Error('Two or more data arrays were expected');
 
   const {a, b, nu, k, N} = getParameters(sortedArrays),
     {H, T, S2, avgGroupRank} = rankData(sortedArrays),
     limit = betaPpf(1 - alpha, a, b) * nu, // Hc
-    results = {value: H, alpha, limit, different: H > limit};
+    results = {value: H, alpha, limit, different: H > limit, correction};
 
   if (!results.different || k < 3) return results;
 
   // Conover-Iman post-hoc: pairwise significance using t(N-k), approximated by z.
   // groupDifference[i][j] is true when pair (i,j) is significantly different.
+  // FWER over the k(k-1)/2 pairs is controlled by `correction` (see correction.js).
 
-  const m = new Array(k),
-    C = zPpf(1 - alpha / 2) * Math.sqrt((S2 * (N - 1 - T)) / (N - k));
-
+  const cBase = Math.sqrt((S2 * (N - 1 - T)) / (N - k)),
+    pairs = [];
   for (let i = 0; i < k; ++i) {
-    m[i] = new Array(k);
-  }
-  for (let i = 0; i < k; ++i) {
-    m[i][i] = false;
     for (let j = i + 1; j < k; ++j) {
-      m[i][j] = m[j][i] =
-        Math.abs(avgGroupRank[i] - avgGroupRank[j]) >
-        C * Math.sqrt(1 / sortedArrays[i].length + 1 / sortedArrays[j].length);
+      pairs.push({
+        i,
+        j,
+        t:
+          Math.abs(avgGroupRank[i] - avgGroupRank[j]) /
+          (cBase * Math.sqrt(1 / sortedArrays[i].length + 1 / sortedArrays[j].length))
+      });
     }
   }
 
+  const reject = correctPairwise(
+      pairs.map(p => p.t),
+      alpha,
+      correction
+    ),
+    m = Array.from({length: k}, () => new Array(k).fill(false));
+  pairs.forEach((p, idx) => {
+    m[p.i][p.j] = m[p.j][p.i] = reject[idx];
+  });
+
   results.groupDifference = m;
-  results.C = C;
+  results.m = pairs.length;
+  results.C = zPpf(1 - alpha / 2) * cBase;
   return results;
 };
 

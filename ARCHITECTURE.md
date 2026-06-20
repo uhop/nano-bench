@@ -19,6 +19,7 @@ src/                          # Internal source (shipped via npm)
 ├── significance/
 │   ├── mwtest.js                   # Mann-Whitney U test (two-sample)
 │   ├── kwtest.js                   # Kruskal-Wallis test (k-sample) with post-hoc pairwise tests
+│   ├── correction.js               # FWER control for the post-hoc pairwise comparisons (Holm/Bonferroni)
 │   └── kstest.js                   # Kolmogorov-Smirnov test (two-sample)
 ├── stats/                          # Low-level math
 │   ├── normal.js / normal-ppf.js   # Normal distribution CDF/PPF
@@ -100,6 +101,7 @@ bin/nano-bench.js ──→ src/bench/runner.js ──→ src/stats.js
                   ──→ src/significance/kwtest.js ──→ src/stats/rank.js
                                                  ──→ src/stats/beta-ppf.js
                                                  ──→ src/stats/chi-squared-ppf.js
+                                                 ──→ src/significance/correction.js ──→ src/stats/z-ppf.js
 
 bin/nano-watch.js ──→ src/bench/runner.js
                   ──→ src/stream-stats.js
