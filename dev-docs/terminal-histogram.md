@@ -33,7 +33,23 @@ orientation (default `columns`), `--bins N` overrides the auto count.
   prettier `block-frac` variant (sub-character tops) **drops zero-value bins and
   collapses the chart** — a console-toolkit bug, filed in `projects/console-toolkit`
   queue, so we use `plain`.
-- **Layout: ridgeline** — `src/bench/render/histogram-chart.js`. One histogram per
+- **Bars (`--chart bars`) — reworked, no longer "basic" (2026-06-19)** — "columns
+  rotated 90°": per-function horizontal-bar charts placed **side by side** sharing one
+  **vertical time axis on the left** (`┐│┤┘` rail + right-aligned tick labels), with `◂`
+  median / `◃` mean markers in their own column to the **right** of each chart and a
+  three-column legend above (names │ medians │ means). Every element — labels, axis, each
+  chart, each marker column — is its own `k`-row `Box` composed with `Box.addRight`; that
+  per-element boxing is what fixed the row alignment. Bar length adapts to function count:
+  `clamp(⌊(cols − overhead)/n⌋, MINBAR=8, MAXBAR=28)` — wider with fewer functions, equal
+  across charts within a run; bin count is budgeted by terminal **rows** (vs width for
+  columns). Renderer: **`charts/bars/frac-grouped`** (`groupGap: 0` for one row per bin,
+  `.flat()` on the result). **Why frac-grouped, not block-frac:** for bars, `block-frac`
+  fractionalizes the _cross_ axis (bar **thickness**, vertical `▄`) and leaves length
+  integer, whereas `frac-grouped` fractionalizes the _value_ axis (bar **length**,
+  horizontal eighths `▏▎▍▌▋▊▉` on the end) — the sub-cell precision a histogram wants.
+  (`block-frac` = cross-axis, `frac-grouped` = value-axis, in **both** orientations —
+  filed in `projects/console-toolkit`.)
+- **Layout: ridgeline (columns)** — `src/bench/render/histogram-chart.js`. One histogram per
   function, stacked, on a **shared y-scale** (console-toolkit `maxValue`) so a taller
   bar means more mass, and a **shared time axis restacked under each chart** (rendered
   once from the shared range).
@@ -64,8 +80,6 @@ multimodality, skew, or the tail.
   — comparing a 350ps function with a 100ns one crushes each body to a spike. Fine
   for similar-scale comparisons (the common case); a **log-scale axis or
   per-function panels** is the natural follow-up.
-- **Bars (`--chart bars`) is basic** — functional but tall/sparse for many bins on
-  one function; it's meant for the grouped/stacking case, which is later polish.
 
 ## Problem
 
@@ -170,14 +184,21 @@ it.
   `[12, min(48, width)]` (FD underbinned multi-cluster data — 4 bins for
   `bench-string-concat`); `--bins N` overrides (§ As implemented).
 - **D9 — orientation:** _resolved (2026-06-19):_ `--chart columns|bars`, default
-  `columns`; bars shipped **basic** (the grouped/stacking polish is a follow-up).
+  `columns`. Bars is no longer "basic": it ships as the rotated, side-by-side,
+  `Box`-composed design (shared vertical axis, dynamic width, `◂`/`◃` markers,
+  three-column legend) on the `charts/bars/frac-grouped` fractional-_length_ renderer —
+  see § As implemented.
 - **D10 — sizing / overflow:** _resolved (2026-06-19):_ terminal width from
   console-toolkit's `Writer.columns` (no `process.stdout` poking) bounds the bin
-  count; columns a fixed 6-row height; **shared y-scale** across series via
-  `maxValue`. Drawn with `charts/columns/plain` (1 solid char per bin; zero bins keep
-  their slot) — `block-frac` drops zero bins (console-toolkit bug, filed). The
-  shared-_linear_-range collapse for orders-of-magnitude-different functions is a
-  known limitation (log / per-panel = follow-up).
+  count for columns; columns a fixed 6-row height; **shared y-scale** across series via
+  `maxValue`. **Bars** instead budget bin count by terminal **rows** and size each bar's
+  length to `[MINBAR=8, MAXBAR=28]` chars scaled by function count (side-by-side on a
+  shared vertical axis). Columns are drawn with `charts/columns/plain` (1 solid char per
+  bin; zero bins keep their slot) — `block-frac` dropped zero bins (console-toolkit bug,
+  filed; note 1.4.0 reworked `columns/block-frac`, so whether `plain` is still required
+  is worth a revisit). The shared-_linear_-range collapse for
+  orders-of-magnitude-different functions is a known limitation (log / per-panel =
+  follow-up).
 - **D17 — comparing shapes across functions:** _resolved (2026-06-19):_ a
   **ridgeline** — per-function histograms stacked on a shared y-scale, each on a copy
   of the shared time axis (`turtle` + square line theme, ticks pointing **down** to
