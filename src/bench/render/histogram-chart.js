@@ -1,7 +1,7 @@
 import {formatTime, prepareTimeFormat} from 'console-toolkit/alphanumeric/number-formatters.js';
 import style, {c} from 'console-toolkit/style';
 import drawColumns from 'console-toolkit/charts/columns/plain.js';
-import drawBars from 'console-toolkit/charts/bars/block-frac.js';
+import drawBars from 'console-toolkit/charts/bars/frac-grouped.js';
 import Turtle from 'console-toolkit/turtle/turtle.js';
 import drawLineArt from 'console-toolkit/turtle/draw-line-art.js';
 import axisTheme from 'console-toolkit/themes/lines/unicode.js';
@@ -157,8 +157,14 @@ const writeBars = (writer, {names, lo, hi, k, maxCount, series, tick, emoji}) =>
     const s = series[i],
       medRow = colOf(s.median, lo, hi, k),
       meanRow = colOf(s.mean, lo, hi, k),
+      // frac-grouped draws each bin as a fractional-length bar (horizontal eighths on the end);
+      // groupGap:0 keeps one row per bin and .flat() undoes the no-gap path's nested rows
       barsBox = Box.make(
-        drawBars(s.counts, barLen, {maxValue: maxCount, rectSize: 1, theme: themeFor(color(i))})
+        drawBars(s.counts, barLen, {
+          maxValue: maxCount,
+          groupGap: 0,
+          theme: themeFor(color(i))
+        }).flat()
       ),
       bars = barsBox.padRight(barLen - barsBox.width),
       markers = rows(r =>
