@@ -260,12 +260,16 @@ if (results.length > 1) {
 }
 
 if (options.histogram) {
-  const width = Math.max(16, (writer.columns || 80) - 2);
+  // columns are bound by terminal width (1 col/bin); bars by terminal height (1 row/bin)
+  const budget =
+    options.chart === 'bars'
+      ? Math.max(8, (writer.size.rows || 24) - 8)
+      : Math.max(16, (writer.columns || 80) - 2);
   writeHistograms(writer, {
     names,
     hist: computeHistograms(results, {
-      bins: options.bins || binCount(options.samples, width),
-      maxBins: width
+      bins: options.bins || binCount(options.samples, budget),
+      maxBins: budget
     }),
     orientation: options.chart,
     emoji: options.emoji

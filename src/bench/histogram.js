@@ -7,9 +7,10 @@ export const percentile = (sorted, p) => {
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
 };
 
-// default histogram bin count: scale with sample size, fit the screen, floor so it's not sparse
-export const binCount = (samples, width) =>
-  Math.max(12, Math.min(48, width, Math.round(samples / 3)));
+// default histogram bin count: scale with sample size, floor so it's not sparse,
+// then cap by the limiting screen dimension (columns' width or bars' row budget)
+export const binCount = (samples, budget) =>
+  Math.min(budget, Math.max(12, Math.min(48, Math.round(samples / 3))));
 
 const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
 

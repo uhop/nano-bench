@@ -149,13 +149,17 @@ if (unpaired.length) {
 }
 
 if (options.histogram) {
-  const width = Math.max(16, (writer.columns || 80) - 2),
+  // columns are bound by terminal width (1 col/bin); bars by terminal height (1 row/bin)
+  const budget =
+      options.chart === 'bars'
+        ? Math.max(8, (writer.size.rows || 24) - 8)
+        : Math.max(16, (writer.columns || 80) - 2),
     n = Math.min(...series.map(s => s.samples.length));
   writeHistograms(writer, {
     names: series.map(s => s.label),
     hist: computeHistograms(
       series.map(s => s.samples),
-      {bins: options.bins || binCount(n, width), maxBins: width}
+      {bins: options.bins || binCount(n, budget), maxBins: budget}
     ),
     orientation: options.chart,
     emoji: options.emoji
