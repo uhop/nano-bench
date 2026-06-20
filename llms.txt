@@ -4,13 +4,13 @@
 
 ## Overview
 
-nano-benchmark provides two CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U, Kruskal-Wallis) to produce statistically rigorous results. Designed for micro-benchmarks where function-call overhead matters.
+nano-benchmark provides three CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U for two functions; Kruskal-Wallis H with Conover-Iman pairwise post-hoc for three or more, with Holm/Bonferroni multiple-comparison correction) to produce statistically rigorous results. Saved runs can be re-rendered and compared with significance recomputed from the raw samples. Designed for micro-benchmarks where function-call overhead matters.
 
 - NPM: https://npmjs.org/package/nano-benchmark
 - GitHub: https://github.com/uhop/nano-bench
 - Wiki: https://github.com/uhop/nano-bench/wiki
 - License: BSD-3-Clause
-- Runtime: Node.js 20+, Bun, Deno
+- Runtime: Node.js (every non-EOL release), Bun, Deno; no `engines` floor pinned
 - Module system: ESM only (`"type": "module"`)
 
 ## Installation
@@ -23,14 +23,32 @@ npm install nano-benchmark
 
 ### nano-bench
 
-Benchmarks multiple functions, compares them with bootstrap confidence intervals and significance tests, outputs a styled table.
+Benchmarks multiple functions, compares them with bootstrap confidence intervals and significance tests, outputs a styled table. Name one or more methods after the file to benchmark just those; a single name runs as a baseline (no significance test).
 
 ```bash
 npx nano-bench benchmark.js
 npx nano-bench -s 200 -b 2000 -a 0.01 benchmark.js
+npx nano-bench benchmark.js --json out.json --label after-opt   # save results
+npx nano-bench benchmark.js --histogram --chart bars            # show distributions
 ```
 
-Options: `--ms` (measurement time, default 50), `--iterations` (overrides --ms), `--samples` (default 100), `--bootstrap` (default 1000), `--alpha` (significance level, default 0.05), `--parallel`, `--observe` (emit User Timing marks at phase boundaries), `--export` (default "default"), `--self`.
+Options:
+- Measurement: `--ms` (time per sample, default 50), `--iterations` (fixed count, overrides --ms), `--min-iterations` (default 1), `--samples` (default 100), `--parallel` (collect samples concurrently — for async benches).
+- Statistics: `--alpha` (significance level, default 0.05 = 95% CI), `--bootstrap` (resamples, default 1000), `--seed` (bootstrap RNG seed; auto-recorded if omitted), `--correction` (post-hoc multiple-comparison method: `none`/`holm`/`bonferroni`, default `holm`), `--verbose` (show test statistics + critical values).
+- Output: `--json <file>` (write schema-v1 results), `--label <text>` (annotate the JSON), `-H, --host` / `--host-name <name>` (record machine in the JSON), `--histogram` + `--chart columns|bars` + `--bins N` (per-function distribution chart), `--no-emoji` (ASCII F/S markers), `--observe` (emit User Timing marks at phase boundaries).
+- Misc: `--export` (default "default"), `--self`.
+
+### nano-bench-compare
+
+Reads results JSON only (never benchmarks): renders one saved run, or compares several — recomputing significance from the saved samples and warning when the runs' environments differ. Default pairs same-named series across files (before/after); `--pooled` runs one k-sample omnibus over all series.
+
+```bash
+npx nano-bench-compare results.json                 # render one saved run
+npx nano-bench-compare base.json new.json           # before/after, paired by name
+npx nano-bench-compare base.json new.json --pooled  # one omnibus over all series
+```
+
+Options: `--alpha` (override the recompute α; default the first file's), `--correction` (override; default the first file's), `--pooled`, `--verbose`, `--histogram` + `--chart` + `--bins`, `--no-emoji`.
 
 ### nano-watch
 
@@ -73,8 +91,10 @@ deno run -A `npx nano-bench --self` benchmark.js
 
 ## Statistical methods
 
-- **Bootstrap resampling** for confidence intervals (median, percentiles).
-- **Mann-Whitney U test** for comparing two samples.
-- **Kruskal-Wallis test** with post-hoc pairwise tests for comparing 3+ samples.
-- **Kolmogorov-Smirnov test** for two-sample distribution comparison.
+- **Bootstrap-percentile CI of the median** — the reported median and its confidence interval are the mean of weighted quantiles over `--bootstrap` resamples; seeded (`--seed`, else auto-recorded) so a recompute reproduces it exactly.
+- **Mann-Whitney U test** — two functions; normal approximation, two-sided, tie-corrected. No multiplicity correction (a single comparison).
+- **Kruskal-Wallis H test** — three or more functions; beta approximation for the null of H. If significant, **Conover-Iman** pairwise post-hoc (Fisher's LSD on ranks) identifies which pairs differ.
+- **Multiple-comparison correction** — `--correction` controls the family-wise error rate over the post-hoc pairwise comparisons: `holm` (default; step-down, uniformly more powerful than Bonferroni), `bonferroni` (single-step), or `none` (uncorrected). Scoped to one omnibus's k(k-1)/2 pairs; the CI's α is untouched.
+- **Kolmogorov-Smirnov test** — two-sample distribution comparison; available in the library API (`src/significance/kstest.js`), not wired into the CLI.
+- **Distribution histograms** (`--histogram`) — render each function's sample distribution to reveal multimodality, skew, and outlier tails that a median+CI line hides.
 - **Online algorithms** (streaming mean, variance, skewness, kurtosis, approximate median) for continuous monitoring.

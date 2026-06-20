@@ -7,6 +7,16 @@ description: Write a benchmark file for nano-watch (continuous single-function m
 
 nano-watch continuously benchmarks a single function, showing live streaming statistics (mean, median, stdDev, skewness, kurtosis) and memory usage. Useful for detecting performance regressions, memory leaks, and GC effects over time.
 
+## When to use nano-watch vs nano-bench
+
+`nano-watch` watches **one** function over an unbounded run — it does not compare
+functions, run significance tests, draw histograms, or save results. If the task is to
+**compare** implementations, test **statistical significance**, capture a **JSON** result,
+do a **before/after** comparison, or inspect a **distribution histogram**, use `nano-bench`
+(and `nano-bench-compare`) instead — see the `write-bench` skill. The benchmark **file
+format is the same**, so one file serves both tools; only the CLI you point at it differs.
+`nano-watch`'s own options are just `--ms`, `--iterations`, `--export`, and `--self`.
+
 ## File structure — single function
 
 The simplest form is a module that default-exports a single function taking `n`:

@@ -9,6 +9,17 @@ per-phase verification gates.
 `--alpha`. **Out of scope** (deferred): multiple-comparison correction (D7),
 `--no-display`, `--select`, the HTML viewer.
 
+> **As built (status):** shipped 2026-06-17 across these phases. Two deviations
+> from the plan below: (1) no separate `bench/render/compare-table.js` was
+> created — `nano-bench-compare` reuses `summary-table.js` + `significance-table.js`
+> directly (the `writeSignificance` renderer), so the comparison table is the
+> shared renderer, not a new module; (2) the deferred `--correction` (D7) and the
+> `--pooled` compare mode (D15) landed in later passes (2026-06-19/20), and
+> `--histogram` was added to `nano-bench-compare` too. Treat the module names and
+> `renderSignificance`/`renderXxx` function names below as the plan's working
+> labels; the shipped exports are `writeSignificance` / `summaryTable` /
+> `computeSignificance`.
+
 ## Module layout (new = ＋, changed = ～)
 
 ```

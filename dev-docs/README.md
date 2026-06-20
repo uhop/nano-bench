@@ -25,9 +25,9 @@ Plus a fourth note — lower priority, independent of the trio above, but reusin
 the same sample data model:
 
 - [`terminal-histogram.md`](./terminal-histogram.md) — opt-in terminal histogram
-  of each function's sample distribution via `console-toolkit`'s charts. Future /
-  optional (queue Priority −1); sibling to the deferred HTML/SVG viewer (D6), same
-  goal by a lighter, terminal-first means. Requires binning the raw samples into
+  of each function's sample distribution via `console-toolkit`'s charts. **Shipped
+  2026-06-19** (was queue Priority −1); sibling to the deferred HTML/SVG viewer
+  (D6), same goal by a lighter, terminal-first means. Bins the raw samples into
   buckets before charting.
 
 ## The one principle the whole design rests on
@@ -84,7 +84,7 @@ directly comparable sample arrays. The JSON format stores the normalized values;
 | D6  | Web viewer at all, given "no build step / CLI-only"?             | 3   | CLI re-render first; static inline-SVG HTML viewer deferred to its own future queue item                                                                                                                                                                 |
 | D7  | Multiple-comparison correction for many before/after tests?      | 3   | Implemented: `--correction`, default Holm (corrected out of the box); `none` = old uncorrected post-hoc; family = each omnibus (M = k(k-1)/2); reuses `--alpha`; Šidák rejected                                                                          |
 | D8  | Histogram binning rule (fixed k / Sturges / Freedman–Diaconis)?  | 4   | Resolved (2026-06-19): screen-aware count `round(samples/3)` bounded `[12, min(48, width)]` (not FD — it underbinned multi-cluster data); `--bins N` overrides; p1–p99 clamp → outlier **notes**, not a silent bin                                       |
-| D9  | Default histogram orientation — columns or bars?                 | 4   | Resolved (2026-06-19): `--chart columns\|bars`, default columns; bars shipped basic (grouped/stacking = follow-up)                                                                                                                                       |
+| D9  | Default histogram orientation — columns or bars?                 | 4   | Resolved (2026-06-19): `--chart columns\|bars`, default columns; bars reworked (rotated, side-by-side, `Box`-composed, `frac-grouped` renderer) — no longer "basic"                                                                                      |
 | D10 | Histogram sizing / overflow when too wide or too tall?           | 4   | Resolved (2026-06-19): width from console-toolkit `Writer.columns`; columns fixed 6-row height; `charts/columns/plain` (zero bins keep their slot; `block-frac` drops them — c-t bug filed); linear-range collapse for ×-different functions = follow-up |
 | D11 | Hostname in results — always-on, or opt-in?                      | 3   | Resolved: opt-in; `-H, --host` (boolean) = `os.hostname()`, `--host-name <name>` = string                                                                                                                                                                |
 | D12 | Provenance hash — bench-file hash, or per-function body hash?    | 3   | Resolved: per-result `bodyHash` = `sha256(fn.toString())`; file hash dropped                                                                                                                                                                             |

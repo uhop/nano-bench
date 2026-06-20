@@ -1,6 +1,7 @@
 # Benchmark a single function (baseline mode)
 
-Status: **design**. Queue item 2. Producer side of the baseline/compare feature
+Status: **implemented** (2026-06-16 — see "As implemented" below). Queue item 2.
+Producer side of the baseline/compare feature
 in [`json-results-and-compare.md`](./json-results-and-compare.md).
 
 ## Problem

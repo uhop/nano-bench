@@ -127,14 +127,98 @@ export default {
 ## Running
 
 ```bash
-npx nano-bench bench/bench-<name>.js
-npx nano-bench -s 200 -b 2000 -a 0.01 bench/bench-<name>.js   # more samples, tighter CI
-npx nano-bench -i 10000 bench/bench-<name>.js                  # fixed iteration count
+npx nano-bench bench/bench-<name>.js                           # all functions
+npx nano-bench bench/bench-<name>.js fnA fnB                   # only these two
+npx nano-bench bench/bench-<name>.js fnA                       # baseline: one function, no significance test
+npx nano-bench -s 200 -b 2000 -a 0.01 bench/bench-<name>.js    # more samples, tighter CI
+npx nano-bench -i 10000 bench/bench-<name>.js                  # fixed iteration count (skip calibration)
 
 # Alternative runtimes
 bun `npx nano-bench --self` bench/bench-<name>.js
 deno run -A `npx nano-bench --self` bench/bench-<name>.js
 ```
+
+Name functions after the file to run a subset; omit them to run all. One name is
+a **baseline** — its stats are reported with no significance test.
+
+## Choosing options
+
+| Goal                         | Option                                          | Notes                                                                   |
+| ---------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
+| Longer/shorter measurement   | `-m, --ms` (default 50)                         | Time per sample; the batch size is auto-found to fill it.               |
+| Fixed iteration count        | `-i, --iterations`                              | Overrides `--ms`, skips calibration. Use for deterministic batch sizes. |
+| More precision               | `-s, --samples` (100), `-b, --bootstrap` (1000) | More samples tighten the test; more bootstrap resamples smooth the CI.  |
+| Stricter/looser significance | `-a, --alpha` (0.05)                            | 0.01 = 99% CI and a stricter test.                                      |
+| Async benchmarks             | `-p, --parallel`                                | Collect samples concurrently.                                           |
+| Multiple-comparison control  | `--correction` (holm)                           | See below.                                                              |
+| See the test internals       | `-v, --verbose`                                 | Prints statistic, critical value, per-comparison α.                     |
+| Inspect distribution shape   | `--histogram`                                   | See below.                                                              |
+| Save / compare runs          | `--json`, then `nano-bench-compare`             | See below.                                                              |
+| Pin reproducibility          | `--seed <n>`                                    | Else a seed is auto-generated and recorded.                             |
+
+## Reading the significance output
+
+With ≥2 functions, a `Significance:` line names the test, α, and (for 3+) the
+post-hoc method and correction:
+
+- **2 functions** → Mann-Whitney U (two-sided, tie-corrected).
+- **3+ functions** → Kruskal-Wallis H omnibus; if significant, a Conover-Iman
+  pairwise post-hoc fills the N×N matrix showing which pairs differ. Fastest is
+  marked 🐇, slowest 🐢 (`F`/`S` with `--no-emoji`).
+
+## Multiple-comparison correction (`--correction`)
+
+Comparing many functions runs many pairwise tests, which inflates the chance of a
+false "significant". The post-hoc is corrected by default:
+
+- `holm` (**default**) — keep it for normal use; uniformly more powerful than Bonferroni.
+- `bonferroni` — only if the user explicitly wants the conservative/familiar name.
+- `none` — only to reproduce an uncorrected post-hoc (e.g. matching an old run).
+
+Don't disable correction to make a result "look significant" — that defeats its purpose.
+
+## Distribution histograms (`--histogram`)
+
+Reach for this when a median is surprising, or you suspect multimodality (fast/slow
+paths), heavy skew, or outlier tails (GC/JIT). The median+CI line can't show shape;
+the histogram can.
+
+```bash
+npx nano-bench bench/bench-<name>.js --histogram               # vertical columns (default)
+npx nano-bench bench/bench-<name>.js --histogram --chart bars  # horizontal, side by side (good for many functions)
+npx nano-bench bench/bench-<name>.js --histogram --bins 24     # override the auto bin count
+```
+
+Add `--no-emoji` on terminals with unreliable emoji widths.
+
+## Before/after comparisons (`--json` + `nano-bench-compare`)
+
+To measure whether a change actually helped, save a baseline, change the code, save
+a new run, then compare — significance is **recomputed from the saved samples**, no
+re-measuring:
+
+```bash
+npx nano-bench bench/bench-<name>.js --json before.json --label before
+# ...edit the implementation...
+npx nano-bench bench/bench-<name>.js --json after.json --label after
+
+npx nano-bench-compare before.json after.json            # before/after, paired by name (default)
+npx nano-bench-compare before.json after.json --pooled   # one k-sample omnibus over all series
+npx nano-bench-compare after.json                         # just re-render a saved run
+```
+
+- **Paired by name (default)** — one before/after test per function name shared across
+  the files. This is the right mode for "did `fnA` get faster?". Keep the same function
+  **names** across runs so they pair up.
+- **`--pooled`** — one omnibus over _all_ series at once. Use only when you genuinely want
+  "which of these k series differ from which"; for a plain before/after it buries the
+  meaningful comparison, so don't reach for it by default.
+- The bootstrap seed is recorded in each file, so a recompare reproduces the original
+  intervals exactly. `nano-bench-compare` warns if the runs' environments (CPU, runtime,
+  OS) or the function bodies differ — heed it: a measured delta across machines may be the
+  environment, not the code.
+- Add `--host` / `--host-name <name>` to stamp the machine into the JSON (opt-in; the file
+  is shareable).
 
 ## Complete example
 

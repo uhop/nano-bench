@@ -2,7 +2,7 @@
 
 ## Project identity
 
-nano-benchmark is an ESM JavaScript package providing command-line utilities (`nano-bench`, `nano-watch`, `nano-bench-compare`) for micro-benchmarking code with proper nonparametric statistics and significance testing. Node.js 22+, Bun, Deno. The `src/` modules (stats, significance tests, streaming counters) are internal — the user-facing surface is the three CLI tools in `bin/`.
+nano-benchmark is an ESM JavaScript package providing command-line utilities (`nano-bench`, `nano-watch`, `nano-bench-compare`) for micro-benchmarking code with proper nonparametric statistics and significance testing. Runs on Node.js, Bun, and Deno. Per the fleet runtime policy it supports every non-EOL Node release (active LTS plus current) with no `engines` floor pinned — don't add one without a feature that requires it, and don't name specific versions in docs. CI runs the suite across the non-EOL Node versions. The `src/` modules (stats, significance tests, streaming counters) are internal — the user-facing surface is the three CLI tools in `bin/`.
 
 ## Critical rules
 
@@ -21,23 +21,28 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 
 ## Architecture quick reference
 
-- **`bin/nano-bench.js`** — benchmarks multiple functions, compares them with bootstrap CI and significance tests, outputs a styled table; `--json` writes a results file.
+- **`bin/nano-bench.js`** — benchmarks multiple functions, compares them with bootstrap CI and significance tests, outputs a styled table. `--json` writes a results file; `--histogram` draws a per-function distribution chart; `--correction` picks the post-hoc multiple-comparison method.
 - **`bin/nano-watch.js`** — continuously benchmarks a single function in streaming mode, showing live stats and memory usage.
-- **`bin/nano-bench-compare.js`** — reads results JSON, recomputes significance, and renders view/compare tables with an environment-diff banner; no benchmarking.
+- **`bin/nano-bench-compare.js`** — reads results JSON, recomputes significance from the saved samples, and renders view/compare tables with an environment-diff banner; no benchmarking. Pairs same-named series across files (default) or pools all series with `--pooled`.
 - **`src/bench/runner.js`** — core benchmark engine: `findLevel`, `benchmark`, `benchmarkSeries`, `measure`, `Stats`. The orchestrating functions (`findLevel`, `benchmarkSeries`, `benchmarkSeriesPar`, `measure`, `measurePar`) accept an `observe: boolean | string` option that emits User Timing marks at phase boundaries (`nano-bench/<label>/<phase>`).
 - **`src/bench/compare.js`** — high-level `compare()` that measures multiple functions and runs significance tests.
-- **`src/stats.js`** — batch statistics: `mean`, `variance`, `stdDev`, `skewness`, `kurtosis`, `bootstrap`, `getWeightedValue`.
+- **`src/bench/significance.js`** — `computeSignificance` (dispatches Mann-Whitney for 2 series, Kruskal-Wallis for 3+) and `significanceMatrix`.
+- **`src/bench/pair-series.js`** — `planComparison`: partition compared series into paired-by-name blocks, or one pooled omnibus.
+- **`src/bench/histogram.js`** + **`src/bench/render/`** — sample binning (`computeHistograms`, `binCount`) and the renderers: `summary-table.js`, `significance-table.js`, `histogram-chart.js`.
+- **`src/bench/results/`** — JSON results I/O: `build.js` (schema v1 object), `load.js` (read + validate), `environment.js` (`captureEnvironment` / `diffEnvironments`).
+- **`src/stats.js`** — batch statistics: `mean`, `variance`, `stdDev`, `skewness`, `kurtosis`, `bootstrap`, `getWeightedValue`, `exactSummary`, `bootstrapSummary`.
 - **`src/stream-stats.js`** — `StatCounter` class for online/streaming mean, variance, skewness, kurtosis.
 - **`src/stream-median.js`** — `MedianCounter` class for approximate streaming median.
-- **`src/significance/`** — `mwtest` (Mann-Whitney U), `kwtest` (Kruskal-Wallis), `kstest` (Kolmogorov-Smirnov).
+- **`src/significance/`** — `mwtest` (Mann-Whitney U), `kwtest` (Kruskal-Wallis H + Conover-Iman pairwise post-hoc), `correction` (Holm/Bonferroni FWER control over the post-hoc pairs), `kstest` (Kolmogorov-Smirnov, library-only).
 - **`src/stats/`** — low-level math: distributions (normal, beta, chi-squared, z), PPF functions, ranking, error function.
-- **`src/utils/`** — helpers: binary search, Runge-Kutta solver.
+- **`src/utils/`** — helpers: binary search, Runge-Kutta solver, `mulberry32` PRNG (seeded bootstrap), `bodyHash` (`sha256(fn.toString())`).
 
 ## Dependencies
 
-- **`commander`** — CLI argument parsing for both binaries.
-- **`console-toolkit`** — styled terminal output, tables, ANSI sequences.
-- **Dev only:** `tape-six`, `tape-six-proc` for testing; `prettier` for formatting.
+- **`commander`** — CLI argument parsing for all three binaries.
+- **`console-toolkit`** — styled terminal output, tables, charts, ANSI sequences.
+- **`emoji-regex`** + **`get-east-asian-width`** — let `console-toolkit` measure wide-glyph widths faithfully (emoji markers 🐇/🐢, CJK/fullwidth names) so table cells align; without them every wide glyph would measure as 1 column.
+- **Dev only:** `tape-six`, `tape-six-proc` for testing; `prettier` for formatting; `typescript` + `@types/node` for the `js-check` step.
 
 ## Verification commands
 
@@ -47,6 +52,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - `npm run test:deno` — run tests with Deno
 - `npm run lint` — check formatting with Prettier
 - `npm run lint:fix` — fix formatting with Prettier
+- `npm run js-check` — type-check the JS sources with `tsc` (`checkJs`, no emit)
 
 ## File layout
 

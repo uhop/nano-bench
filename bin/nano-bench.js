@@ -91,7 +91,11 @@ program
       .choices(['columns', 'bars'])
       .default('columns')
   )
-  .option('--bins <bins>', 'histogram bin count (default: auto, Freedman–Diaconis)', toInt)
+  .option(
+    '--bins <bins>',
+    'histogram bin count (default: auto, scaled to samples and terminal size)',
+    toInt
+  )
   .option('--no-emoji', 'use ASCII fastest/slowest markers (F/S) instead of emoji')
   .option('--self', 'print the file name to stdout and exit')
   .showHelpAfterError('(add --help to see available options)');

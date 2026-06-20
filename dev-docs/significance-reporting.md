@@ -1,6 +1,6 @@
 # Report which significance algorithm was used
 
-Status: **design**. Queue item 1. Smallest of the three; no data-model impact.
+Status: **implemented** (verbose `-v` 2026-06-16; markers/glyph-width D16/D18 2026-06-19 — see the "As implemented" notes inline). Queue item 1. Smallest of the three; no data-model impact.
 
 ## Problem
 

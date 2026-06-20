@@ -6,7 +6,7 @@
 - GitHub: https://github.com/uhop/nano-bench
 - Wiki: https://github.com/uhop/nano-bench/wiki
 - License: BSD-3-Clause
-- Runtime: Node.js 20+, Bun, Deno
+- Runtime: Node.js (every non-EOL release), Bun, Deno; no `engines` floor pinned
 - Module system: ESM only (`"type": "module"`)
 
 ## Installation
@@ -22,23 +22,46 @@ Benchmarks multiple functions, compares them with bootstrap confidence intervals
 ### Usage
 
 ```
-nano-bench [options] <file>
+nano-bench [options] <file> [methods...]
 ```
 
 ### Arguments
 
 - `file` — JavaScript module to benchmark. If `"self"`, prints its own file path and exits.
+- `methods...` — optional function names to benchmark; omit to run every function in the export. A single name runs as a **baseline** — its statistics are reported with no significance test (nothing to compare against in isolation).
 
 ### Options
 
+Measurement:
+
 - `-m, --ms <ms>` — measurement time in milliseconds per sample (default: 50). The tool auto-discovers the batch size where one call takes at least this long.
-- `-i, --iterations <iterations>` — fixed iteration count per sample (overrides `--ms`).
+- `-i, --iterations <iterations>` — fixed iteration count per sample (overrides `--ms`, skips calibration).
 - `--min-iterations <n>` — minimum iterations per sample (default: 1).
 - `-s, --samples <samples>` — number of samples to collect (default: 100).
-- `-b, --bootstrap <bootstrap>` — number of bootstrap resamples for CI estimation (default: 1000).
-- `-a, --alpha <alpha>` — significance level for confidence interval and tests (default: 0.05 = 95% CI).
 - `-p, --parallel` — collect samples in parallel (useful for async benchmarks).
+
+Statistics:
+
+- `-a, --alpha <alpha>` — significance level for the confidence interval and tests (default: 0.05 = 95% CI).
+- `-b, --bootstrap <bootstrap>` — number of bootstrap resamples for CI estimation (default: 1000).
+- `--seed <seed>` — bootstrap RNG seed (32-bit integer). If omitted, a seed is generated and still recorded in the JSON, so every saved run is reproducible; pass it only to pin a specific value.
+- `--correction <method>` — post-hoc multiple-comparison correction over the Kruskal-Wallis pairwise comparisons: `none`, `holm` (default), or `bonferroni`. See Statistical methods.
+- `-v, --verbose` — show the significance test statistic, critical value, and per-comparison α.
+
+Output:
+
+- `--json <file>` — write a schema-v1 results JSON (raw samples + summaries + metadata). No stdout streaming — a normal run already prints a styled table.
+- `--label <label>` — free-form run label recorded in the JSON (e.g. `before-opt`); overrides the file basename as the display name in `nano-bench-compare`.
+- `-H, --host` — record `os.hostname()` in the JSON (opt-in; default absent).
+- `--host-name <name>` — record a custom machine name in the JSON (overrides `--host`).
+- `--histogram` — show a distribution histogram per function (sample shape).
+- `--chart <type>` — histogram orientation: `columns` (default, vertical ridgeline) or `bars` (horizontal, side-by-side on a shared axis).
+- `--bins <bins>` — histogram bin count (default: auto — scaled to the sample count and capped to the terminal size).
+- `--no-emoji` — use ASCII fastest/slowest markers (`F`/`S`) instead of 🐇/🐢 (and `!` instead of the histogram's `⚠`), for terminals with shaky emoji-width handling.
 - `-o, --observe` — emit User Timing marks at calibration and sampling phase boundaries, observable via `PerformanceObserver` or DevTools / `node --inspect` traces. Mark names follow `nano-bench/<function-name>/<phase>`. Default: off.
+
+Misc:
+
 - `-e, --export <name>` — name of the export to use from the file (default: `"default"`).
 - `--self` — print the script's file path to stdout and exit (for Deno/Bun usage).
 
@@ -55,21 +78,111 @@ A styled table with columns:
 | op/s | Operations per second (1000 / median) |
 | batch | Iterations per sample (batch size) |
 
-If differences are statistically significant, a significance matrix is printed showing pairwise comparisons with percentage or ratio differences. The fastest function is marked with 🐇 and the slowest with 🐢.
+When two or more functions are measured, a `Significance:` line names the test, α, and (for 3+ functions) the post-hoc method and correction, followed — if the difference is significant — by an N×N matrix of pairwise percentage/ratio differences. The fastest function is marked with 🐇 and the slowest with 🐢 (`F`/`S` under `--no-emoji`). With `--histogram`, a per-function distribution chart follows; with `--json`, a results file is written.
 
 ### How it works
 
 1. **Find level**: auto-discovers batch size `n` where `fn(n)` takes ≥ `--ms` milliseconds.
-2. **Collect samples**: runs `fn(n)` `--samples` times, collecting timing data.
-3. **Bootstrap CI**: uses bootstrap resampling to estimate median and confidence interval.
-4. **Significance test**: Mann-Whitney U (2 functions) or Kruskal-Wallis with post-hoc tests (3+ functions).
+2. **Collect samples**: runs `fn(n)` `--samples` times, collecting timing data (normalized to ms/iteration).
+3. **Bootstrap CI**: seeded bootstrap resampling estimates the median and its percentile confidence interval.
+4. **Significance test**: Mann-Whitney U (2 functions) or Kruskal-Wallis H + Conover-Iman pairwise post-hoc (3+ functions), with `--correction` controlling the post-hoc family-wise error rate.
+5. **Optional outputs**: a distribution histogram (`--histogram`) and/or a schema-v1 results file (`--json`).
 
 ### Example
 
 ```bash
 npx nano-bench bench/bench-string-concat.js
 npx nano-bench -s 200 -b 2000 -a 0.01 bench/bench-string-concat.js
+npx nano-bench bench/bench-string-concat.js plus template   # only these two
+npx nano-bench bench/bench-string-concat.js --json base.json --label baseline
 ```
+
+---
+
+## CLI tool: nano-bench-compare
+
+Reads nano-bench results JSON and renders a view/compare table — **recomputing** significance and CIs from the saved raw samples (it never benchmarks). Use it to render one saved run, or to compare a baseline against a new run (before/after) without re-measuring.
+
+### Usage
+
+```
+nano-bench-compare [options] <files...>
+```
+
+### Arguments
+
+- `files...` — one or more results JSON files written by `nano-bench --json`.
+
+### Options
+
+- `-a, --alpha <alpha>` — significance level for the recompute (default: the first file's recorded α).
+- `--correction <method>` — post-hoc correction for the recompute: `none` / `holm` / `bonferroni` (default: the first file's recorded method).
+- `--pooled` — compare all series as one k-sample Kruskal-Wallis omnibus instead of pairing by name.
+- `-v, --verbose` — show test statistics and critical values.
+- `--histogram`, `--chart columns|bars`, `--bins <bins>` — distribution histograms (one chart per series on a shared axis).
+- `--no-emoji` — ASCII `F`/`S` markers.
+
+### Comparison modes
+
+- **Paired by name (default)** — partition series by `name`; run one before/after test per name that appears in ≥2 of the files (2 series → Mann-Whitney; 3+ → Kruskal-Wallis within that name). Names appearing once are shown in the summary table but not tested ("not compared"). This is the headline "save a baseline, run a new version, compare" case.
+- **Pooled (`--pooled`)** — throw every series into one Kruskal-Wallis omnibus + Conover-Iman post-hoc matrix. Answers "which of these k series differ from which" — but for a before/after it buries the meaningful same-name cells and lets unrelated series perturb the ranks, so it is opt-in.
+- **Degrade** — with no shared name (a single file, or disjoint names), paired mode falls back to one omnibus so a single-file render still reproduces the in-run table.
+
+### Comparability banner
+
+The raw samples make recompute exact, but they do not make a cross-machine comparison *valid*. `nano-bench-compare` diffs the recorded environments and warns loudly above the results on any mismatch — runtime/engine version, OS/arch, CPU model/count, total memory — and on `params` (α/samples/bootstrap/correction) or per-series `bodyHash` divergence. `host` and `cpu.speedMHz` are shown as provenance but never trigger a warning. A differing `bodyHash` for a same-named pair means the code changed (the delta may be real); an identical one means any delta is environment/noise.
+
+### Determinism
+
+Each series' CI is reproduced exactly from its saved samples + the run's recorded `params.seed` + its series index + `params.bootstrap` (per-series `mulberry32` streams). The rank tests are deterministic regardless. So a recompute reproduces the original run's verdict and interval rather than silently re-deciding.
+
+### Example
+
+```bash
+npx nano-bench-compare base.json                       # render one saved run
+npx nano-bench-compare base.json new.json              # before/after, paired by name
+npx nano-bench-compare base.json new.json --pooled     # one omnibus over all series
+npx nano-bench-compare base.json new.json -a 0.01      # recompute at a different α
+```
+
+---
+
+## Results JSON schema (v1)
+
+`nano-bench --json out.json` writes this shape. The **raw per-sample arrays are the source of truth** — significance and CIs are always recomputed from them; the stored summaries are FYI only.
+
+```json
+{
+  "schemaVersion": 1,
+  "tool": "nano-benchmark",
+  "toolVersion": "1.0.16",
+  "createdAt": "2026-06-03T12:00:00.000Z",
+  "label": "baseline",
+  "source": {"file": "bench/bench-string-concat.js", "export": "default", "methods": ["plus", "template"]},
+  "environment": {
+    "host": "nuke",
+    "runtime": {"name": "node", "version": "22.11.0", "engine": "v8 12.4"},
+    "os": {"platform": "linux", "release": "7.0.0", "arch": "x64"},
+    "cpu": {"model": "AMD Ryzen 9 …", "count": 16, "speedMHz": 3600},
+    "totalmemMB": 64000
+  },
+  "params": {"ms": 50, "minIterations": 1, "samples": 100, "bootstrap": 1000, "seed": 12345, "alpha": 0.05, "correction": "holm", "parallel": false},
+  "results": [
+    {
+      "name": "plus",
+      "bodyHash": "sha256:…",
+      "reps": 100000,
+      "samples": [0.000123, "… ms/iteration, full precision …"],
+      "summary": {"median": 0.000124, "lo": 0.000119, "hi": 0.000131, "mean": 0.000126, "stdDev": 0.0000044, "opsPerSec": 8064516, "ci": "bootstrap-percentile"}
+    }
+  ],
+  "significance": {"test": "mann-whitney-u", "value": -3.42, "alpha": 0.05, "limit": -1.959, "different": true}
+}
+```
+
+- `label`, `environment.host` and `params.iterations` (in place of `ms`) appear only when their flags are used; `significance` is present only when ≥2 series were measured.
+- `params.seed` is always recorded (the `--seed` value or an auto-generated one), making every run reproducible.
+- `results[].bodyHash` is `sha256(fn.toString())` — the per-function comparability guard. Blind spots: closures (source text doesn't capture closed-over values) and imported implementations.
 
 ---
 
@@ -185,21 +298,35 @@ For Deno, `--allow-read` is required and `--allow-hrtime` is recommended. Use `-
 
 ## Statistical methods
 
-### Bootstrap resampling
+### Bootstrap-percentile CI of the median
 
-Used by nano-bench to estimate confidence intervals. Resamples the collected timing data `--bootstrap` times, computing the median of each resample, then takes the mean of those medians for the final estimate.
+Used by nano-bench to estimate the median and its confidence interval. For each of `--bootstrap` resamples (sampling the timing data with replacement), it computes a weighted quantile — 0.5 for the median, α/2 and 1−α/2 for the interval bounds — and reports the **mean of those quantiles across resamples**. The RNG is `mulberry32` seeded by `--seed` (or an auto-recorded seed), with a distinct per-series stream, so the CI is reproducible exactly on recompute. Before the bootstrap completes, an exact order-statistic estimate is shown and then overwritten.
 
 ### Mann-Whitney U test
 
-Nonparametric two-sample test used when comparing exactly 2 functions. Tests whether the two timing distributions are significantly different at the given `--alpha` level. Does not assume normal distribution.
+Nonparametric two-sample test used when comparing exactly 2 functions; normal approximation, two-sided, tie-corrected. Tests whether the two timing distributions are significantly different at the given `--alpha` level. Does not assume a normal distribution. A single comparison, so no multiplicity correction applies.
 
-### Kruskal-Wallis test
+### Kruskal-Wallis H test + Conover-Iman post-hoc
 
-Nonparametric k-sample test used when comparing 3+ functions. Uses beta approximation for the critical value. If significant, performs post-hoc pairwise comparisons to identify which specific pairs differ.
+Nonparametric k-sample test used when comparing 3+ functions. The omnibus uses a beta approximation for the null distribution of H. If the omnibus is significant, the **Conover-Iman** pairwise post-hoc (Fisher's LSD on the shared ranks, with the Student t critical value approximated by z for large df) identifies which specific pairs differ.
+
+### Multiple-comparison correction
+
+The k(k−1)/2 Conover-Iman pairwise comparisons within one omnibus inflate the family-wise error rate. `--correction` controls it, acting on the per-comparison critical value (`zPpf(1 − α/2)`):
+
+- `holm` (default) — Holm step-down: sort the comparisons by strength and test against progressively relaxed thresholds, stopping at the first failure. Same FWER guarantee as Bonferroni but uniformly more powerful, so it is the default.
+- `bonferroni` — single-step; every comparison tested at α/m. More conservative; kept for its familiarity.
+- `none` — uncorrected (reproduces the earlier, pre-correction post-hoc behaviour).
+
+The correction touches only the significance path, not the bootstrap CI's α (a CI is one interval, not a family). The 2-series Mann-Whitney case and separate paired-by-name compare blocks are single comparisons (m = 1, uncorrected).
+
+### Distribution histograms
+
+`--histogram` renders each function's sample distribution as an inline terminal chart, on a shared range/bin set so series are comparable. It surfaces multimodality, skew, and outlier tails (GC pauses, JIT warmup) that a single median+CI line cannot show. Bin count is automatic (scaled to the sample count, capped to the terminal), overridable with `--bins`; orientation is `columns` (vertical ridgeline) or `bars` (horizontal). Median (▾) and mean (▿) markers and a multimodality nudge annotate each chart.
 
 ### Kolmogorov-Smirnov test
 
-Two-sample distribution comparison test. Available in the internal API (`src/significance/kstest.js`).
+Two-sample distribution comparison test. Available in the library API (`src/significance/kstest.js`), not wired into the CLI.
 
 ### Online/streaming algorithms
 

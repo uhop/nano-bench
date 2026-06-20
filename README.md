@@ -6,12 +6,14 @@
 `nano-benchmark` provides command-line utilities for micro-benchmarking code
 with nonparametric statistics and significance testing.
 
-Two utilities are available:
+Three utilities are available:
 
 - `nano-watch` &mdash; continuously benchmarks a single function, showing live statistics
   and memory usage.
 - `nano-bench` &mdash; benchmarks and compares multiple functions, calculating confidence
   intervals and statistical significance.
+- `nano-bench-compare` &mdash; views and compares saved results (JSON), recomputing
+  significance from the raw samples &mdash; for before/after comparisons across runs.
 
 Designed for performance tuning of small, fast code snippets used in tight loops.
 
@@ -96,6 +98,51 @@ npx nano-bench bench-strings-concat.js strings join    # compare just these two
 npx nano-bench bench-strings-concat.js strings         # baseline one (no significance test)
 npx nano-watch bench-strings-concat.js backticks
 ```
+
+### Statistical significance and correction
+
+For two functions `nano-bench` uses the Mann-Whitney U test; for three or more, the
+Kruskal-Wallis H test with a Conover-Iman pairwise post-hoc. Because running many
+pairwise comparisons inflates the chance of a false "significant", the post-hoc is
+corrected for multiple comparisons by default. Choose the method with
+`--correction <none|holm|bonferroni>` (default `holm`, which is uniformly more
+powerful than Bonferroni); `none` reproduces an uncorrected post-hoc. Add `-v` /
+`--verbose` to see the test statistic, critical value, and per-comparison &alpha;.
+
+### Distribution histograms
+
+A median and confidence interval can't show multimodality, skew, or outlier tails
+(GC pauses, JIT warmup). Pass `--histogram` to draw each function's sample
+distribution inline in the terminal, on a shared scale so the shapes are comparable:
+
+```bash
+npx nano-bench bench-strings-concat.js --histogram                 # vertical columns
+npx nano-bench bench-strings-concat.js --histogram --chart bars    # horizontal bars
+npx nano-bench bench-strings-concat.js --histogram --bins 24       # override bin count
+```
+
+Use `--no-emoji` for ASCII markers on terminals with unreliable emoji widths.
+
+### Saving and comparing results
+
+Write a run to a JSON file with `--json`, then view or compare saved runs with
+`nano-bench-compare`. Comparison **recomputes** significance from the raw samples (no
+re-measuring), pairs same-named functions across files by default, and warns when the
+runs' environments differ:
+
+```bash
+npx nano-bench bench-strings-concat.js --json before.json --label before
+# ...change the code...
+npx nano-bench bench-strings-concat.js --json after.json --label after
+
+npx nano-bench-compare before.json after.json            # before/after, paired by name
+npx nano-bench-compare before.json after.json --pooled   # one omnibus over all series
+npx nano-bench-compare after.json                         # just re-render a saved run
+```
+
+The seed for the bootstrap is always recorded, so a recompare reproduces the original
+intervals exactly. Add `--host` (or `--host-name <name>`) to stamp the machine into the
+JSON.
 
 See [wiki](https://github.com/uhop/nano-bench/wiki) for more details.
 

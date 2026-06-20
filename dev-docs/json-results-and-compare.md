@@ -1,9 +1,10 @@
 # JSON results, baselines, comparison, and a viewer
 
-Status: **design**. Queue item 3 — the largest, and the reason items 1 and 2
-exist. Read [`README.md`](./README.md) first; this doc assumes its two
-principles (raw samples are the source of truth; cross-run comparison is the same
-computation as in-run comparison).
+Status: **implemented** (JSON producer + `nano-bench-compare` 2026-06-17;
+multiple-comparison correction D7 2026-06-20). Queue item 3 — the largest, and
+the reason items 1 and 2 exist. Read [`README.md`](./README.md) first; this doc
+assumes its two principles (raw samples are the source of truth; cross-run
+comparison is the same computation as in-run comparison).
 
 The user's open questions, answered in order at the end:
 
