@@ -158,7 +158,7 @@ const writeBars = (writer, {names, lo, hi, k, maxCount, series, tick, emoji}) =>
       medRow = colOf(s.median, lo, hi, k),
       meanRow = colOf(s.mean, lo, hi, k),
       barsBox = Box.make(
-        drawBars(s.counts, barLen, {maxValue: maxCount, theme: themeFor(color(i))})
+        drawBars(s.counts, barLen, {maxValue: maxCount, rectSize: 1, theme: themeFor(color(i))})
       ),
       bars = barsBox.padRight(barLen - barsBox.width),
       markers = rows(r =>
