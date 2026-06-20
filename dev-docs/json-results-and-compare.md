@@ -333,8 +333,8 @@ a pure, unit-tested `planComparison(series, {pooled})` in `src/bench/pair-series
   before/after tests inflates family-wise error. Kruskal–Wallis gates its post-hoc
   behind the omnibus, but that post-hoc is Fisher's LSD (no multiplicity correction
   beyond the gate) and independent paired tests have none. v1 ships uncorrected and
-  documented; a later opt-in correction must stay non-parametric (Holm preferred) —
-  see D7.
+  documented; the opt-in correction (default Holm, opt-in Bonferroni) must stay
+  non-parametric — see D7.
 - **Normalization** — only valid because samples are per-iteration normalized; a
   future raw-sample mode would have to renormalize before comparing.
 - **Environment confound** — restated from § 2; the banner is the mitigation.
@@ -462,14 +462,23 @@ lives in the shared [`README.md`](./README.md) decision table.)
   (bench-file positional vs. JSON positionals). No combined run-and-compare mode.
 - **D6** — `nano-bench-compare` (render + compare) first; static inline-SVG HTML
   viewer deferred to its own future queue item.
-- **D7** — _follow-up (not v1):_ v1 ships uncorrected pairwise, documented. Any
-  later correction must stay within the non-parametric policy. **Holm (preferred)
-  and Bonferroni qualify** — distribution-free FWER procedures acting on the α /
-  p-values, assuming nothing about the data, valid under the _dependence_ of
-  shared-group pairwise comparisons (Holm is uniformly more powerful). **Avoid
-  Šidák-type** corrections (assume independent comparisons — violated here).
-  Mechanically just a corrected α fed to the existing `zPpf` / critical-value path
-  — no new distributional machinery.
+- **D7** — _follow-up (not v1):_ v1 ships uncorrected pairwise, documented. The
+  opt-in correction is **`--correction holm|bonferroni|none` (default `holm`)**.
+  Both are distribution-free FWER procedures acting on the α / p-values, assuming
+  nothing about the data, valid under the _dependence_ of shared-group pairwise
+  comparisons — so both are sound here. **Holm is the default** because it
+  uniformly dominates Bonferroni (same FWER guarantee, never less powerful);
+  **Bonferroni stays opt-in** as the more recognizable / conservative name to cite.
+  **Avoid Šidák-type** corrections (assume independent comparisons — violated here).
+  α is the existing `--alpha`, not a new parameter — the correction splits that
+  single α across the _m_ rendered pairwise verdicts and touches the **significance /
+  critical-value path only** (the post-hoc `zPpf(1-α/2)` + compare-mode paired
+  tests), **not the bootstrap CI's α** (a CI is one interval, not a family). Note
+  α currently feeds _both_ the CI summary and `computeSignificance`, so the
+  corrected α must be derived inside the test path where _m_ is known, leaving the
+  CI α untouched. Mechanically just a corrected α fed to the existing `zPpf` /
+  critical-value path — no new distributional machinery; Holm adds a sort +
+  step-down loop.
 - **D11** — _resolved:_ `host` is opt-in, default absent — `-H, --host` (boolean)
   records `os.hostname()`, `--host-name <name>` records a chosen string. Two flags,
   not an optional-arg `--host [name]`, so commander can't eat the bench-file
