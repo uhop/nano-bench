@@ -1,0 +1,196 @@
+# Design note — macro-benchmarking, system/I/O metrics, cluster analysis
+
+Design + decision record for three related directions that extend nano-bench
+past its current tight-hot-loop focus. Status: **research + proposal, 2026-07-06**
+— nothing shipped; this note states the problems, weighs options against the
+project's constraints, and records leanings. Companion to the existing
+[`json-results-and-compare.md`](./json-results-and-compare.md) (shares the sample
+data model) and the vault queue item "ms-scale I/O collection mode."
+
+External facts here were gathered and adversarially verified in a focused
+research pass (2026-07-06); primary sources are cited inline.
+
+## Scope
+
+Three directions, designed together because they share the nonparametric sample
+model and, ultimately, the same statistics kernel:
+
+- **(A) Macro-benchmarking slow whole processes** — a modest number of repeated
+  runs (tens, not millions) of a slow command/process, instead of batching a
+  hot loop to defeat timer resolution.
+- **(B) System + I/O metrics per run** — richer per-run accounting (CPU, memory,
+  file/network I/O, faults) for lightweight profiling, not just wall-clock.
+- **(C) Cluster analysis** — separate a multimodal distribution (fast-path vs
+  slow-path, cache hit vs miss) into its modes and report each apart.
+
+## The principle still holds — and it's the differentiation
+
+nano-bench's [one principle](./README.md#the-one-principle-the-whole-design-rests-on)
+— nonparametric, rank-based, raw-samples-as-truth — is not just preserved here;
+for the macro path it is the **competitive edge**. The reference macro-benchmark
+tools all report *parametric* summaries only:
+
+- **hyperfine** (the reference tool) reports mean ± a CI on the mean, plus
+  stddev/min/median/max — **no percentiles, no nonparametric inference**
+  ([github.com/sharkdp/hyperfine](https://github.com/sharkdp/hyperfine)).
+- **multitime** attaches a parametric t/z CI to the **mean only** (median is a
+  bare point); **cmdperf** reports min/max/mean/median/stddev, no percentiles
+  ([multitime](https://github.com/ltratt/multitime),
+  [cmdperf](https://github.com/miklosn/cmdperf)).
+
+So a whole-process benchmarker that reports **bootstrap median CI + p90/p99 tails
++ Mann–Whitney U between two commands** — nano-bench's existing engine, pointed
+at tens of process runs — occupies a niche none of them fill. This is the same
+argument the blog *200ms ± 500ms* makes: process latency is skewed and
+long-tailed, so mean ± stddev is the wrong summary, and the tail is the story.
+
+## (A) Macro-benchmarking slow processes
+
+**Problem.** `findLevel` batches a function until one call takes ≥ threshold ms —
+the right move at ns/µs scale to defeat timer resolution. At ms/s scale a single
+whole-process run is directly measurable (batch = 1), batching would erase the
+per-run distribution, and the interesting quantity is the run-to-run spread and
+tail, not the mean of a million iterations.
+
+**Prior art (verified).** hyperfine is the model to learn from:
+- **Run count:** adaptive — at least 10 runs *and* at least 3 s of measurement,
+  no upper limit, `-r/--runs` forces an exact count. cmdperf/multitime use a
+  fixed N. **None** use a variance- or CI-driven adaptive stop.
+- **Warmup:** `-w/--warmup N` runs before measurement to fill (disk) caches.
+- **Per-run setup:** `-p/--prepare CMD` runs before *each* timed run — the
+  canonical cold-cache recipe (`sync; echo 3 | sudo tee /proc/sys/vm/drop_caches`).
+- **Outlier detection:** modified z-scores, with distinct warnings for caching
+  (first run slower) vs interference from other programs — lightweight, portable.
+
+**Design leanings.**
+- A macro mode (a `--process`/`--macro` flag on `nano-bench`, or a `nano-bench-io`
+  sibling — see the queue item) that runs a spawned command tens of times.
+- **Warmup + per-run prepare/teardown hooks**, matching hyperfine's warm-vs-cold
+  distinction. In-process benchmark modules get `warmup()`/`prepare()`/`teardown()`
+  exports; a spawned command gets `--warmup N` and `--prepare CMD`.
+- **Run-count policy:** support fixed N *and* a time budget *and* — the novel
+  option none of the prior art has — an **adaptive stop on median-CI width**
+  (keep running until the bootstrap CI on the median is tight enough or a cap is
+  hit). This is the nonparametric analogue of criterion's adaptive sampling.
+- Reuse the existing engine wholesale: normalized samples → bootstrap median CI +
+  percentiles + MW U / Kruskal–Wallis across commands. Add modified-z outlier
+  **notes** (caching vs interference), consistent with the histogram's p1–p99
+  outlier-note precedent (D8).
+
+## (B) System + I/O metrics per run
+
+**Problem.** For a slow process, wall-clock alone is a thin signal. Memory, page
+faults, context switches, and especially file/network I/O are what a developer
+profiling a slow process needs. The constraint: collect as much as possible
+**without tracing and without elevated privilege**, cross-runtime.
+
+**What's portable (verified).**
+- **`getrusage` via `process.resourceUsage()`** — uniform across Node, Bun
+  (`Bun.spawn().resourceUsage()`), and Deno: CPU user/sys time, `ru_maxrss` peak
+  memory, page faults, voluntary/involuntary context switches. Read from the
+  child's own kernel accounting — no tracing, no privilege
+  ([getrusage(2)](https://man7.org/linux/man-pages/man2/getrusage.2.html)).
+  **Caveats:** many fields are zeroed/unmaintained on Linux; Node marks IPC/swap
+  and fine-grained memory unsupported everywhere, and context switches / major
+  faults unsupported on Windows; **`ru_maxrss` units differ — KiB on Linux, bytes
+  on macOS** — so the collector must normalize.
+- **Linux `/proc/[pid]/io`** separates **logical** I/O (`rchar`/`wchar` — bytes
+  passed to `read()`/`write()`, including page-cache hits and buffered writes)
+  from **physical** I/O (`read_bytes`/`write_bytes` — bytes moved at the block
+  layer), plus `syscr`/`syscw` syscall counts
+  ([proc_pid_io(5)](https://man7.org/linux/man-pages/man5/proc_pid_io.5.html)).
+  Linux-only, ptrace-gated — readable for a child we spawn.
+- **Network-specific bytes are *not* available** from a process's own counters —
+  that needs eBPF/dtrace tracing, which is out of the zero-privilege scope. The
+  portable proxy is syscall counts (`syscr`/`syscw`).
+
+**Design leanings — a tiered collector that degrades per platform.**
+- **Tier 1 (portable, always):** `process.resourceUsage()` — CPU, `ru_maxrss`
+  (unit-normalized), page faults, context switches. Cross-runtime.
+- **Tier 2 (Linux):** `/proc/[pid]/io` logical + physical bytes and syscall
+  counts, when spawning a child on Linux. (macOS approximation: `rusage_info`
+  `RUSAGE_INFO_V*` `ri_diskio_bytesread/written` via libproc — open item.)
+- **Tier 3 (out of scope):** anything needing strace/dtrace/eBPF — document
+  "run your tracer alongside" rather than build it in.
+- Report per-run and as a distribution (a slow run's `ru_maxrss` tail matters as
+  much as its time); persist into the JSON results so `nano-bench-compare` can
+  diff memory/I/O across runs the same way it diffs timing.
+
+## (C) Cluster analysis — separating multimodal distributions
+
+**Problem.** Process/latency distributions are often multimodal (fast path vs
+slow path, cache hit vs miss). A single median then lies the same way a mean does
+— the blog's 90/10 cache is two populations wearing one number. The histogram
+work (D17's `meanSparse` multimodality nudge) already *hints* at this; clustering
+makes it explicit and reports each mode apart.
+
+**Verified, dependency-light approach.**
+- **Gate first with Hartigan's dip test** — a nonparametric unimodality test
+  (dip statistic = min over unimodal CDFs of the max distance to the empirical
+  CDF, calibrated against the uniform)
+  ([Hartigan & Hartigan 1985](https://projecteuclid.org/journals/annals-of-statistics/volume-13/issue-1/The-Dip-Test-of-Unimodality/10.1214/aos/1176346577.full)).
+  If unimodal, report a single distribution; only split if the dip test says so.
+- **Pick the modes with X-means** (auto-K over `[Kmin, Kmax]` by alternating
+  K-means and centroid-splitting, keeping the best BIC/AIC) — small and pure-JS-
+  friendly for 1-D data
+  ([Pelleg & Moore](https://www.semanticscholar.org/paper/d7d385f45c096082812deb1623e5af2c2915b4a9)),
+  or KDE mode-finding.
+- **Caveat (verified):** BIC/AIC recover the true mode count only asymptotically
+  and only under i.i.d.-Gaussian assumptions that benchmark latencies (skewed,
+  heavy-tailed, autocorrelated) **violate**
+  ([scikit-learn mixture](https://scikit-learn.org/stable/modules/mixture.html)).
+  So treat the mode count as a **heuristic**: report per-cluster nonparametric
+  stats (median, CI, percentiles) and cluster weights (the fast-path/slow-path
+  split as a %), and let the user confirm rather than asserting "there are 2
+  modes." This matches the project's habit of outlier *notes* over silent
+  decisions.
+- Feeds the deferred HTML/SVG viewer (queue Priority −1) and the ridgeline
+  histogram: per-cluster overlays are the natural visualization.
+
+## Open items (from the research pass; resolve before building the affected part)
+
+- **Coordinated omission** (Gil Tene): a closed-loop macro benchmark that waits
+  for each run under-samples the tail during slow periods. For tens-of-runs whole
+  processes this is less acute than for high-rate load testing, but a note in the
+  output (or an open-loop option) is worth it.
+- **Streaming quantiles for unbounded per-op I/O:** **t-digest** (mergeable,
+  accurate at extreme quantiles, no fixed range) looks the better fit than
+  HdrHistogram (fixed value range) for the per-operation tail case, but confirm
+  against the current sample-array model before adding a sketch at all.
+- **Steady-state / warmup detection:** the changepoint/CV-based method from
+  Kalibera & Jones, *Rigorous benchmarking in reasonable time*, for auto-discarding
+  JIT/TCP/HPACK warmup in a small number of slow runs.
+- **Effect sizes:** Cliff's delta / Vargha–Delaney A12 (nonparametric, pair
+  naturally with MW U) to report *how much* faster beyond significance; MAD-based
+  robust outliers; lag-1 autocorrelation to check run independence. All small
+  pure-JS additions.
+- **Profiling exports:** emit folded stacks (flamegraph), V8 `--cpu-prof`, or
+  Chrome trace JSON for a spawned child, so downstream tools can profile.
+  Cross-runtime capture differs (Node `--cpu-prof`, Deno `--v8-flags`, Bun).
+
+## Decisions
+
+| #    | Decision                                                            | Leaning                                                                                                      |
+| ---- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| DM1  | Macro mode: flag on `nano-bench`, or a `nano-bench-io` sibling?     | Sibling `nano-bench-io` sharing the stats engine (per the queue item) — keeps the hot-loop runner clean     |
+| DM2  | Run-count policy for slow processes                                 | Support fixed N + time budget + **adaptive-on-median-CI-width** (the novel option); default time-budgeted    |
+| DM3  | Warmup / per-run setup                                              | Adopt hyperfine's split: `--warmup N` (pre-runs) + `--prepare`/`teardown` hooks (per-run reset)             |
+| DM4  | Summary statistics for the macro path                              | Nonparametric — bootstrap median CI + p90/p99 tails + MW U/KW — **not** mean±stddev (the differentiation)    |
+| DM5  | Outlier handling                                                    | Modified-z-score **notes** (caching vs interference), never silent trimming — consistent with D8            |
+| DM6  | System-metric collection scope                                     | Tiered: Tier 1 rusage (portable), Tier 2 Linux `/proc/pid/io`, Tier 3 tracing out of scope; degrade + note  |
+| DM7  | `ru_maxrss` unit normalization                                     | Normalize KiB(Linux)/bytes(macOS) to bytes at collection; document per-field platform support               |
+| DM8  | Multimodal handling                                                 | Dip-test gate → X-means/KDE modes → per-cluster nonparametric stats + weights; mode count is a **heuristic** |
+| DM9  | Where the new statistics live                                      | In the shared stats kernel (see below), not duplicated — both nano-bench and tape-six consume them          |
+
+## Synergy: the shared statistics kernel
+
+Every new statistic here — bootstrap median CI (already have), MW U (already
+have), percentiles, **Cliff's delta / A12, Hartigan's dip test, X-means, t-digest,
+MAD** — belongs in the pure-JS statistics core. The tape-six directions doc
+(`tape-six/dev-docs/testing-landscape-and-directions.md` §5) proposes **extracting
+that core into a standalone package both nano-bench and tape-six vendor as a git
+submodule** (the `deep6` model), which also lets tape-six get `t.bench` and
+run-history analytics with no npm dependency. These clustering/effect-size/sketch
+additions are kernel work that *both* projects consume — one more reason the
+extraction pays off. Coordinate the kernel API when this and the tape-six
+`t.bench`/history work are scheduled together.
