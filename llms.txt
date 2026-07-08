@@ -4,7 +4,7 @@
 
 ## Overview
 
-nano-benchmark provides three CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U for two functions; Kruskal-Wallis H with Conover-Iman pairwise post-hoc for three or more, with Holm/Bonferroni multiple-comparison correction) to produce statistically rigorous results. Saved runs can be re-rendered and compared with significance recomputed from the raw samples. Designed for micro-benchmarks where function-call overhead matters.
+nano-benchmark provides four CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U for two functions; Kruskal-Wallis H with Conover-Iman pairwise post-hoc for three or more, with Holm/Bonferroni multiple-comparison correction) to produce statistically rigorous results. Saved runs can be re-rendered and compared with significance recomputed from the raw samples. Designed for micro-benchmarks where function-call overhead matters.
 
 - NPM: https://npmjs.org/package/nano-benchmark
 - GitHub: https://github.com/uhop/nano-bench
@@ -39,6 +39,15 @@ Options:
 - Output: `--json <file>` (write schema-v1 results), `--label <text>` (annotate the JSON), `-H, --host` / `--host-name <name>` (record machine in the JSON), `--histogram` + `--chart columns|bars` + `--bins N` (per-function distribution chart), `--no-emoji` (ASCII F/S markers), `--observe` (emit User Timing marks at phase boundaries).
 - Misc: `--smoke` (run each selected function once to verify the module — imports, setup, throws/rejections — then exit, non-zero on failure), `--export` (default "default"), `--self`.
 
+### nano-bench-io
+
+Benchmarks slow (ms-scale) functions one call per run — no batching — reporting the bootstrap median CI plus p90/p99 tail percentiles. Same module format (functions are called with `n = 1`, awaited); optional `prepare()`/`teardown()` named exports run untimed around every run. Default policy: at least 10 runs (`--min-runs`) and 5 s (`--budget <ms>`) per function, capped by `--max-runs`; `-r, --runs N` forces an exact count; `--stable <pct>` runs until the median CI width is <= pct% of the median (a CI-driven adaptive stop no other tool in this niche has). `-w, --warmup N` discards the first runs. Modified-z outlier notes distinguish caching (slow first run — use `--warmup`) from interference (scattered slow runs). Shares `--json`, histograms, significance options, and `--smoke` with nano-bench.
+
+```bash
+npx nano-bench-io io-bench.js
+npx nano-bench-io io-bench.js --stable 5 --histogram
+```
+
 ### nano-bench-compare
 
 Reads results JSON only (never benchmarks): renders one saved run, or compares several — recomputing significance from the saved samples and warning when the runs' environments differ. Default pairs same-named series across files (before/after); `--pooled` runs one k-sample omnibus over all series.
@@ -64,7 +73,7 @@ Options: `--ms` (measurement time, default 500), `--iterations` (default Infinit
 
 ## Benchmark file format
 
-Both tools import a module. `nano-bench` expects an object of functions; `nano-watch` can use a single function or an object with a method name argument. Each function takes `n` (iteration count) and runs the measured code in a loop:
+The benchmarking tools import a module. `nano-bench` and `nano-bench-io` expect an object of functions; `nano-watch` can use a single function or an object with a method name argument. Each function takes `n` (iteration count) and runs the measured code in a loop (`nano-bench-io` always passes `n = 1` — keep the loop anyway so the same file works in every tool):
 
 ```js
 export default {

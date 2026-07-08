@@ -188,6 +188,30 @@ makes it explicit and reports each mode apart.
 | DM8 | Multimodal handling                                             | Dip-test gate → X-means/KDE modes → per-cluster nonparametric stats + weights; mode count is a **heuristic** |
 | DM9 | Where the new statistics live                                   | In the shared stats kernel (see below), not duplicated — both nano-bench and tape-six consume them           |
 
+### Resolutions (2026-07-08, with Eugene)
+
+- **v1 target — in-process modules first.** Same benchmark-module format
+  (functions consume `n`, called with `n = 1`, awaited); the engine already
+  lands on batch = 1 at ms scale, so v1 is per-run collection policy +
+  reporting. Spawned commands (the hyperfine niche, `--prepare CMD`, and the
+  (B) child metrics) are v2.
+- **DM1 — sibling binary `nano-bench-io` in this package** (fourth bin, the
+  `nano-bench-compare` model), sharing `src/` wholesale.
+- **DM2 — default run policy: time budget + min runs** — keep running while
+  `runs < --min-runs` (10) _or_ `elapsed < --budget` (5000 ms), per function.
+  `-r/--runs N` forces an exact count; `--stable <pct>` is the adaptive stop
+  (run until the bootstrap CI on the median is ≤ pct% of the median, checked
+  periodically after min-runs; `--max-runs` caps both adaptive and default
+  modes).
+- **DM9 — new statistics live in-repo** under `src/stats/` (quantiles, MAD /
+  modified z); kernel extraction happens when the tape-six `t.bench` work is
+  scheduled.
+- v1 surface: optional module-level `prepare()` / `teardown()` **named
+  exports** awaited untimed around every run (cold-state resets); `--warmup N`
+  discarded runs; p90/p99 tails with a coarse-tail note on small N; modified-z
+  outlier notes (caching vs interference, slow side only); significance,
+  histograms, `--json`, and `--smoke` reused from the engine.
+
 ## Synergy: the shared statistics kernel
 
 Every new statistic here — bootstrap median CI (already have), MW U (already

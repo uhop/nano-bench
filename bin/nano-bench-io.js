@@ -18,12 +18,15 @@ import {c} from 'console-toolkit/style.js';
 import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
-import {findLevel, benchmarkSeries, benchmarkSeriesPar} from '../src/bench/runner.js';
+import {collectMacro} from '../src/bench/macro-runner.js';
 import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
+import quantileSorted from '../src/stats/quantile.js';
+import {outlierNotes} from '../src/bench/outlier-notes.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {corrections} from '../src/significance/correction.js';
 import {mulberry32} from '../src/utils/prng.js';
-import {summaryTable} from '../src/bench/render/summary-table.js';
+import {numericAsc} from '../src/utils/numeric-asc.js';
+import {ioSummaryTable} from '../src/bench/render/io-summary-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {smokeTable} from '../src/bench/render/smoke-table.js';
 import selectFunctions from '../src/bench/select-functions.js';
@@ -52,21 +55,28 @@ const showSelf = () => {
 };
 
 program
-  .name('nano-bench')
+  .name('nano-bench-io')
   .version(pkg.version)
-  .description('Benchmark and compare code.')
+  .description('Benchmark slow (ms-scale) functions per run: distributions and tails, no batching.')
   .argument('<file>', 'File to benchmark.\nIf "self", returns its file name to stdout and exits')
   .argument(
     '[methods...]',
     'function names to benchmark; omit to run all (one name = baseline, no significance test)'
   )
-  .option('-m, --ms <ms>', 'measurement time in milliseconds', toInt, 50)
+  .option('-w, --warmup <runs>', 'discarded warmup runs per function', toInt, 0)
+  .option('--min-runs <runs>', 'minimum measured runs per function', toInt, 10)
+  .option('-t, --budget <ms>', 'time budget per function in milliseconds', toInt, 5000)
   .addOption(
-    new Option('-i, --iterations <iterations>', 'measurement iterations (overrides --ms)')
-      .conflicts('ms')
+    new Option('-r, --runs <runs>', 'exact number of runs (overrides the stop policy)')
+      .conflicts(['budget', 'minRuns', 'stable'])
       .argParser(toInt)
   )
-  .option('--min-iterations <min-iterations>', 'minimum number of iterations', toInt, 1)
+  .option(
+    '--stable <pct>',
+    'run until the median CI width is <= pct% of the median (overrides --budget)',
+    toFloat
+  )
+  .option('--max-runs <runs>', 'hard cap on measured runs', toInt, 1000)
   .option('-e, --export <name>', 'name of the export', 'default')
   .option('-a, --alpha <alpha>', 'significance level', toFloat, 0.05)
   .addOption(
@@ -74,18 +84,12 @@ program
       .choices(corrections)
       .default('holm')
   )
-  .option('-s, --samples <samples>', 'number of samples', toInt, 100)
-  .option('-p, --parallel', 'collect samples in parallel')
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
   .option('--seed <seed>', 'bootstrap RNG seed (32-bit integer; default: random)', toInt)
   .option('--json <file>', 'write results to a JSON file')
   .option('--label <label>', 'free-form run label recorded in the JSON')
   .option('-H, --host', 'record os.hostname() in the JSON')
   .option('--host-name <name>', 'record a custom machine name in the JSON (overrides --host)')
-  .option(
-    '-o, --observe',
-    'emit User Timing marks at phase boundaries (PerformanceObserver/DevTools)'
-  )
   .option('-v, --verbose', 'show significance test statistics and critical values')
   .option('--histogram', 'show a distribution histogram per function')
   .addOption(
@@ -114,20 +118,28 @@ if (args[0] === 'self') showSelf();
 
 // validate the options
 
-if (options.minIterations < 1) program.error('The minimum number of iterations must be >= 1');
+if (options.warmup < 0) program.error('The number of warmup runs must be >= 0');
+if (options.minRuns < 1) program.error('The minimum number of runs must be >= 1');
+if (options.budget < 1) program.error('The time budget must be >= 1 ms');
+if (options.runs !== undefined && options.runs < 1)
+  program.error('The number of runs must be >= 1');
+if (options.stable !== undefined && options.stable <= 0)
+  program.error('The CI width target must be > 0');
+if (options.maxRuns < 1) program.error('The maximum number of runs must be >= 1');
 if (options.alpha <= 0 || options.alpha >= 1)
   program.error('The significance level must be > 0 and < 1');
-if (options.samples < 1) program.error('The number of samples must be >= 1');
 if (options.bootstrap < 1) program.error('The number of bootstrap samples must be >= 1');
 
 // open the file
 
 const fileName = pathToFileURL(path.resolve(process.cwd(), args[0]));
 
-let fns;
+let fns, prepare, teardown;
 try {
   const file = await import(fileName.href);
   fns = file[options.export];
+  if (typeof file.prepare == 'function') prepare = file.prepare;
+  if (typeof file.teardown == 'function') teardown = file.teardown;
 } catch (error) {
   program.error(`File not found: ${args[0]} (${fileName})`);
 }
@@ -167,50 +179,38 @@ if (options.smoke) {
   process.exit(failed ? 1 : 0);
 }
 
-const normalizeSamples = (samples, batchSize) => {
-  for (let i = 0; i < samples.length; ++i) {
-    samples[i] /= batchSize;
-  }
-  return samples;
-};
-
-const benchSeries = options.parallel ? benchmarkSeriesPar : benchmarkSeries;
-
 const seed = (options.seed ?? Math.random() * 2 ** 32) >>> 0;
 
-let iterations = [];
-if (options.iterations > 0) {
-  iterations = new Array(names.length).fill(Math.max(options.iterations, options.minIterations));
-}
+const policyLine =
+  options.runs > 0
+    ? c`Measuring {{save.bright.yellow}}${formatInteger(options.runs)}{{restore}} runs per function (no batching, one call per run)`
+    : options.stable > 0
+      ? c`Measuring until the median CI width is {{save.bright.yellow}}${formatNumber(options.stable, {decimals: 2})}%{{restore}} of the median (at least ${formatInteger(
+          options.minRuns
+        )} runs, at most ${formatInteger(options.maxRuns)})`
+      : c`Measuring for {{save.bright.yellow}}${formatTime(
+          options.budget,
+          prepareTimeFormat([options.budget], 1000)
+        )}{{restore}} per function (at least ${formatInteger(
+          options.minRuns
+        )} runs, at most ${formatInteger(options.maxRuns)})`;
 
 await writer.write([
   c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: ${program.description()}`,
   '',
   c`Confidence interval: {{save.bright.yellow}}${formatNumber(100 * (1 - options.alpha), {decimals: 2})}%{{restore}} bootstrap-percentile of the median ({{save.bright.yellow}}${formatInteger(
     options.bootstrap
-  )}{{restore}} resamples), samples: {{save.bright.yellow}}${formatInteger(
-    options.samples
-  )}{{restore}}`,
-  iterations.length
-    ? c`Measuring {{save.bright.yellow}}${formatInteger(
-        iterations[0]
-      )}{{restore}} iterations per sample ({{save.bright.yellow}}${formatInteger(
-        iterations[0] * options.samples
-      )}{{restore}} per function)`
-    : c`Measuring {{save.bright.yellow}}${formatTime(
-        options.ms,
-        prepareTimeFormat([options.ms], 1000)
-      )}{{restore}} per sample (~{{save.bright.yellow}}${formatTime(
-        options.ms * 2 * options.samples,
-        prepareTimeFormat([options.ms * 2 * options.samples], 1000)
-      )}{{restore}} per function)`,
+  )}{{restore}} resamples)`,
+  policyLine,
   ''
 ]);
 
 const results = [],
-  stats = [];
+  stats = [],
+  runCounts = names.map(() => 0),
+  notes = [];
 
-const report = () => summaryTable(names, stats, iterations);
+const report = () => ioSummaryTable(names, stats, runCounts);
 
 updater = new Updater(
   report,
@@ -218,43 +218,42 @@ updater = new Updater(
   writer
 );
 
-while (iterations.length < names.length) {
-  const index = iterations.length,
-    fn = fns[names[index]];
+const ciWidth = samples => {
+  const s = bootstrapSummary(samples, {
+    alpha: options.alpha,
+    bootstrap: options.bootstrap,
+    random: mulberry32(seed)
+  });
+  return (100 * (s.hi - s.lo)) / s.median;
+};
 
-  iterations.push(0);
-
-  const batchSize = await findLevel(
-    fn,
+for (let i = 0; i < names.length; ++i) {
+  const samples = await collectMacro(
+    fns[names[i]],
     {
-      threshold: options.ms,
-      startFrom: options.minIterations,
-      observe: options.observe ? names[index] : undefined
+      warmup: options.warmup,
+      runs: options.runs || 0,
+      minRuns: options.minRuns,
+      budget: options.budget,
+      stable: options.stable || 0,
+      maxRuns: options.maxRuns,
+      ciWidth: options.stable > 0 ? ciWidth : undefined,
+      prepare,
+      teardown
     },
     async (name, data) => {
-      if (name === 'finding-level-next') {
-        iterations[index] = data.n;
+      if (name === 'macro-run') {
+        runCounts[i] = data.n;
         await updater.update();
-        await sleep(5);
       }
     }
   );
-
-  iterations[index] = batchSize;
-  await updater.update();
-}
-
-// run the benchmark
-
-for (let i = 0; i < iterations.length; ++i) {
-  const batchSize = iterations[i],
-    samples = await benchSeries(fns[names[i]], batchSize, {
-      nSeries: options.samples,
-      observe: options.observe ? names[i] : undefined
-    });
-  normalizeSamples(samples, batchSize);
   results.push(samples);
-  stats.push({...exactSummary(samples, {alpha: options.alpha}), bootstrap: false});
+  runCounts[i] = samples.length;
+
+  const sorted = samples.slice().sort(numericAsc),
+    percentiles = {p90: quantileSorted(sorted, 0.9), p99: quantileSorted(sorted, 0.99)};
+  stats.push({...exactSummary(samples, {alpha: options.alpha}), ...percentiles, bootstrap: false});
   await updater.update();
   await sleep(5);
   stats[i] = {
@@ -263,14 +262,30 @@ for (let i = 0; i < iterations.length; ++i) {
       bootstrap: options.bootstrap,
       random: mulberry32((seed + Math.imul(i, 0x9e3779b9)) >>> 0)
     }),
+    ...percentiles,
     bootstrap: true
   };
   await updater.update();
   await sleep(5);
+
+  const {note} = outlierNotes(samples);
+  if (note) notes.push({name: names[i], note});
 }
 
 await updater.final();
 updater = null;
+
+const warn = options.emoji ? '⚠' : '!';
+if (results.some(samples => samples.length < 100)) {
+  notes.push({
+    name: '',
+    note: 'fewer than 100 runs — p99 lands on the few slowest runs and is coarse'
+  });
+}
+for (const {name, note} of notes) {
+  await writer.write(c`{{save.bright.yellow}}${warn}{{restore}} ${name ? name + ': ' : ''}${note}`);
+}
+if (notes.length) await writer.write('');
 
 let significance = null;
 if (results.length > 1) {
@@ -291,7 +306,6 @@ if (results.length > 1) {
 }
 
 if (options.histogram) {
-  // columns are bound by terminal width (1 col/bin); bars by terminal height (1 row/bin)
   const budget =
     options.chart === 'bars'
       ? Math.max(8, (writer.size.rows || 24) - 8)
@@ -299,7 +313,7 @@ if (options.histogram) {
   writeHistograms(writer, {
     names,
     hist: computeHistograms(results, {
-      bins: options.bins || binCount(options.samples, budget),
+      bins: options.bins || binCount(Math.max(...results.map(samples => samples.length)), budget),
       maxBins: budget
     }),
     orientation: options.chart,
@@ -315,24 +329,29 @@ if (options.json) {
     source: {file: args[0], export: options.export, methods: names},
     environment: captureEnvironment({host: options.host, hostName: options.hostName}),
     params: {
-      ...(options.iterations > 0 ? {iterations: options.iterations} : {ms: options.ms}),
-      minIterations: options.minIterations,
-      samples: options.samples,
+      mode: 'macro',
+      ...(options.runs > 0
+        ? {runs: options.runs}
+        : {minRuns: options.minRuns, budget: options.budget}),
+      ...(options.stable > 0 ? {stable: options.stable} : {}),
+      maxRuns: options.maxRuns,
+      warmup: options.warmup,
       bootstrap: options.bootstrap,
       seed,
       alpha: options.alpha,
-      correction: options.correction,
-      parallel: Boolean(options.parallel)
+      correction: options.correction
     },
     series: names.map((name, i) => ({
       name,
       bodyHash: bodyHash(fns[name]),
-      reps: iterations[i],
+      reps: 1,
       samples: results[i],
       summary: {
         median: stats[i].median,
         lo: stats[i].lo,
         hi: stats[i].hi,
+        p90: stats[i].p90,
+        p99: stats[i].p99,
         mean: mean(results[i]),
         stdDev: stdDev(results[i]),
         opsPerSec: 1000 / stats[i].median,

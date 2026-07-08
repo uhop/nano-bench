@@ -6,12 +6,14 @@
 `nano-benchmark` provides command-line utilities for micro-benchmarking code
 with nonparametric statistics and significance testing.
 
-Three utilities are available:
+Four utilities are available:
 
 - `nano-watch` &mdash; continuously benchmarks a single function, showing live statistics
   and memory usage.
 - `nano-bench` &mdash; benchmarks and compares multiple functions, calculating confidence
   intervals and statistical significance.
+- `nano-bench-io` &mdash; benchmarks slow (ms-scale) functions one call per run &mdash;
+  distributions and tail percentiles (p90/p99), no batching.
 - `nano-bench-compare` &mdash; views and compares saved results (JSON), recomputing
   significance from the raw samples &mdash; for before/after comparisons across runs.
 
@@ -155,6 +157,24 @@ npx nano-bench-compare after.json                         # just re-render a sav
 The seed for the bootstrap is always recorded, so a recompare reproduces the original
 intervals exactly. Add `--host` (or `--host-name <name>`) to stamp the machine into the
 JSON.
+
+### Benchmarking slow functions
+
+Batching is right for nanosecond loops but erases the run-to-run distribution of
+slow operations. `nano-bench-io` runs each function once per run (`n = 1`) and
+reports p90/p99 tails alongside the median and its confidence interval &mdash; for
+I/O-bound and other ms-scale code where the tail is the story:
+
+```bash
+npx nano-bench-io io-bench.js                # at least 10 runs and 5 s per function
+npx nano-bench-io io-bench.js -r 50          # exactly 50 runs
+npx nano-bench-io io-bench.js --stable 5     # run until the median CI is within 5%
+```
+
+The module format is the same. Optional `prepare()` / `teardown()` named exports
+run untimed around every run; `--warmup N` discards the first runs (caches, JIT,
+connections). Slow outliers are flagged, distinguishing caching (slow first run)
+from interference (scattered slow runs).
 
 Full documentation is in the **[wiki](https://github.com/uhop/nano-bench/wiki)** &mdash; browse the [index](https://github.com/uhop/nano-bench/wiki/Home), or [search it](https://uhop.github.io/wiki-search/app/?wiki=uhop/nano-bench) by name.
 
