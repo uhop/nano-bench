@@ -63,7 +63,7 @@ const options = program.opts(),
 
 if (args[0] === 'self') showSelf();
 
-const fileName = pathToFileURL(path.join(process.cwd(), args[0]));
+const fileName = pathToFileURL(path.resolve(process.cwd(), args[0]));
 
 let fn;
 try {

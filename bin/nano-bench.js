@@ -123,7 +123,7 @@ if (options.bootstrap < 1) program.error('The number of bootstrap samples must b
 
 // open the file
 
-const fileName = pathToFileURL(path.join(process.cwd(), args[0]));
+const fileName = pathToFileURL(path.resolve(process.cwd(), args[0]));
 
 let fns;
 try {
