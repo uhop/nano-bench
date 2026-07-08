@@ -62,6 +62,7 @@ Output:
 
 Misc:
 
+- `--smoke` — run each selected function once (`n = 1`) and exit: a pre-flight that validates the module (imports, setup, throws/rejections) before a long collection run. Reports ok/failed with a rough duration per function; the exit code is non-zero if any function throws or rejects. Exits explicitly, so a module holding live handles (servers, watchers) can't hang the check. Measurement/statistics options are ignored.
 - `-e, --export <name>` — name of the export to use from the file (default: `"default"`).
 - `--self` — print the script's file path to stdout and exit (for Deno/Bun usage).
 
@@ -95,6 +96,7 @@ npx nano-bench bench/bench-string-concat.js
 npx nano-bench -s 200 -b 2000 -a 0.01 bench/bench-string-concat.js
 npx nano-bench bench/bench-string-concat.js plus template   # only these two
 npx nano-bench bench/bench-string-concat.js --json base.json --label baseline
+npx nano-bench bench/bench-string-concat.js --smoke         # pre-flight: each function once
 ```
 
 ---

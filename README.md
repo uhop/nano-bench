@@ -99,6 +99,18 @@ npx nano-bench bench-strings-concat.js strings         # baseline one (no signif
 npx nano-watch bench-strings-concat.js backticks
 ```
 
+### Smoke-testing a module
+
+Before committing to a long collection run, validate the module with `--smoke`:
+each selected function is called once (`n = 1`) and reported ok/failed with a
+rough duration. The exit code is non-zero if any function throws or rejects,
+and the tool exits promptly even if the module holds live handles (servers,
+watchers):
+
+```bash
+npx nano-bench bench-strings-concat.js --smoke
+```
+
 ### Statistical significance and correction
 
 For two functions `nano-bench` uses the Mann-Whitney U test; for three or more, the

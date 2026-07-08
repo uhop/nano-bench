@@ -16,6 +16,7 @@ src/                          # Internal source (shipped via npm)
 │   ├── compare.js                  # High-level compare() — measures + significance tests
 │   ├── significance.js             # computeSignificance (MW vs KW) + significanceMatrix
 │   ├── select-functions.js         # Resolve the [methods…] positional against the export
+│   ├── smoke.js                    # smokeRun — each function once (the --smoke pre-flight)
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
 │   ├── histogram.js                # Sample binning: computeHistograms, binCount, percentile
 │   ├── render/
@@ -95,6 +96,8 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 3. **Bootstrap CI** — `bootstrapSummary` resamples (`bootstrap()` + `getWeightedValue()`) to estimate the median and its percentile confidence interval, seeded by `--seed` (or an auto-recorded seed) via `mulberry32` for reproducibility.
 4. **Significance testing** (`computeSignificance`) — Mann-Whitney U (2 functions) or Kruskal-Wallis H + Conover-Iman pairwise post-hoc (3+ functions); the post-hoc family-wise error rate is controlled by `--correction` (none/Holm/Bonferroni, default Holm).
 5. **Output** — styled summary table + significance header/matrix via `console-toolkit`; optional per-function distribution histogram (`--histogram`); optional schema-v1 results file (`--json`).
+
+`--smoke` short-circuits the pipeline before calibration: each selected function runs once (`n = 1`), reported ok/failed with a rough duration, and the process exits explicitly — non-zero on any throw/rejection — so a module holding live handles can't hang the pre-flight.
 
 ### nano-bench-compare pipeline
 

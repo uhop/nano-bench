@@ -30,13 +30,14 @@ npx nano-bench benchmark.js
 npx nano-bench -s 200 -b 2000 -a 0.01 benchmark.js
 npx nano-bench benchmark.js --json out.json --label after-opt   # save results
 npx nano-bench benchmark.js --histogram --chart bars            # show distributions
+npx nano-bench benchmark.js --smoke                             # pre-flight: run each function once
 ```
 
 Options:
 - Measurement: `--ms` (time per sample, default 50), `--iterations` (fixed count, overrides --ms), `--min-iterations` (default 1), `--samples` (default 100), `--parallel` (collect samples concurrently — for async benches).
 - Statistics: `--alpha` (significance level, default 0.05 = 95% CI), `--bootstrap` (resamples, default 1000), `--seed` (bootstrap RNG seed; auto-recorded if omitted), `--correction` (post-hoc multiple-comparison method: `none`/`holm`/`bonferroni`, default `holm`), `--verbose` (show test statistics + critical values).
 - Output: `--json <file>` (write schema-v1 results), `--label <text>` (annotate the JSON), `-H, --host` / `--host-name <name>` (record machine in the JSON), `--histogram` + `--chart columns|bars` + `--bins N` (per-function distribution chart), `--no-emoji` (ASCII F/S markers), `--observe` (emit User Timing marks at phase boundaries).
-- Misc: `--export` (default "default"), `--self`.
+- Misc: `--smoke` (run each selected function once to verify the module — imports, setup, throws/rejections — then exit, non-zero on failure), `--export` (default "default"), `--self`.
 
 ### nano-bench-compare
 

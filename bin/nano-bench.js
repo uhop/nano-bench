@@ -15,6 +15,8 @@ import {
   prepareTimeFormat
 } from 'console-toolkit/alphanumeric/number-formatters.js';
 import {c} from 'console-toolkit/style.js';
+import {Table} from 'console-toolkit/table';
+import lineTheme from 'console-toolkit/themes/lines/unicode-rounded.js';
 import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
@@ -26,6 +28,7 @@ import {mulberry32} from '../src/utils/prng.js';
 import {summaryTable} from '../src/bench/render/summary-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import selectFunctions from '../src/bench/select-functions.js';
+import smokeRun from '../src/bench/smoke.js';
 import {bodyHash} from '../src/utils/body-hash.js';
 import {captureEnvironment} from '../src/bench/results/environment.js';
 import {buildResultsObject} from '../src/bench/results/build.js';
@@ -97,6 +100,7 @@ program
     toInt
   )
   .option('--no-emoji', 'use ASCII fastest/slowest markers (F/S) instead of emoji')
+  .option('--smoke', 'run each function once to verify the module, then exit (non-zero on failure)')
   .option('--self', 'print the file name to stdout and exit')
   .showHelpAfterError('(add --help to see available options)');
 
@@ -146,6 +150,44 @@ let updater;
 process.once('exit', () => updater?.done());
 process.once('SIGINT', async () => process.exit(130));
 process.once('SIGTERM', () => process.exit(143));
+
+if (options.smoke) {
+  await writer.write([
+    c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: smoke run, each function once (n = 1)`,
+    ''
+  ]);
+  const smoke = await smokeRun(fns, names),
+    timeFormat = prepareTimeFormat(
+      smoke.map(result => result.time),
+      1000
+    ),
+    rows = [];
+  for (const result of smoke) {
+    rows.push([
+      result.ok ? c`{{save.bright.green}}OK{{restore}}` : c`{{save.bright.red}}FAILED{{restore}}`,
+      result.name,
+      {
+        value: c`{{save.bright.yellow}}${formatTime(result.time, timeFormat)}{{restore}}`,
+        align: 'r'
+      }
+    ]);
+    if (!result.ok)
+      rows.push([
+        null,
+        {value: c`{{save.bright.red}}${String(result.error)}{{restore}}`, width: 2},
+        null
+      ]);
+  }
+  await writer.write(new Table(rows, lineTheme, {hAxis: 0, vAxis: 0}).toStrings());
+  const failed = smoke.filter(result => !result.ok).length;
+  await writer.write([
+    '',
+    failed
+      ? c`{{save.bright.red}}Failed: ${failed} of ${smoke.length}{{restore}}`
+      : c`{{save.bright.green}}All ${smoke.length} passed{{restore}}`
+  ]);
+  process.exit(failed ? 1 : 0);
+}
 
 const normalizeSamples = (samples, batchSize) => {
   for (let i = 0; i < samples.length; ++i) {

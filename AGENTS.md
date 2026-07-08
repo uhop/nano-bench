@@ -21,7 +21,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 
 ## Architecture quick reference
 
-- **`bin/nano-bench.js`** — benchmarks multiple functions, compares them with bootstrap CI and significance tests, outputs a styled table. `--json` writes a results file; `--histogram` draws a per-function distribution chart; `--correction` picks the post-hoc multiple-comparison method.
+- **`bin/nano-bench.js`** — benchmarks multiple functions, compares them with bootstrap CI and significance tests, outputs a styled table. `--json` writes a results file; `--histogram` draws a per-function distribution chart; `--correction` picks the post-hoc multiple-comparison method; `--smoke` runs each function once to validate the module, then exits (non-zero on failure).
 - **`bin/nano-watch.js`** — continuously benchmarks a single function in streaming mode, showing live stats and memory usage.
 - **`bin/nano-bench-compare.js`** — reads results JSON, recomputes significance from the saved samples, and renders view/compare tables with an environment-diff banner; no benchmarking. Pairs same-named series across files (default) or pools all series with `--pooled`.
 - **`src/bench/runner.js`** — core benchmark engine: `findLevel`, `benchmark`, `benchmarkSeries`, `measure`, `Stats`. The orchestrating functions (`findLevel`, `benchmarkSeries`, `benchmarkSeriesPar`, `measure`, `measurePar`) accept an `observe: boolean | string` option that emits User Timing marks at phase boundaries (`nano-bench/<label>/<phase>`).
