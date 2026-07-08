@@ -124,6 +124,20 @@ nano-bench-io [options] <file> [methods...]
 
 The module may export `prepare()` / `teardown()` (named exports, sync or async) — awaited untimed around every run, warmup included. Use them to reset state so every run measures the same thing (drop a cache, open a fresh connection, recreate a temp file).
 
+### Command mode
+
+`-c, --command` treats the arguments as shell commands to benchmark instead of a module file — whole-process macro benchmarking (hyperfine's niche, with nonparametric statistics):
+
+```bash
+npx nano-bench-io -c 'node script.js' 'bun script.js'
+npx nano-bench-io -c -w 2 --prepare 'sync' 'tar xf big.tar'
+```
+
+- Each command runs via the system shell; stdout/stderr are discarded (output would garble the live table and skew timing).
+- `--prepare <cmd>` — a shell command run untimed before every run (the canonical cold-cache recipe).
+- A run **fails** when the child exits non-zero or dies by a signal — `--smoke` reports it per command; a measured run aborts with the error.
+- Series are named by the command string; the JSON records `source: {commands}` and a `bodyHash` of the command text. Everything else (stop policies, percentiles, outlier notes, significance, histograms) works exactly as in module mode.
+
 ### Other options
 
 Shared with nano-bench: `-e, --export`, `-a, --alpha`, `-b, --bootstrap`, `--seed`, `--correction`, `-v, --verbose`, `--histogram` / `--chart` / `--bins`, `--no-emoji`, `--json` / `--label` / `-H, --host` / `--host-name`, `--smoke`, `--self`.

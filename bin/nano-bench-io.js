@@ -19,6 +19,7 @@ import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
 import {collectMacro} from '../src/bench/macro-runner.js';
+import runCommand, {commandFunctions} from '../src/bench/command-runner.js';
 import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
 import quantileSorted from '../src/stats/quantile.js';
 import {outlierNotes} from '../src/bench/outlier-notes.js';
@@ -31,7 +32,7 @@ import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {smokeTable} from '../src/bench/render/smoke-table.js';
 import selectFunctions from '../src/bench/select-functions.js';
 import smokeRun from '../src/bench/smoke.js';
-import {bodyHash} from '../src/utils/body-hash.js';
+import {bodyHash, textHash} from '../src/utils/body-hash.js';
 import {captureEnvironment} from '../src/bench/results/environment.js';
 import {buildResultsObject} from '../src/bench/results/build.js';
 import {computeHistograms, binCount} from '../src/bench/histogram.js';
@@ -77,6 +78,8 @@ program
     toFloat
   )
   .option('--max-runs <runs>', 'hard cap on measured runs', toInt, 1000)
+  .option('-c, --command', 'treat the arguments as shell commands to benchmark, not a module file')
+  .option('--prepare <cmd>', 'shell command run (untimed) before every run in command mode')
   .option('-e, --export <name>', 'name of the export', 'default')
   .option('-a, --alpha <alpha>', 'significance level', toFloat, 0.05)
   .addOption(
@@ -130,27 +133,35 @@ if (options.alpha <= 0 || options.alpha >= 1)
   program.error('The significance level must be > 0 and < 1');
 if (options.bootstrap < 1) program.error('The number of bootstrap samples must be >= 1');
 
-// open the file
+// open the file (or adapt the commands)
 
-const fileName = pathToFileURL(path.resolve(process.cwd(), args[0]));
+let fns, names, prepare, teardown;
+if (options.command) {
+  if (new Set(args).size !== args.length) program.error('Duplicate commands');
+  fns = commandFunctions(args);
+  names = args;
+  if (options.prepare) {
+    const prepareCommand = options.prepare;
+    prepare = () => runCommand(prepareCommand);
+  }
+} else {
+  const fileName = pathToFileURL(path.resolve(process.cwd(), args[0]));
+  try {
+    const file = await import(fileName.href);
+    fns = file[options.export];
+    if (typeof file.prepare == 'function') prepare = file.prepare;
+    if (typeof file.teardown == 'function') teardown = file.teardown;
+  } catch (error) {
+    program.error(`File not found: ${args[0]} (${fileName})`);
+  }
 
-let fns, prepare, teardown;
-try {
-  const file = await import(fileName.href);
-  fns = file[options.export];
-  if (typeof file.prepare == 'function') prepare = file.prepare;
-  if (typeof file.teardown == 'function') teardown = file.teardown;
-} catch (error) {
-  program.error(`File not found: ${args[0]} (${fileName})`);
-}
+  if (!fns) program.error(`Export not found: ${options.export}`);
 
-if (!fns) program.error(`Export not found: ${options.export}`);
-
-let names;
-try {
-  names = selectFunctions(fns, args.slice(1));
-} catch (error) {
-  program.error(error.message);
+  try {
+    names = selectFunctions(fns, args.slice(1));
+  } catch (error) {
+    program.error(error.message);
+  }
 }
 
 // set up the writer and the updater
@@ -228,26 +239,31 @@ const ciWidth = samples => {
 };
 
 for (let i = 0; i < names.length; ++i) {
-  const samples = await collectMacro(
-    fns[names[i]],
-    {
-      warmup: options.warmup,
-      runs: options.runs || 0,
-      minRuns: options.minRuns,
-      budget: options.budget,
-      stable: options.stable || 0,
-      maxRuns: options.maxRuns,
-      ciWidth: options.stable > 0 ? ciWidth : undefined,
-      prepare,
-      teardown
-    },
-    async (name, data) => {
-      if (name === 'macro-run') {
-        runCounts[i] = data.n;
-        await updater.update();
+  let samples;
+  try {
+    samples = await collectMacro(
+      fns[names[i]],
+      {
+        warmup: options.warmup,
+        runs: options.runs || 0,
+        minRuns: options.minRuns,
+        budget: options.budget,
+        stable: options.stable || 0,
+        maxRuns: options.maxRuns,
+        ciWidth: options.stable > 0 ? ciWidth : undefined,
+        prepare,
+        teardown
+      },
+      async (name, data) => {
+        if (name === 'macro-run') {
+          runCounts[i] = data.n;
+          await updater.update();
+        }
       }
-    }
-  );
+    );
+  } catch (error) {
+    program.error(String(error));
+  }
   results.push(samples);
   runCounts[i] = samples.length;
 
@@ -326,7 +342,9 @@ if (options.json) {
     pkg,
     createdAt: new Date().toISOString(),
     label: options.label,
-    source: {file: args[0], export: options.export, methods: names},
+    source: options.command
+      ? {commands: names, ...(options.prepare ? {prepare: options.prepare} : {})}
+      : {file: args[0], export: options.export, methods: names},
     environment: captureEnvironment({host: options.host, hostName: options.hostName}),
     params: {
       mode: 'macro',
@@ -343,7 +361,7 @@ if (options.json) {
     },
     series: names.map((name, i) => ({
       name,
-      bodyHash: bodyHash(fns[name]),
+      bodyHash: options.command ? textHash(name) : bodyHash(fns[name]),
       reps: 1,
       samples: results[i],
       summary: {

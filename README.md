@@ -176,6 +176,14 @@ run untimed around every run; `--warmup N` discards the first runs (caches, JIT,
 connections). Slow outliers are flagged, distinguishing caching (slow first run)
 from interference (scattered slow runs).
 
+It also benchmarks whole commands (`-c`), with `--prepare <cmd>` running untimed
+before every run &mdash; like hyperfine, but with nonparametric statistics and
+tail percentiles:
+
+```bash
+npx nano-bench-io -c 'node script.js' 'bun script.js'
+```
+
 Full documentation is in the **[wiki](https://github.com/uhop/nano-bench/wiki)** &mdash; browse the [index](https://github.com/uhop/nano-bench/wiki/Home), or [search it](https://uhop.github.io/wiki-search/app/?wiki=uhop/nano-bench) by name.
 
 ## User Timing API integration

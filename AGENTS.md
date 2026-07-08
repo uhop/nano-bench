@@ -22,7 +22,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 ## Architecture quick reference
 
 - **`bin/nano-bench.js`** — benchmarks multiple functions, compares them with bootstrap CI and significance tests, outputs a styled table. `--json` writes a results file; `--histogram` draws a per-function distribution chart; `--correction` picks the post-hoc multiple-comparison method; `--smoke` runs each function once to validate the module, then exits (non-zero on failure).
-- **`bin/nano-bench-io.js`** — benchmarks slow (ms-scale) functions one call per run, no batching: p90/p99 tail percentiles, modified-z outlier notes (caching vs interference), stop policies (`--min-runs`+`--budget` default, `-r` fixed, `--stable` CI-width adaptive), optional module-level `prepare()`/`teardown()` named exports run untimed around every run. Shares the module format, significance tests, histograms, `--json`, and `--smoke` with `nano-bench`.
+- **`bin/nano-bench-io.js`** — benchmarks slow (ms-scale) functions one call per run, no batching: p90/p99 tail percentiles, modified-z outlier notes (caching vs interference), stop policies (`--min-runs`+`--budget` default, `-r` fixed, `--stable` CI-width adaptive), optional module-level `prepare()`/`teardown()` named exports run untimed around every run. `-c`/`--command` benchmarks shell commands instead (whole processes; `--prepare <cmd>` untimed before each run; a run fails on non-zero exit _or_ a fatal signal). Shares the module format, significance tests, histograms, `--json`, and `--smoke` with `nano-bench`.
 - **`bin/nano-watch.js`** — continuously benchmarks a single function in streaming mode, showing live stats and memory usage.
 - **`bin/nano-bench-compare.js`** — reads results JSON, recomputes significance from the saved samples, and renders view/compare tables with an environment-diff banner; no benchmarking. Pairs same-named series across files (default) or pools all series with `--pooled`.
 - **`src/bench/runner.js`** — core benchmark engine: `findLevel`, `benchmark`, `benchmarkSeries`, `measure`, `Stats`. The orchestrating functions (`findLevel`, `benchmarkSeries`, `benchmarkSeriesPar`, `measure`, `measurePar`) accept an `observe: boolean | string` option that emits User Timing marks at phase boundaries (`nano-bench/<label>/<phase>`).
@@ -30,6 +30,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - **`src/bench/significance.js`** — `computeSignificance` (dispatches Mann-Whitney for 2 series, Kruskal-Wallis for 3+) and `significanceMatrix`.
 - **`src/bench/pair-series.js`** — `planComparison`: partition compared series into paired-by-name blocks, or one pooled omnibus.
 - **`src/bench/macro-runner.js`** — `collectMacro`: per-run collection (one awaited call per sample) with warmup discard, per-run `prepare`/`teardown`, and the three stop policies.
+- **`src/bench/command-runner.js`** — `runCommand` (shell spawn, output discarded, rejects on non-zero exit or signal) + `commandFunctions` (adapts commands to benchmark functions for `collectMacro`).
 - **`src/bench/outlier-notes.js`** — modified-z slow-side outliers classified as caching (first runs) vs interference (scattered).
 - **`src/bench/histogram.js`** + **`src/bench/render/`** — sample binning (`computeHistograms`, `binCount`) and the renderers: `summary-table.js`, `significance-table.js`, `histogram-chart.js`.
 - **`src/bench/results/`** — JSON results I/O: `build.js` (schema v1 object), `load.js` (read + validate), `environment.js` (`captureEnvironment` / `diffEnvironments`).
@@ -42,7 +43,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 
 ## Dependencies
 
-- **`commander`** — CLI argument parsing for all three binaries.
+- **`commander`** — CLI argument parsing for all four binaries.
 - **`console-toolkit`** — styled terminal output, tables, charts, ANSI sequences.
 - **`emoji-regex`** + **`get-east-asian-width`** — let `console-toolkit` measure wide-glyph widths faithfully (emoji markers 🐇/🐢, CJK/fullwidth names) so table cells align; without them every wide glyph would measure as 1 column.
 - **Dev only:** `tape-six`, `tape-six-proc` for testing; `prettier` for formatting; `typescript` + `@types/node` for the `js-check` step.

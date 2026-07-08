@@ -19,6 +19,7 @@ src/                          # Internal source (shipped via npm)
 │   ├── select-functions.js         # Resolve the [methods…] positional against the export
 │   ├── smoke.js                    # smokeRun — each function once (the --smoke pre-flight)
 │   ├── macro-runner.js             # collectMacro — one call per run; warmup, prepare/teardown, stop policies
+│   ├── command-runner.js           # runCommand (shell spawn, fails on code or signal) + command adapter
 │   ├── outlier-notes.js            # Modified-z slow-side outliers: caching vs interference notes
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
 │   ├── histogram.js                # Sample binning: computeHistograms, binCount, percentile
@@ -109,7 +110,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 
 ### nano-bench-io pipeline
 
-1. **Collect** (`collectMacro`) — one awaited call per run (`n = 1`, no batching); optional warmup runs discarded, optional module-level `prepare()`/`teardown()` awaited untimed around every run. Stop policy: fixed `--runs`, or the default min-runs + time-budget pair, or `--stable` (bootstrap-median-CI width target, checked every 10 runs) — all capped by `--max-runs`.
+1. **Collect** (`collectMacro`) — one awaited call per run (`n = 1`, no batching); optional warmup runs discarded, optional module-level `prepare()`/`teardown()` awaited untimed around every run. Stop policy: fixed `--runs`, or the default min-runs + time-budget pair, or `--stable` (bootstrap-median-CI width target, checked every 10 runs) — all capped by `--max-runs`. With `-c`/`--command` the "functions" are adapted shell commands (`command-runner.js`): spawned via the system shell, output discarded, a run failing on non-zero exit or a fatal signal; `--prepare <cmd>` becomes the untimed per-run hook.
 2. **Summarize** — the same `bootstrapSummary`, plus p90/p99 (`quantileSorted`, R-7).
 3. **Notes** — modified-z slow-side outliers (`outlier-notes.js`): all in the first runs → caching (suggest `--warmup`); scattered → interference. A coarse-tail note fires below 100 runs.
 4. **Significance / output** — same tests, histograms, and JSON as `nano-bench` (`params.mode: "macro"`, `reps: 1`), then the explicit exit.
@@ -151,6 +152,7 @@ bin/nano-bench.js ──→ src/bench/runner.js ──→ src/stats.js
                   ──→ src/utils/{prng,body-hash}.js
 
 bin/nano-bench-io.js ──→ src/bench/macro-runner.js
+                     ──→ src/bench/command-runner.js (the -c/--command adapter)
                      ──→ src/bench/outlier-notes.js ──→ src/stats/{quantile,mad}.js
                      ──→ src/stats.js (bootstrapSummary), src/stats/quantile.js
                      ──→ src/bench/significance.js, render/*, results/* (same as nano-bench)

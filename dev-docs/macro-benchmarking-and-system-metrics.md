@@ -211,6 +211,19 @@ makes it explicit and reports each mode apart.
   discarded runs; p90/p99 tails with a coarse-tail note on small N; modified-z
   outlier notes (caching vs interference, slow side only); significance,
   histograms, `--json`, and `--smoke` reused from the engine.
+- **v2 shipped the same day: spawned commands via `-c`/`--command`** on the
+  same binary — each command is adapted to a benchmark function
+  (`() => runCommand(cmd)`, `spawn(…, {shell: true, stdio: 'ignore'})`), so
+  the collector, stop policies, stats, notes, `--smoke`, and JSON reuse is
+  total. `--prepare <cmd>` runs untimed before every run (the cold-cache
+  recipe); a child that exits non-zero **or dies by a signal** fails the run
+  (`close` reports `(code, signal)` — checking only `code` would count a
+  SIGKILL as success). Series are named by the command string; `bodyHash` is
+  the sha256 of the command text; the JSON records `source: {commands}`.
+  Child output is discarded (hyperfine's default) — it would garble the live
+  table and skew timing. Still deferred: the concurrency dimension,
+  Kalibera–Jones steady-state detection, effect sizes; the (B) child metrics
+  are now unlockable.
 
 ## Synergy: the shared statistics kernel
 
