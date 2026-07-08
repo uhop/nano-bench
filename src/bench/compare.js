@@ -3,7 +3,7 @@ import {computeSignificance} from './significance.js';
 
 const ALPHA = 0.05;
 
-const compare = async (inputs, options = {}, report) => {
+export const compare = async (inputs, options = {}, report) => {
   const keys = Object.keys(inputs);
   if (keys.length < 2) throw new Error('The "inputs" is supposed to have 2 or more samples.');
 

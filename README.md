@@ -144,7 +144,7 @@ The seed for the bootstrap is always recorded, so a recompare reproduces the ori
 intervals exactly. Add `--host` (or `--host-name <name>`) to stamp the machine into the
 JSON.
 
-See [wiki](https://github.com/uhop/nano-bench/wiki) for more details.
+Full documentation is in the **[wiki](https://github.com/uhop/nano-bench/wiki)** &mdash; browse the [index](https://github.com/uhop/nano-bench/wiki/Home), or [search it](https://uhop.github.io/wiki-search/app/?wiki=uhop/nano-bench) by name.
 
 ## User Timing API integration
 

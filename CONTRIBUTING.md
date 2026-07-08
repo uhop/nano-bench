@@ -2,13 +2,13 @@
 
 ## Prerequisites
 
-- Node.js 20 or later
+- Node.js (any non-EOL release)
 - npm
 
 ## Setup
 
 ```bash
-git clone --recursive git@github.com:uhop/nano-bench
+git clone --recursive https://github.com/uhop/nano-bench.git
 cd nano-bench
 npm install
 ```
@@ -19,7 +19,7 @@ The `--recursive` flag is needed to clone the wiki submodule under `wiki/`.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for a detailed module map and dependency graph.
 
-- `bin/` — CLI entry points (`nano-bench`, `nano-watch`)
+- `bin/` — CLI entry points (`nano-bench`, `nano-watch`, `nano-bench-compare`)
 - `src/` — internal source (stats, significance, bench runner, streaming counters, utils)
 - `tests/` — automated tests (`test-*.js`)
 - `bench/` — example benchmark files

@@ -2,7 +2,7 @@ import {normalMakeCdf, normalMakePdf} from './normal.js';
 import ppf from './ppf.js';
 
 // percent point function
-const normalPpf = (z, mu = 0, sigma = 1) => {
+export const normalPpf = (z, mu = 0, sigma = 1) => {
   // find the lower bound
   const cdf = normalMakeCdf(mu, sigma);
   let x = mu - 6 * sigma,

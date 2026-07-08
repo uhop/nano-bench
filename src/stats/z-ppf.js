@@ -2,7 +2,7 @@ import {zCdf, zPdf} from './z.js';
 import ppf from './ppf.js';
 
 // percent point function
-const zPpf = z => {
+export const zPpf = z => {
   // find the lower bound
   let x = -6,
     p = zCdf(x);
