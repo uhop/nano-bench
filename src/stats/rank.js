@@ -19,7 +19,7 @@ export const rank = groups => {
 
   // sort and rank
   t.sort((a, b) => a.value - b.value);
-  for (let i = 0; i < t.length; ) {
+  for (let i = 0; i < t.length;) {
     let ahead = i + 1;
     const value = t[i].value;
     while (ahead < t.length && value === t[ahead].value) ++ahead;

@@ -13,7 +13,7 @@ export const mwtest = (sorted1, sorted2, alpha = 0.05) => {
   const m = (sorted1.length * sorted2.length) / 2;
 
   let tiesC = 0;
-  for (let i = 0, size = t.length; i < size; ) {
+  for (let i = 0, size = t.length; i < size;) {
     const rank = t[i].rank;
     let j = i + 1;
     while (j < size && rank === t[j].rank) ++j;

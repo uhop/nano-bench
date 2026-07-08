@@ -178,7 +178,12 @@ if (options.smoke) {
         null
       ]);
   }
-  await writer.write(new Table(rows, lineTheme, {hAxis: 0, vAxis: 0}).toStrings());
+  await writer.write(
+    new Table(rows, lineTheme, {
+      hAxis: [0, 0, 0, 0],
+      vAxis: new Array(rows.length + 1).fill(0)
+    }).toStrings()
+  );
   const failed = smoke.filter(result => !result.ok).length;
   await writer.write([
     '',
