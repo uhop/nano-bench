@@ -365,3 +365,6 @@ if (options.json) {
   });
   await writeFile(options.json, JSON.stringify(obj, null, 2) + '\n');
 }
+
+// must be explicit: a module holding live handles would otherwise keep a finished run alive
+process.exit(0);

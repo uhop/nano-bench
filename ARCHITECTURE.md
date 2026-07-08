@@ -95,7 +95,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 2. **Collect samples** (`benchmarkSeries`) — runs the function `nSeries` times, collecting timing data, normalized to ms/iteration.
 3. **Bootstrap CI** — `bootstrapSummary` resamples (`bootstrap()` + `getWeightedValue()`) to estimate the median and its percentile confidence interval, seeded by `--seed` (or an auto-recorded seed) via `mulberry32` for reproducibility.
 4. **Significance testing** (`computeSignificance`) — Mann-Whitney U (2 functions) or Kruskal-Wallis H + Conover-Iman pairwise post-hoc (3+ functions); the post-hoc family-wise error rate is controlled by `--correction` (none/Holm/Bonferroni, default Holm).
-5. **Output** — styled summary table + significance header/matrix via `console-toolkit`; optional per-function distribution histogram (`--histogram`); optional schema-v1 results file (`--json`).
+5. **Output** — styled summary table + significance header/matrix via `console-toolkit`; optional per-function distribution histogram (`--histogram`); optional schema-v1 results file (`--json`). The run then ends with an explicit `process.exit(0)`, so a module holding live handles (servers, watchers) can't keep a finished run alive.
 
 `--smoke` short-circuits the pipeline before calibration: each selected function runs once (`n = 1`), reported ok/failed with a rough duration, and the process exits explicitly — non-zero on any throw/rejection — so a module holding live handles can't hang the pre-flight.
 
@@ -111,7 +111,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 
 1. **Find level** — same as above.
 2. **Streaming loop** — repeatedly calls `benchmark()`, feeds results into `StatCounter` (online stats) and `MedianCounter` (streaming median).
-3. **Live output** — continuously updates a table showing count, time, mean, stdDev, median, skewness, kurtosis, ops/sec, and memory usage.
+3. **Live output** — continuously updates a table showing count, time, mean, stdDev, median, skewness, kurtosis, ops/sec, and memory usage. A bounded run (`--iterations`) ends with an explicit `process.exit(0)` — same live-handles rationale as `nano-bench`.
 
 ## Key patterns
 

@@ -223,3 +223,6 @@ for (let i = 0; i < iterations; ++i) {
 
 await updater.finalFrame();
 updater = null;
+
+// must be explicit: a module holding live handles would otherwise keep a finished run alive
+process.exit(0);

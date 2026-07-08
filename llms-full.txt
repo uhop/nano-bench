@@ -89,6 +89,8 @@ When two or more functions are measured, a `Significance:` line names the test, 
 4. **Significance test**: Mann-Whitney U (2 functions) or Kruskal-Wallis H + Conover-Iman pairwise post-hoc (3+ functions), with `--correction` controlling the post-hoc family-wise error rate.
 5. **Optional outputs**: a distribution histogram (`--histogram`) and/or a schema-v1 results file (`--json`).
 
+The run ends with an explicit `process.exit(0)` once reporting (and the `--json` write) completes, so a module holding live handles (servers, watchers) can't keep a finished run alive.
+
 ### Example
 
 ```bash
@@ -223,6 +225,8 @@ A live-updating styled table with:
 All statistics are computed using online/streaming algorithms (constant memory):
 - **StatCounter**: streaming mean, variance, skewness, kurtosis (Welford's algorithm).
 - **MedianCounter**: approximate streaming median (median-of-medians).
+
+A bounded run (`--iterations`) ends with an explicit `process.exit(0)`, so a module holding live handles can't keep a finished run alive.
 
 ### Example
 
