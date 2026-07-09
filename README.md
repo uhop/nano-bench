@@ -243,6 +243,7 @@ BSD 3-Clause License
 
 ## Release history
 
+- 1.2.0: _Added `nano-bench-io` for slow (ms-scale) functions and whole commands: per-run collection with p90/p99 tails, system metrics, warmup auto-detection, and multimodal cluster splitting. Added the `--smoke` pre-flight and effect sizes (Cliff's &delta;). Bugfixes._
 - 1.1.0: _Added saving to JSON, `nano-bench-compare` for comparing runs distribution histograms, and Holm/Bonferroni multiple-comparison. Also per-function selection and a `findLevel` termination fix._
 - 1.0.16: _Added User Timing API integration: `--observe` flag._
 - 1.0.15: _Updated dependencies._

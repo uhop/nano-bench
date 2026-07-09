@@ -1,7 +1,7 @@
 {
   "name": "nano-benchmark",
-  "version": "1.1.0",
-  "description": "CLI micro-benchmarking for Node, Deno, and Bun with nonparametric statistics and significance testing.",
+  "version": "1.2.0",
+  "description": "CLI micro- and macro-benchmarking for Node, Deno, and Bun — hot loops, ms-scale operations, and whole commands — with nonparametric statistics and significance testing.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -35,6 +35,12 @@
   "keywords": [
     "benchmark",
     "micro-benchmark",
+    "macro-benchmark",
+    "hyperfine",
+    "latency",
+    "percentiles",
+    "effect-size",
+    "warmup",
     "performance",
     "statistics",
     "nonparametric",
