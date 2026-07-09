@@ -14,6 +14,44 @@ export const procAvailable = () => {
   }
 };
 
+const descendants = pid => {
+  const pids = [pid];
+  for (let i = 0; i < pids.length; ++i) {
+    try {
+      const kids = readFileSync(`/proc/${pids[i]}/task/${pids[i]}/children`, 'utf8').trim();
+      if (kids) pids.push(...kids.split(/\s+/).map(Number));
+    } catch {}
+  }
+  return pids;
+};
+
+const IO_KEYS = [
+  'logicalRead',
+  'logicalWrite',
+  'physicalRead',
+  'physicalWrite',
+  'syscallRead',
+  'syscallWrite'
+];
+
+// the wrapper shell forks the command (dash does not exec here) and its own readings
+// must never pass as the command's — only descendants count; io is summed over the
+// live tree, peakRSS is the max of any single process
+export const readTreeMetrics = pid => {
+  let reading = null;
+  for (const target of descendants(pid).slice(1)) {
+    const one = readProcMetrics(target);
+    if (!one) continue;
+    if (reading) {
+      reading.peakRSS = Math.max(reading.peakRSS, one.peakRSS);
+      for (const key of IO_KEYS) reading[key] += one[key];
+    } else {
+      reading = one;
+    }
+  }
+  return reading;
+};
+
 export const readProcMetrics = pid => {
   try {
     const io = readFileSync(`/proc/${pid}/io`, 'utf8'),

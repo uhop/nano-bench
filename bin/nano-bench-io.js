@@ -321,15 +321,29 @@ updater = null;
 
 if (options.metrics) {
   if (metricsOn) {
-    const medians = names.map((_, i) => metricMedians(runMetrics[i], metricSpecs[metricsKind]));
+    // a median over a minority of runs isn't a median — blank + note instead
+    const medians = names.map((_, i) => {
+      const perRun = runMetrics[i],
+        enough = perRun.filter(Boolean).length * 2 >= perRun.length;
+      return metricMedians(enough ? perRun : [], metricSpecs[metricsKind]);
+    });
     await writer.write(['', c`{{save.bold}}Metrics{{restore}} (median per run):`, '']);
     await writer.write(metricsTable(names, medians, metricsKind));
     await writer.write([c`{{save.dim}}${metricLegends[metricsKind]}{{restore}}`, '']);
-    if (metricsKind === 'proc' && runMetrics.some(list => list.some(reading => !reading)))
-      notes.push({
-        name: '',
-        note: 'some runs were too short for a /proc reading — their metrics are missing'
-      });
+    if (metricsKind === 'proc') {
+      for (let i = 0; i < names.length; ++i) {
+        const total = runMetrics[i].length,
+          caught = runMetrics[i].filter(Boolean).length;
+        if (caught === total) continue;
+        notes.push({
+          name: names[i],
+          note:
+            caught * 2 >= total
+              ? `metrics captured in ${caught} of ${total} runs (the rest were too short for a /proc reading)`
+              : `metrics captured in ${caught} of ${total} runs — below the half threshold, not shown`
+        });
+      }
+    }
   } else {
     notes.push({
       name: '',

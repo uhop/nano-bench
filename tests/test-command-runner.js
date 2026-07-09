@@ -38,6 +38,33 @@ test('runCommand()', t => {
     }
   });
 
+  t.test('metrics reflect the command, not the wrapper shell', async t => {
+    const readings = [];
+    await runCommand(
+      'node -e "process.stdout.write(Buffer.alloc(100000)); setTimeout(() => {}, 60)"',
+      {metrics: r => readings.push(r)}
+    );
+    if (procAvailable()) {
+      const reading = readings[0];
+      t.ok(reading);
+      t.ok(reading.logicalWrite >= 100000);
+      t.ok(reading.peakRSS > 10 * 1024 * 1024);
+    } else {
+      t.ok(true);
+    }
+  });
+
+  t.test('adaptive polling catches short commands', async t => {
+    const readings = [];
+    await runCommand('node -e "setTimeout(() => {}, 15)"', {metrics: r => readings.push(r)});
+    t.equal(readings.length, 1);
+    if (procAvailable()) {
+      t.ok(readings[0] && readings[0].peakRSS > 0);
+    } else {
+      t.ok(true);
+    }
+  });
+
   t.test('commandFunctions adapts commands to benchmark functions', async t => {
     const commands = ['node -e "process.exit(0)"', 'node --version'],
       fns = commandFunctions(commands);

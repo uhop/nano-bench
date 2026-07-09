@@ -1,30 +1,46 @@
 import {spawn} from 'node:child_process';
+import {performance} from 'node:perf_hooks';
 
-import {readProcMetrics} from './proc-metrics.js';
+import {readTreeMetrics} from './proc-metrics.js';
 
 // stdio ignored: child output would garble the live table and skew timing (hyperfine's default)
 export const runCommand = (command, options = {}) =>
   new Promise((resolve, reject) => {
-    const {metrics, interval = 5} = options,
+    const {metrics, interval} = options,
       child = spawn(command, {shell: true, stdio: 'ignore'});
-    // /proc/<pid> vanishes at reap: poll while alive, keep the last good reading
+    // /proc/<pid> vanishes at reap: poll while alive, keep the last good reading;
+    // adaptive backoff — dense while short commands are likely alive, cheap for long
+    // runs; a fixed `interval` overrides the schedule
     let last = null,
-      timer = null;
+      timer = null,
+      done = false;
     if (metrics) {
+      const started = performance.now();
       const read = () => {
-        const reading = readProcMetrics(child.pid);
+        const reading = readTreeMetrics(child.pid);
         if (reading) last = reading;
       };
+      const schedule = () => {
+        if (done) return;
+        const elapsed = performance.now() - started,
+          delay = interval ?? (elapsed < 100 ? 1 : elapsed < 3000 ? 5 : 25);
+        timer = setTimeout(() => {
+          read();
+          schedule();
+        }, delay);
+        timer.unref?.();
+      };
       read();
-      timer = setInterval(read, interval);
-      timer.unref?.();
+      schedule();
     }
     child.once('error', error => {
-      if (timer) clearInterval(timer);
+      done = true;
+      if (timer) clearTimeout(timer);
       reject(error);
     });
     child.once('close', (code, signal) => {
-      if (timer) clearInterval(timer);
+      done = true;
+      if (timer) clearTimeout(timer);
       if (metrics) metrics(last);
       if (signal) {
         reject(new Error(`Command killed by ${signal}: ${command}`));

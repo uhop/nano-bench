@@ -245,6 +245,28 @@ makes it explicit and reports each mode apart.
 - **Compare integration deferred:** the JSON is forward-compatible
   (`load.js` tolerates unknown keys); `nano-bench-compare` metric diffing is
   a queued follow-up.
+- **Same-day correction (Eugene's catch):** the first cut polled `child.pid`
+  — but that is the wrapper shell (`/bin/sh -c …`), and dash _forks_ the
+  command rather than exec'ing it in this spawn context, so every command's
+  "metrics" were dash's startup footprint (2 MB rss, 4,260 B rchar,
+  identical across commands). Fixed: readings come from the wrapper's
+  **descendants** only (`/proc/[pid]/task/[pid]/children` walked
+  recursively; io summed, peakRSS maxed); the wrapper's own readings never
+  pass as the command's, so a command faster than the poll now yields _no_
+  reading and the missing-metrics note — honest — instead of the shell's
+  numbers. Pinned by a regression test (a 100 KB-writing child must show
+  `logicalWrite ≥ 100000` and node-scale RSS).
+- **Adaptive poll backoff (same day, Eugene's call):** instead of a fixed
+  5 ms interval (or a `--poll` knob), the poller runs every 1 ms for the
+  command's first 100 ms, then 5 ms, then 25 ms past 3 s — dense where short
+  commands live, cheap for long runs, no user decision; a fixed `interval`
+  option remains as an internal override should a `--poll` flag ever be
+  wanted. Measured floor: a command whose own life is ~1–2 ms (bun
+  `--version` behind the shell fork) still evades even 1 ms polling
+  (~1 catch in 20) — so a metric captured in **under half the runs** is
+  reported blank + note rather than as a fake median of a few lucky
+  snapshots. True sub-5 ms accounting stays with the queued Tier-3
+  (`wait4`/pidfd) follow-up.
 
 ## Synergy: the shared statistics kernel
 
