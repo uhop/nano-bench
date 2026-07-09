@@ -184,6 +184,10 @@ tail percentiles:
 npx nano-bench-io -c 'node script.js' 'bun script.js'
 ```
 
+Add `-M` / `--metrics` for per-run system metrics: CPU, page faults, and context
+switches for module functions (any runtime); peak RSS, I/O bytes, and syscall
+counts for commands (Linux).
+
 Full documentation is in the **[wiki](https://github.com/uhop/nano-bench/wiki)** &mdash; browse the [index](https://github.com/uhop/nano-bench/wiki/Home), or [search it](https://uhop.github.io/wiki-search/app/?wiki=uhop/nano-bench) by name.
 
 ## User Timing API integration

@@ -20,6 +20,14 @@ import Updater from 'console-toolkit/output/updater.js';
 
 import {collectMacro} from '../src/bench/macro-runner.js';
 import runCommand, {commandFunctions} from '../src/bench/command-runner.js';
+import {rusageAvailable, rusageDelta} from '../src/bench/metrics.js';
+import {procAvailable} from '../src/bench/proc-metrics.js';
+import {
+  metricsTable,
+  metricSpecs,
+  metricMedians,
+  metricLegends
+} from '../src/bench/render/metrics-table.js';
 import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
 import quantileSorted from '../src/stats/quantile.js';
 import {outlierNotes} from '../src/bench/outlier-notes.js';
@@ -80,6 +88,7 @@ program
   .option('--max-runs <runs>', 'hard cap on measured runs', toInt, 1000)
   .option('-c, --command', 'treat the arguments as shell commands to benchmark, not a module file')
   .option('--prepare <cmd>', 'shell command run (untimed) before every run in command mode')
+  .option('-M, --metrics', 'collect per-run system metrics (rusage; Linux /proc for commands)')
   .option('-e, --export <name>', 'name of the export', 'default')
   .option('-a, --alpha <alpha>', 'significance level', toFloat, 0.05)
   .addOption(
@@ -135,11 +144,21 @@ if (options.bootstrap < 1) program.error('The number of bootstrap samples must b
 
 // open the file (or adapt the commands)
 
+const metricsKind = options.command ? 'proc' : 'rusage',
+  metricsOn = options.metrics && (options.command ? procAvailable() : rusageAvailable()),
+  metricsByName = new Map();
+
 let fns, names, prepare, teardown;
 if (options.command) {
   if (new Set(args).size !== args.length) program.error('Duplicate commands');
-  fns = commandFunctions(args);
   names = args;
+  if (metricsOn) for (const name of names) metricsByName.set(name, []);
+  fns = commandFunctions(
+    names,
+    metricsOn
+      ? command => ({metrics: reading => metricsByName.get(command).push(reading)})
+      : undefined
+  );
   if (options.prepare) {
     const prepareCommand = options.prepare;
     prepare = () => runCommand(prepareCommand);
@@ -219,6 +238,7 @@ await writer.write([
 const results = [],
   stats = [],
   runCounts = names.map(() => 0),
+  runMetrics = names.map(() => []),
   notes = [];
 
 const report = () => ioSummaryTable(names, stats, runCounts);
@@ -252,7 +272,12 @@ for (let i = 0; i < names.length; ++i) {
         maxRuns: options.maxRuns,
         ciWidth: options.stable > 0 ? ciWidth : undefined,
         prepare,
-        teardown
+        teardown,
+        metricsBefore: metricsOn && !options.command ? () => process.resourceUsage() : undefined,
+        metricsAfter:
+          metricsOn && !options.command
+            ? token => runMetrics[i].push(rusageDelta(token, process.resourceUsage()))
+            : undefined
       },
       async (name, data) => {
         if (name === 'macro-run') {
@@ -266,6 +291,9 @@ for (let i = 0; i < names.length; ++i) {
   }
   results.push(samples);
   runCounts[i] = samples.length;
+  if (metricsOn && options.command) {
+    runMetrics[i] = metricsByName.get(names[i]).slice(options.warmup);
+  }
 
   const sorted = samples.slice().sort(numericAsc),
     percentiles = {p90: quantileSorted(sorted, 0.9), p99: quantileSorted(sorted, 0.99)};
@@ -290,6 +318,27 @@ for (let i = 0; i < names.length; ++i) {
 
 await updater.final();
 updater = null;
+
+if (options.metrics) {
+  if (metricsOn) {
+    const medians = names.map((_, i) => metricMedians(runMetrics[i], metricSpecs[metricsKind]));
+    await writer.write(['', c`{{save.bold}}Metrics{{restore}} (median per run):`, '']);
+    await writer.write(metricsTable(names, medians, metricsKind));
+    await writer.write([c`{{save.dim}}${metricLegends[metricsKind]}{{restore}}`, '']);
+    if (metricsKind === 'proc' && runMetrics.some(list => list.some(reading => !reading)))
+      notes.push({
+        name: '',
+        note: 'some runs were too short for a /proc reading — their metrics are missing'
+      });
+  } else {
+    notes.push({
+      name: '',
+      note: options.command
+        ? 'command metrics need Linux /proc — not available on this platform'
+        : 'metrics not supported on this runtime (process.resourceUsage unavailable)'
+    });
+  }
+}
 
 const warn = options.emoji ? '⚠' : '!';
 if (results.some(samples => samples.length < 100)) {
@@ -352,6 +401,7 @@ if (options.json) {
         ? {runs: options.runs}
         : {minRuns: options.minRuns, budget: options.budget}),
       ...(options.stable > 0 ? {stable: options.stable} : {}),
+      ...(metricsOn ? {metrics: metricsKind} : {}),
       maxRuns: options.maxRuns,
       warmup: options.warmup,
       bootstrap: options.bootstrap,
@@ -364,6 +414,7 @@ if (options.json) {
       bodyHash: options.command ? textHash(name) : bodyHash(fns[name]),
       reps: 1,
       samples: results[i],
+      ...(metricsOn ? {metrics: runMetrics[i]} : {}),
       summary: {
         median: stats[i].median,
         lo: stats[i].lo,

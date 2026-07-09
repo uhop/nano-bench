@@ -55,6 +55,18 @@ test('collectMacro()', t => {
     t.deepEqual(log, ['prep', 'run', 'down', 'prep', 'run', 'down', 'prep', 'run', 'down']);
   });
 
+  t.test('metrics hooks wrap measured runs only, warmup excluded', async t => {
+    let counter = 0;
+    const tokens = [];
+    await collectMacro(() => {}, {
+      runs: 3,
+      warmup: 2,
+      metricsBefore: () => ++counter,
+      metricsAfter: token => tokens.push(token)
+    });
+    t.deepEqual(tokens, [1, 2, 3]);
+  });
+
   t.test('async functions are awaited per run', async t => {
     const samples = await collectMacro(n => new Promise(resolve => setTimeout(resolve, 5 * n)), {
       runs: 3

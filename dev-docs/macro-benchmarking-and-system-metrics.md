@@ -225,6 +225,27 @@ makes it explicit and reports each mode apart.
   Kalibera–Jones steady-state detection, effect sizes; the (B) child metrics
   are now unlockable.
 
+### (B) v1 resolutions (2026-07-08, with Eugene)
+
+- **Scope: both modes, tiered.** Module mode = Tier 1 per-run
+  `process.resourceUsage()` deltas (verified working on Node, Bun, and Deno),
+  taken outside the timed window via `collectMacro`'s `metricsBefore`/`After`
+  hooks. Command mode = Tier 2 Linux `/proc/[pid]/{io,status}` polling
+  (5 ms, last successful poll wins — up to one interval of trailing activity
+  can be missed, negligible for genuinely slow processes; very short commands
+  may yield no reading, noted). Degrades with a note elsewhere.
+- **Correction to the research pass:** Node exposes **no child rusage**
+  (`spawn`/`spawnSync` return no resource usage; `Bun.spawn().resourceUsage()`
+  has no Node/Deno equivalent) — the "uniform across runtimes" Tier-1 claim
+  holds for _self_ accounting only, which is why command-mode metrics are
+  /proc-based.
+- **Surfacing: opt-in `-M`/`--metrics`** (the `--observe` precedent) —
+  collects, prints a medians table, persists raw per-run readings into the
+  JSON (`series[].metrics`, `params.metrics` names the collector).
+- **Compare integration deferred:** the JSON is forward-compatible
+  (`load.js` tolerates unknown keys); `nano-bench-compare` metric diffing is
+  a queued follow-up.
+
 ## Synergy: the shared statistics kernel
 
 Every new statistic here — bootstrap median CI (already have), MW U (already

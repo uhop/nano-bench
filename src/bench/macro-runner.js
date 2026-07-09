@@ -11,7 +11,9 @@ export const collectMacro = async (fn, options = {}, report) => {
     checkEvery = 10,
     ciWidth,
     prepare,
-    teardown
+    teardown,
+    metricsBefore,
+    metricsAfter
   } = options;
 
   for (let i = 0; i < warmup; ++i) {
@@ -25,9 +27,11 @@ export const collectMacro = async (fn, options = {}, report) => {
     started = performance.now();
   for (;;) {
     await prepare?.();
+    const token = metricsBefore?.();
     const start = performance.now();
     await fn(1);
     const time = performance.now() - start;
+    metricsAfter?.(token);
     await teardown?.();
     samples.push(time);
     await report?.('macro-run', {n: samples.length, time});

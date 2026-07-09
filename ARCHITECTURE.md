@@ -20,12 +20,15 @@ src/                          # Internal source (shipped via npm)
 │   ├── smoke.js                    # smokeRun — each function once (the --smoke pre-flight)
 │   ├── macro-runner.js             # collectMacro — one call per run; warmup, prepare/teardown, stop policies
 │   ├── command-runner.js           # runCommand (shell spawn, fails on code or signal) + command adapter
+│   ├── metrics.js                  # rusageDelta over process.resourceUsage() — portable per-run metrics
+│   ├── proc-metrics.js             # Linux /proc/[pid]/{io,status} readings for spawned children
 │   ├── outlier-notes.js            # Modified-z slow-side outliers: caching vs interference notes
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
 │   ├── histogram.js                # Sample binning: computeHistograms, binCount, percentile
 │   ├── render/
 │   │   ├── summary-table.js        # The median/CI/ops summary table
 │   │   ├── io-summary-table.js     # The macro variant: median/CI + p90/p99 + runs
+│   │   ├── metrics-table.js        # System-metric medians per function (--metrics)
 │   │   ├── smoke-table.js          # The --smoke report (shared by bench & io)
 │   │   ├── significance-table.js   # Significance header + N×N matrix (shared by bench & compare)
 │   │   └── histogram-chart.js      # Terminal distribution charts (columns ridgeline / rotated bars)
@@ -111,7 +114,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 ### nano-bench-io pipeline
 
 1. **Collect** (`collectMacro`) — one awaited call per run (`n = 1`, no batching); optional warmup runs discarded, optional module-level `prepare()`/`teardown()` awaited untimed around every run. Stop policy: fixed `--runs`, or the default min-runs + time-budget pair, or `--stable` (bootstrap-median-CI width target, checked every 10 runs) — all capped by `--max-runs`. With `-c`/`--command` the "functions" are adapted shell commands (`command-runner.js`): spawned via the system shell, output discarded, a run failing on non-zero exit or a fatal signal; `--prepare <cmd>` becomes the untimed per-run hook.
-2. **Summarize** — the same `bootstrapSummary`, plus p90/p99 (`quantileSorted`, R-7).
+2. **Summarize** — the same `bootstrapSummary`, plus p90/p99 (`quantileSorted`, R-7). With `-M`/`--metrics`: per-run rusage deltas taken outside the timed window (module mode) or Linux `/proc/[pid]` polling with last-poll-wins semantics (command mode), rendered as a medians table and persisted into the JSON.
 3. **Notes** — modified-z slow-side outliers (`outlier-notes.js`): all in the first runs → caching (suggest `--warmup`); scattered → interference. A coarse-tail note fires below 100 runs.
 4. **Significance / output** — same tests, histograms, and JSON as `nano-bench` (`params.mode: "macro"`, `reps: 1`), then the explicit exit.
 

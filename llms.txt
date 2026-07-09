@@ -45,6 +45,8 @@ Benchmarks slow (ms-scale) functions one call per run — no batching — report
 
 Command mode: `-c, --command` treats the arguments as shell commands to benchmark (hyperfine-style, but nonparametric); `--prepare <cmd>` runs untimed before every run (cold-cache resets); a run fails on a non-zero exit or a fatal signal; child output is discarded.
 
+System metrics: `-M, --metrics` (opt-in) collects per-run metrics, prints their medians, and persists them into the JSON. Module mode: `process.resourceUsage()` deltas (CPU, faults, context switches — Node/Bun/Deno). Command mode: Linux `/proc/[pid]` (peak RSS, logical/physical I/O bytes, syscall counts), polled while the child runs; degrades with a note elsewhere.
+
 ```bash
 npx nano-bench-io io-bench.js
 npx nano-bench-io io-bench.js --stable 5 --histogram

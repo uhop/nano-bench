@@ -138,6 +138,14 @@ npx nano-bench-io -c -w 2 --prepare 'sync' 'tar xf big.tar'
 - A run **fails** when the child exits non-zero or dies by a signal — `--smoke` reports it per command; a measured run aborts with the error.
 - Series are named by the command string; the JSON records `source: {commands}` and a `bodyHash` of the command text. Everything else (stop policies, percentiles, outlier notes, significance, histograms) works exactly as in module mode.
 
+### System metrics (`-M, --metrics`)
+
+Opt-in per-run system metrics: printed as a second table of medians and persisted into the `--json` results (raw per-run readings, `params.metrics` naming the collector).
+
+- **Module mode** — per-run `process.resourceUsage()` deltas, taken outside the timed window: CPU user/sys time, minor/major page faults, voluntary/involuntary context switches. Works on Node, Bun, and Deno.
+- **Command mode (Linux)** — the child's `/proc/[pid]/{io,status}`: peak RSS (`VmHWM`, bytes), logical (`rchar`/`wchar`) and physical (`read_bytes`/`write_bytes`) I/O, and `syscr`/`syscw` syscall counts. Polled while the child runs; the last successful poll wins, so up to one poll interval (5 ms) of trailing activity can be missed — negligible for genuinely slow processes; a very short command may yield no reading (noted). Other platforms skip command metrics with a note.
+- Network-specific byte counts are not portably available without tracing; syscall counts are the proxy.
+
 ### Other options
 
 Shared with nano-bench: `-e, --export`, `-a, --alpha`, `-b, --bootstrap`, `--seed`, `--correction`, `-v, --verbose`, `--histogram` / `--chart` / `--bins`, `--no-emoji`, `--json` / `--label` / `-H, --host` / `--host-name`, `--smoke`, `--self`.

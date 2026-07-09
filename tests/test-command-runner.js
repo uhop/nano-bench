@@ -1,6 +1,7 @@
 import test from 'tape-six';
 
 import runCommand, {commandFunctions} from 'nano-benchmark/bench/command-runner.js';
+import {procAvailable} from 'nano-benchmark/bench/proc-metrics.js';
 
 test('runCommand()', t => {
   t.test('successful command resolves', async t => {
@@ -25,6 +26,15 @@ test('runCommand()', t => {
     } catch (error) {
       // Linux/macOS surface the signal; Windows emulates it as a non-zero exit code
       t.ok(/killed by SIG|exit code/.test(String(error)));
+    }
+  });
+
+  t.test('metrics callback fires once per run', async t => {
+    const readings = [];
+    await runCommand('node -e "setTimeout(() => {}, 30)"', {metrics: r => readings.push(r)});
+    t.equal(readings.length, 1);
+    if (procAvailable()) {
+      t.ok(readings[0] && readings[0].peakRSS > 0);
     }
   });
 
