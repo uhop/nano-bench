@@ -175,9 +175,10 @@ npx nano-bench-io io-bench.js --stable 5     # run until the median CI is within
 ```
 
 The module format is the same. Optional `prepare()` / `teardown()` named exports
-run untimed around every run; `--warmup N` discards the first runs (caches, JIT,
-connections). Slow outliers are flagged, distinguishing caching (slow first run)
-from interference (scattered slow runs).
+run untimed around every run. Warmup is auto-detected and discarded with a note
+(`--warmup N` pins it, `--warmup 0` keeps everything). Slow outliers are
+flagged, distinguishing caching (slow first run) from interference (scattered
+slow runs).
 
 It also benchmarks whole commands (`-c`), with `--prepare <cmd>` running untimed
 before every run &mdash; like hyperfine, but with nonparametric statistics and

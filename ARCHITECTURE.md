@@ -23,6 +23,7 @@ src/                          # Internal source (shipped via npm)
 │   ├── metrics.js                  # rusageDelta over process.resourceUsage() — portable per-run metrics
 │   ├── proc-metrics.js             # Linux /proc/[pid]/{io,status} readings for spawned children
 │   ├── outlier-notes.js            # Modified-z slow-side outliers: caching vs interference notes
+│   ├── warmup-detect.js            # Windowed MW screen: size the leading slow (warmup) segment
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
 │   ├── histogram.js                # Sample binning: computeHistograms, binCount, percentile
 │   ├── render/
@@ -73,6 +74,7 @@ bench/                        # Example benchmark + sample results files
 ├── bench-substrings.js             # Example: substring extraction methods
 ├── io-sample.js                    # Example: ms-scale async functions for nano-bench-io
 ├── io-bimodal.js                   # Example: deterministic fast/slow mix for --clusters
+├── io-warmup.js                    # Example: slow first calls for the warmup auto-detection
 ├── watch-sample.js                 # Example: single function for nano-watch
 └── *.json                          # Example saved results for nano-bench-compare
 skills/                       # AI coding skills (shipped via npm)
@@ -117,7 +119,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 
 ### nano-bench-io pipeline
 
-1. **Collect** (`collectMacro`) — one awaited call per run (`n = 1`, no batching); optional warmup runs discarded, optional module-level `prepare()`/`teardown()` awaited untimed around every run. Stop policy: fixed `--runs`, or the default min-runs + time-budget pair, or `--stable` (bootstrap-median-CI width target, checked every 10 runs) — all capped by `--max-runs`. With `-c`/`--command` the "functions" are adapted shell commands (`command-runner.js`): spawned via the system shell, output discarded, a run failing on non-zero exit or a fatal signal; `--prepare <cmd>` becomes the untimed per-run hook.
+1. **Collect** (`collectMacro`) — one awaited call per run (`n = 1`, no batching); optional warmup runs discarded, optional module-level `prepare()`/`teardown()` awaited untimed around every run. Stop policy: fixed `--runs`, or the default min-runs + time-budget pair, or `--stable` (bootstrap-median-CI width target, checked every 10 runs) — all capped by `--max-runs`. Unless `--warmup` is explicit, a windowed Mann–Whitney screen then sizes and discards the leading slow (warmup) segment, noted with the count. With `-c`/`--command` the "functions" are adapted shell commands (`command-runner.js`): spawned via the system shell, output discarded, a run failing on non-zero exit or a fatal signal; `--prepare <cmd>` becomes the untimed per-run hook.
 2. **Summarize** — the same `bootstrapSummary`, plus p90/p99 (`quantileSorted`, R-7). With `-M`/`--metrics`: per-run rusage deltas taken outside the timed window (module mode) or Linux `/proc/[pid]` polling with last-poll-wins semantics (command mode), rendered as a medians table and persisted into the JSON.
 3. **Notes** — modified-z slow-side outliers (`outlier-notes.js`): all in the first runs → caching (suggest `--warmup`); scattered → interference. A coarse-tail note fires below 100 runs. A dip-test gate (`dip.js`, seeded bootstrap p-value) flags multimodal distributions; `--clusters` splits them at KDE density minima (`kde-modes.js`) and reports per-cluster weight/median/CI/range — the mode count is a labeled heuristic.
 4. **Significance / output** — same tests, histograms, and JSON as `nano-bench` (`params.mode: "macro"`, `reps: 1`), then the explicit exit.

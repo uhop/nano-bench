@@ -163,7 +163,7 @@ makes it explicit and reports each mode apart.
   accurate at extreme quantiles, no fixed range) looks the better fit than
   HdrHistogram (fixed value range) for the per-operation tail case, but confirm
   against the current sample-array model before adding a sketch at all.
-- **Steady-state / warmup detection:** the changepoint/CV-based method from
+- **Steady-state / warmup detection — shipped 2026-07-08** (decision with Eugene: auto-discard + loud note by default, the Holm correct-by-default precedent; an explicit `--warmup` — any value, incl. 0 — disables detection). Implementation: not the Kalibera–Jones changepoint/CV machinery but a windowed Mann–Whitney screen over the run sequence (`src/bench/warmup-detect.js`) — reuse over new machinery: drop leading windows (w = max(5, n/20)) that read significantly slower than the remainder, capped at 25% of runs, requiring n ≥ 20; repeated testing makes it a heuristic and the note labels the count. Detection is window-granular — stragglers surface as outlier notes/p99, honestly. Per-series `warmupDetected` recorded in the JSON. Original note: the changepoint/CV-based method from
   Kalibera & Jones, _Rigorous benchmarking in reasonable time_, for auto-discarding
   JIT/TCP/HPACK warmup in a small number of slow runs.
 - **Effect sizes — shipped 2026-07-08** for the Mann–Whitney pair case: A12 derived from the U rank sums in `mwtest` (zero extra computation), δ = 2·A12 − 1, rendered with Romano magnitude labels wherever the shared significance renderer runs (all three binaries), persisted in the JSON `significance` object. Still open: a pairwise δ matrix for the Kruskal–Wallis post-hoc. Original note: Cliff's delta / Vargha–Delaney A12 (nonparametric, pair

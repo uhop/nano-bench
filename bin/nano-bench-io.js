@@ -19,6 +19,7 @@ import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
 import {collectMacro} from '../src/bench/macro-runner.js';
+import detectWarmup from '../src/bench/warmup-detect.js';
 import runCommand, {commandFunctions} from '../src/bench/command-runner.js';
 import {rusageAvailable, rusageDelta} from '../src/bench/metrics.js';
 import {procAvailable} from '../src/bench/proc-metrics.js';
@@ -75,7 +76,12 @@ program
     '[methods...]',
     'function names to benchmark; omit to run all (one name = baseline, no significance test)'
   )
-  .option('-w, --warmup <runs>', 'discarded warmup runs per function', toInt, 0)
+  .option(
+    '-w, --warmup <runs>',
+    'discarded warmup runs per function (omitted: auto-detected; 0 disables detection)',
+    toInt,
+    0
+  )
   .option('--min-runs <runs>', 'minimum measured runs per function', toInt, 10)
   .option('-t, --budget <ms>', 'time budget per function in milliseconds', toInt, 5000)
   .addOption(
@@ -243,6 +249,8 @@ const results = [],
   stats = [],
   runCounts = names.map(() => 0),
   runMetrics = names.map(() => []),
+  detectedWarmup = names.map(() => 0),
+  warmupExplicit = program.getOptionValueSource('warmup') !== 'default',
   notes = [],
   clusterReports = [];
 
@@ -296,11 +304,23 @@ for (let i = 0; i < names.length; ++i) {
   } catch (error) {
     program.error(String(error));
   }
-  results.push(samples);
-  runCounts[i] = samples.length;
   if (metricsOn && options.command) {
     runMetrics[i] = metricsByName.get(names[i]).slice(options.warmup);
   }
+  if (!warmupExplicit) {
+    const drop = detectWarmup(samples);
+    if (drop) {
+      detectedWarmup[i] = drop;
+      samples = samples.slice(drop);
+      if (metricsOn) runMetrics[i] = runMetrics[i].slice(drop);
+      notes.push({
+        name: names[i],
+        note: `warmup detected: the first ${drop} runs read slower — discarded (pin with --warmup ${drop}, keep with --warmup 0)`
+      });
+    }
+  }
+  results.push(samples);
+  runCounts[i] = samples.length;
 
   const sorted = samples.slice().sort(numericAsc),
     percentiles = {p90: quantileSorted(sorted, 0.9), p99: quantileSorted(sorted, 0.99)};
@@ -472,6 +492,7 @@ if (options.json) {
       bodyHash: options.command ? textHash(name) : bodyHash(fns[name]),
       reps: 1,
       samples: results[i],
+      ...(detectedWarmup[i] ? {warmupDetected: detectedWarmup[i]} : {}),
       ...(metricsOn ? {metrics: runMetrics[i]} : {}),
       summary: {
         median: stats[i].median,
