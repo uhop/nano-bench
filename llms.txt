@@ -47,6 +47,8 @@ Command mode: `-c, --command` treats the arguments as shell commands to benchmar
 
 System metrics: `-M, --metrics` (opt-in) collects per-run metrics, prints their medians, and persists them into the JSON. Module mode: `process.resourceUsage()` deltas (CPU, faults, context switches — Node/Bun/Deno). Command mode: Linux `/proc/[pid]` (peak RSS, logical/physical I/O bytes, syscall counts), polled while the child runs; degrades with a note elsewhere.
 
+Clusters: every run set is gated by a dip test (bootstrap-calibrated, seeded); a multimodal distribution gets a note, and `--clusters` splits it at KDE density minima, reporting per-cluster weight, median + CI, and range (mode count is a labeled heuristic).
+
 ```bash
 npx nano-bench-io io-bench.js
 npx nano-bench-io io-bench.js --stable 5 --histogram
@@ -63,7 +65,7 @@ npx nano-bench-compare base.json new.json           # before/after, paired by na
 npx nano-bench-compare base.json new.json --pooled  # one omnibus over all series
 ```
 
-Options: `--alpha` (override the recompute α; default the first file's), `--correction` (override; default the first file's), `--pooled`, `--verbose`, `--histogram` + `--chart` + `--bins`, `--no-emoji`. Files carrying per-run system metrics (from `nano-bench-io --metrics`) get a side-by-side metric-medians table after the summary.
+Options: `--alpha` (override the recompute α; default the first file's), `--correction` (override; default the first file's), `--pooled`, `--clusters`, `--verbose`, `--histogram` + `--chart` + `--bins`, `--no-emoji`. Files carrying per-run system metrics (from `nano-bench-io --metrics`) get a side-by-side metric-medians table after the summary; multimodal series are flagged by the dip test and split per cluster with `--clusters`.
 
 ### nano-watch
 

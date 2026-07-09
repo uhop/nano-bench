@@ -9,6 +9,11 @@ import {c} from 'console-toolkit/style.js';
 import Writer from 'console-toolkit/output/writer.js';
 
 import {bootstrapSummary} from '../src/stats.js';
+import dipTest from '../src/stats/dip.js';
+import kdeClusters from '../src/stats/kde-modes.js';
+import {clustersTable} from '../src/bench/render/clusters-table.js';
+import {numericAsc} from '../src/utils/numeric-asc.js';
+import {formatNumber} from 'console-toolkit/alphanumeric/number-formatters.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {corrections} from '../src/significance/correction.js';
 import {mulberry32} from '../src/utils/prng.js';
@@ -50,6 +55,7 @@ program
   )
   .option('-v, --verbose', 'show significance test statistics and critical values')
   .option('--pooled', 'compare all series as one k-sample omnibus instead of pairing by name')
+  .option('--clusters', 'split multimodal distributions into clusters (dip-test gated)')
   .option('--no-emoji', 'use ASCII fastest/slowest markers (F/S) instead of emoji')
   .option('--histogram', 'show a distribution histogram per series')
   .addOption(
@@ -144,6 +150,53 @@ for (const kind of Object.keys(metricSpecs)) {
     )
   );
   await writer.write([c`{{save.dim}}${metricLegends[kind]}{{restore}}`]);
+}
+
+const pText = p => (p <= 1 / 201 ? 'p < 0.01' : 'p ≈ ' + formatNumber(p, {decimals: 2}));
+
+{
+  const dipSeed = files[0].results.params.seed ?? 1,
+    bootstrapN = files[0].results.params.bootstrap ?? 1000;
+  let shown = false;
+  for (let j = 0; j < series.length; ++j) {
+    const s = series[j],
+      sortedSamples = s.samples.slice().sort(numericAsc),
+      {p} = dipTest(sortedSamples, {
+        random: mulberry32((dipSeed + Math.imul(j, 0x85ebca6b)) >>> 0)
+      });
+    if (p >= 0.05) continue;
+    if (!options.clusters) {
+      warn(
+        `${s.label}: distribution looks multimodal (dip test ${pText(p)}) — pass --clusters to split`
+      );
+      continue;
+    }
+    const {clusters} = kdeClusters(sortedSamples);
+    if (clusters.length < 2) {
+      warn(
+        `${s.label}: dip test flags multimodality (${pText(p)}) but KDE found a single mode — likely heavy skew`
+      );
+      continue;
+    }
+    const clusterStats = clusters.map((cluster, k) => ({
+      weight: cluster.length / sortedSamples.length,
+      ...bootstrapSummary(cluster, {
+        alpha,
+        bootstrap: bootstrapN,
+        random: mulberry32((dipSeed + Math.imul(k + 1, 0xc2b2ae35)) >>> 0)
+      }),
+      min: cluster[0],
+      max: cluster[cluster.length - 1]
+    }));
+    await writer.write([
+      '',
+      c`{{save.bold}}Clusters:{{restore}} ${s.label} — ${clusters.length} modes (heuristic; dip test ${pText(p)})`,
+      ''
+    ]);
+    await writer.write(clustersTable(clusterStats));
+    shown = true;
+  }
+  if (shown) await writer.write('');
 }
 
 const renderBlock = (members, name) => {

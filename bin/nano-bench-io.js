@@ -30,6 +30,9 @@ import {
 } from '../src/bench/render/metrics-table.js';
 import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
 import quantileSorted from '../src/stats/quantile.js';
+import dipTest from '../src/stats/dip.js';
+import kdeClusters from '../src/stats/kde-modes.js';
+import {clustersTable} from '../src/bench/render/clusters-table.js';
 import {outlierNotes} from '../src/bench/outlier-notes.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {corrections} from '../src/significance/correction.js';
@@ -89,6 +92,7 @@ program
   .option('-c, --command', 'treat the arguments as shell commands to benchmark, not a module file')
   .option('--prepare <cmd>', 'shell command run (untimed) before every run in command mode')
   .option('-M, --metrics', 'collect per-run system metrics (rusage; Linux /proc for commands)')
+  .option('--clusters', 'split multimodal distributions into clusters (dip-test gated)')
   .option('-e, --export <name>', 'name of the export', 'default')
   .option('-a, --alpha <alpha>', 'significance level', toFloat, 0.05)
   .addOption(
@@ -239,7 +243,10 @@ const results = [],
   stats = [],
   runCounts = names.map(() => 0),
   runMetrics = names.map(() => []),
-  notes = [];
+  notes = [],
+  clusterReports = [];
+
+const pText = p => (p <= 1 / 201 ? 'p < 0.01' : 'p ≈ ' + formatNumber(p, {decimals: 2}));
 
 const report = () => ioSummaryTable(names, stats, runCounts);
 
@@ -314,6 +321,20 @@ for (let i = 0; i < names.length; ++i) {
 
   const {note} = outlierNotes(samples);
   if (note) notes.push({name: names[i], note});
+
+  const {p} = dipTest(sorted, {random: mulberry32((seed + Math.imul(i, 0x85ebca6b)) >>> 0)});
+  if (p < 0.05) {
+    if (options.clusters) {
+      clusterReports.push({name: names[i], sorted, p});
+    } else {
+      notes.push({
+        name: names[i],
+        note: `distribution looks multimodal (dip test ${pText(p)}) — pass --clusters to split`
+      });
+    }
+  } else if (options.clusters) {
+    notes.push({name: names[i], note: `no multimodality detected (dip test ${pText(p)})`});
+  }
 }
 
 await updater.final();
@@ -348,6 +369,34 @@ if (options.metrics) {
     });
   }
 }
+
+for (const report of clusterReports) {
+  const {clusters} = kdeClusters(report.sorted);
+  if (clusters.length < 2) {
+    notes.push({
+      name: report.name,
+      note: `dip test flags multimodality (${pText(report.p)}) but KDE found a single mode — likely heavy skew`
+    });
+    continue;
+  }
+  const clusterStats = clusters.map((cluster, k) => ({
+    weight: cluster.length / report.sorted.length,
+    ...bootstrapSummary(cluster, {
+      alpha: options.alpha,
+      bootstrap: options.bootstrap,
+      random: mulberry32((seed + Math.imul(k + 1, 0xc2b2ae35)) >>> 0)
+    }),
+    min: cluster[0],
+    max: cluster[cluster.length - 1]
+  }));
+  await writer.write([
+    '',
+    c`{{save.bold}}Clusters:{{restore}} ${report.name} — ${clusters.length} modes (heuristic; dip test ${pText(report.p)})`,
+    ''
+  ]);
+  await writer.write(clustersTable(clusterStats));
+}
+if (clusterReports.length) await writer.write('');
 
 const warn = options.emoji ? '⚠' : '!';
 if (results.some(samples => samples.length < 100)) {

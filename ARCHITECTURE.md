@@ -29,6 +29,7 @@ src/                          # Internal source (shipped via npm)
 │   │   ├── summary-table.js        # The median/CI/ops summary table
 │   │   ├── io-summary-table.js     # The macro variant: median/CI + p90/p99 + runs
 │   │   ├── metrics-table.js        # System-metric medians per function (--metrics)
+│   │   ├── clusters-table.js       # Per-cluster weight/median/CI/range (--clusters)
 │   │   ├── smoke-table.js          # The --smoke report (shared by bench & io)
 │   │   ├── significance-table.js   # Significance header + N×N matrix (shared by bench & compare)
 │   │   └── histogram-chart.js      # Terminal distribution charts (columns ridgeline / rotated bars)
@@ -56,6 +57,8 @@ src/                          # Internal source (shipped via npm)
 │   ├── ppf.js                      # Generic PPF via Runge-Kutta integration
 │   ├── quantile.js                 # Quantiles on sorted data (R-7 interpolation)
 │   ├── mad.js                      # Median absolute deviation + modified z-score
+│   ├── dip.js                      # Unimodality gate: dip-style statistic + seeded bootstrap p-value
+│   ├── kde-modes.js                # Gaussian-KDE mode finding; clusters split at density minima
 │   └── rank.js                     # Ranking with tie correction
 └── utils/
     ├── bsearch.js                  # Binary search
@@ -69,6 +72,7 @@ bench/                        # Example benchmark + sample results files
 ├── bench-string2-concat.js         # Example: another string comparison
 ├── bench-substrings.js             # Example: substring extraction methods
 ├── io-sample.js                    # Example: ms-scale async functions for nano-bench-io
+├── io-bimodal.js                   # Example: deterministic fast/slow mix for --clusters
 ├── watch-sample.js                 # Example: single function for nano-watch
 └── *.json                          # Example saved results for nano-bench-compare
 skills/                       # AI coding skills (shipped via npm)
@@ -115,7 +119,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 
 1. **Collect** (`collectMacro`) — one awaited call per run (`n = 1`, no batching); optional warmup runs discarded, optional module-level `prepare()`/`teardown()` awaited untimed around every run. Stop policy: fixed `--runs`, or the default min-runs + time-budget pair, or `--stable` (bootstrap-median-CI width target, checked every 10 runs) — all capped by `--max-runs`. With `-c`/`--command` the "functions" are adapted shell commands (`command-runner.js`): spawned via the system shell, output discarded, a run failing on non-zero exit or a fatal signal; `--prepare <cmd>` becomes the untimed per-run hook.
 2. **Summarize** — the same `bootstrapSummary`, plus p90/p99 (`quantileSorted`, R-7). With `-M`/`--metrics`: per-run rusage deltas taken outside the timed window (module mode) or Linux `/proc/[pid]` polling with last-poll-wins semantics (command mode), rendered as a medians table and persisted into the JSON.
-3. **Notes** — modified-z slow-side outliers (`outlier-notes.js`): all in the first runs → caching (suggest `--warmup`); scattered → interference. A coarse-tail note fires below 100 runs.
+3. **Notes** — modified-z slow-side outliers (`outlier-notes.js`): all in the first runs → caching (suggest `--warmup`); scattered → interference. A coarse-tail note fires below 100 runs. A dip-test gate (`dip.js`, seeded bootstrap p-value) flags multimodal distributions; `--clusters` splits them at KDE density minima (`kde-modes.js`) and reports per-cluster weight/median/CI/range — the mode count is a labeled heuristic.
 4. **Significance / output** — same tests, histograms, and JSON as `nano-bench` (`params.mode: "macro"`, `reps: 1`), then the explicit exit.
 
 ### nano-bench-compare pipeline

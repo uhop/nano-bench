@@ -270,6 +270,33 @@ makes it explicit and reports each mode apart.
   snapshots. True sub-5 ms accounting stays with the queued Tier-3
   (`wait4`/pidfd) follow-up.
 
+### (C) v1 resolutions (2026-07-08, with Eugene)
+
+- **Surface: auto note + `--clusters` flag** on `nano-bench-io` and
+  `nano-bench-compare` (classic `nano-bench` excluded by physics — batching
+  averages each sample over n iterations, smoothing multimodality away). The
+  dip gate runs always; a flagged distribution gets a note suggesting
+  `--clusters`; the flag prints the per-cluster breakdown. With `--clusters`
+  on a unimodal function, a confirming note prints instead.
+- **Mode finder: KDE** (Gaussian kernel, Silverman bandwidth, 256-point
+  grid); clusters split at the density minima between local maxima. X-means
+  rejected per the BIC caveat above. When the dip fires but KDE finds one
+  mode (heavy skew), a note says so.
+- **Report: weight + median/CI + range** per cluster (tail percentiles of a
+  small cluster would be noise dressed as precision). Mode count labeled a
+  heuristic in the output itself.
+- **Dip implementation note:** `src/stats/dip.js` computes a dip-style
+  statistic — min over mode positions of the half-gap to the nearest
+  convex-then-concave CDF (AS 217's per-segment deviation formulas; a lower
+  bound of the classical dip where the two halves conflict at the mode). The
+  p-value comes from a seeded bootstrap of the SAME statistic under the
+  uniform null, so the calibration stays honest regardless. Property-tested:
+  exact 1/(2n) on evenly spaced data, ~0.25 on tight bimodal, honest p-values
+  both ways. n is capped at 500 (random subsample) to bound the O(n²) worst
+  case; B = 200 bootstrap rounds.
+- Histogram per-cluster overlays and the HTML viewer integration remain with
+  the Priority −1 viewer item.
+
 ## Synergy: the shared statistics kernel
 
 Every new statistic here — bootstrap median CI (already have), MW U (already

@@ -146,6 +146,10 @@ Opt-in per-run system metrics: printed as a second table of medians and persiste
 - **Command mode (Linux)** — `/proc/[pid]/{io,status}` of the **command's process tree**: peak RSS (`VmHWM`, bytes; max of any single process), logical (`rchar`/`wchar`) and physical (`read_bytes`/`write_bytes`) I/O, and `syscr`/`syscw` syscall counts (summed over the tree). The wrapper shell that spawns the command is excluded — its readings never pass as the command's. Polled on an adaptive backoff — every 1 ms for the command's first 100 ms, then every 5 ms, then every 25 ms past 3 s — and the last successful poll wins, so a sliver of trailing activity can be missed (negligible for genuinely slow processes). A command living only a few ms typically yields no reading; a per-command note reports the capture count (`metrics captured in N of M runs`), and below half the runs the row is reported blank rather than as a fake median over a slow-run-biased minority. Other platforms skip command metrics with a note.
 - Network-specific byte counts are not portably available without tracing; syscall counts are the proxy.
 
+### Cluster analysis (`--clusters`)
+
+Latency distributions are often multimodal (fast path vs slow path, cache hit vs miss) — one median then lies the same way one mean does. Every run set is gated by a Hartigan-style dip test (the statistic is bootstrap-calibrated against the uniform null with a seeded RNG, so the p-value stays honest): a multimodal distribution gets a note suggesting `--clusters`, and the flag splits the samples at the KDE density minima (Gaussian kernel, Silverman bandwidth), reporting per cluster: weight (the fast/slow split as a %), median with bootstrap CI, and its min/max bounds (separate columns). The **mode count is a labeled heuristic** — reported for confirmation, never asserted. When the dip test fires but KDE finds a single mode (heavy skew), a note says so instead. The same gate and flag exist on `nano-bench-compare` for saved runs.
+
 ### Other options
 
 Shared with nano-bench: `-e, --export`, `-a, --alpha`, `-b, --bootstrap`, `--seed`, `--correction`, `-v, --verbose`, `--histogram` / `--chart` / `--bins`, `--no-emoji`, `--json` / `--label` / `-H, --host` / `--host-name`, `--smoke`, `--self`.
@@ -169,7 +173,7 @@ npx nano-bench-io io-bench.js -w 3 --histogram     # discard 3 warmup runs, show
 
 ## CLI tool: nano-bench-compare
 
-Reads nano-bench results JSON and renders a view/compare table — **recomputing** significance and CIs from the saved raw samples (it never benchmarks). Use it to render one saved run, or to compare a baseline against a new run (before/after) without re-measuring. When files carry per-run system metrics (recorded by `nano-bench-io --metrics`), their medians render side by side in a metrics table after the summary — memory and I/O diff across runs the same way timing does; series without metrics are simply absent from that table.
+Reads nano-bench results JSON and renders a view/compare table — **recomputing** significance and CIs from the saved raw samples (it never benchmarks). Use it to render one saved run, or to compare a baseline against a new run (before/after) without re-measuring. When files carry per-run system metrics (recorded by `nano-bench-io --metrics`), their medians render side by side in a metrics table after the summary — memory and I/O diff across runs the same way timing does; series without metrics are simply absent from that table. Multimodal series are flagged by the dip test, and `--clusters` splits them per cluster exactly as in `nano-bench-io`.
 
 ### Usage
 
