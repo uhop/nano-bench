@@ -242,9 +242,11 @@ makes it explicit and reports each mode apart.
 - **Surfacing: opt-in `-M`/`--metrics`** (the `--observe` precedent) —
   collects, prints a medians table, persists raw per-run readings into the
   JSON (`series[].metrics`, `params.metrics` names the collector).
-- **Compare integration deferred:** the JSON is forward-compatible
-  (`load.js` tolerates unknown keys); `nano-bench-compare` metric diffing is
-  a queued follow-up.
+- **Compare integration — shipped same day** (was deferred): when loaded
+  files carry `series[].metrics`, `nano-bench-compare` renders per-kind
+  metric-medians tables after the summary, series side by side with
+  file-tagged labels (the same view timing gets) — one table per collector
+  kind, majority guard applied per series, non-carrying series absent.
 - **Same-day correction (Eugene's catch):** the first cut polled `child.pid`
   — but that is the wrapper shell (`/bin/sh -c …`), and dash _forks_ the
   command rather than exec'ing it in this spawn context, so every command's

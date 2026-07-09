@@ -13,6 +13,12 @@ import {computeSignificance, significanceMatrix} from '../src/bench/significance
 import {corrections} from '../src/significance/correction.js';
 import {mulberry32} from '../src/utils/prng.js';
 import {summaryTable} from '../src/bench/render/summary-table.js';
+import {
+  metricsTable,
+  metricSpecs,
+  guardedMedians,
+  metricLegends
+} from '../src/bench/render/metrics-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {loadResults} from '../src/bench/results/load.js';
 import {diffEnvironments} from '../src/bench/results/environment.js';
@@ -89,6 +95,8 @@ for (const f of files) {
       reps: s.reps,
       bodyHash: s.bodyHash,
       samples: s.samples,
+      metrics: Array.isArray(s.metrics) ? s.metrics : null,
+      metricsKind: f.results.params.metrics,
       summary: bootstrapSummary(s.samples, {alpha, bootstrap, random})
     });
   });
@@ -123,6 +131,20 @@ await writer.write(
     series.map(s => s.reps)
   )
 );
+
+for (const kind of Object.keys(metricSpecs)) {
+  const carrying = series.filter(s => s.metricsKind === kind && s.metrics);
+  if (!carrying.length) continue;
+  await writer.write(['', c`{{save.bold}}Metrics{{restore}} (median per run):`, '']);
+  await writer.write(
+    metricsTable(
+      carrying.map(s => s.label),
+      carrying.map(s => guardedMedians(s.metrics, metricSpecs[kind])),
+      kind
+    )
+  );
+  await writer.write([c`{{save.dim}}${metricLegends[kind]}{{restore}}`]);
+}
 
 const renderBlock = (members, name) => {
   if (members.length < 2) return;

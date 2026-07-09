@@ -154,7 +154,7 @@ Shared with nano-bench: `-e, --export`, `-a, --alpha`, `-b, --bootstrap`, `--see
 
 The summary table adds `p90` / `p99` columns and a `runs` column (batch is always 1). After the table: outlier notes (modified z-score > 3.5, slow side only) distinguishing a slow *first* run (caching — consider `--warmup`) from scattered slow runs (interference from other programs), plus a coarse-tail note when a function ran fewer than 100 times (p99 lands on the few slowest runs). Significance testing and histograms work exactly as in nano-bench.
 
-`--json` writes the same schema-v1 results file with `params.mode: "macro"`, per-series `reps: 1`, and `p90` / `p99` added to the stored summary — `nano-bench-compare` reads it unchanged.
+`--json` writes the same schema-v1 results file with `params.mode: "macro"`, per-series `reps: 1`, `p90` / `p99` added to the stored summary, and (with `--metrics`) the raw per-run readings — `nano-bench-compare` renders those side by side, so memory and I/O diff across runs the same way timing does.
 
 ### Example
 
@@ -169,7 +169,7 @@ npx nano-bench-io io-bench.js -w 3 --histogram     # discard 3 warmup runs, show
 
 ## CLI tool: nano-bench-compare
 
-Reads nano-bench results JSON and renders a view/compare table — **recomputing** significance and CIs from the saved raw samples (it never benchmarks). Use it to render one saved run, or to compare a baseline against a new run (before/after) without re-measuring.
+Reads nano-bench results JSON and renders a view/compare table — **recomputing** significance and CIs from the saved raw samples (it never benchmarks). Use it to render one saved run, or to compare a baseline against a new run (before/after) without re-measuring. When files carry per-run system metrics (recorded by `nano-bench-io --metrics`), their medians render side by side in a metrics table after the summary — memory and I/O diff across runs the same way timing does; series without metrics are simply absent from that table.
 
 ### Usage
 

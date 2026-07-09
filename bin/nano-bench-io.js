@@ -25,7 +25,7 @@ import {procAvailable} from '../src/bench/proc-metrics.js';
 import {
   metricsTable,
   metricSpecs,
-  metricMedians,
+  guardedMedians,
   metricLegends
 } from '../src/bench/render/metrics-table.js';
 import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
@@ -321,12 +321,7 @@ updater = null;
 
 if (options.metrics) {
   if (metricsOn) {
-    // a median over a minority of runs isn't a median — blank + note instead
-    const medians = names.map((_, i) => {
-      const perRun = runMetrics[i],
-        enough = perRun.filter(Boolean).length * 2 >= perRun.length;
-      return metricMedians(enough ? perRun : [], metricSpecs[metricsKind]);
-    });
+    const medians = names.map((_, i) => guardedMedians(runMetrics[i], metricSpecs[metricsKind]));
     await writer.write(['', c`{{save.bold}}Metrics{{restore}} (median per run):`, '']);
     await writer.write(metricsTable(names, medians, metricsKind));
     await writer.write([c`{{save.dim}}${metricLegends[metricsKind]}{{restore}}`, '']);

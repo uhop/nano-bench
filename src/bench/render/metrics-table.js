@@ -50,6 +50,10 @@ export const metricMedians = (perRun, spec) => {
   return medians;
 };
 
+// a median over a minority of runs isn't a median — render blank instead
+export const guardedMedians = (perRun, spec) =>
+  metricMedians(perRun.filter(Boolean).length * 2 >= perRun.length ? perRun : [], spec);
+
 const formatValue = (value, kind) => {
   if (value == null) return '';
   switch (kind) {
