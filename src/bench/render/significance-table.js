@@ -32,6 +32,17 @@ export const writeSignificance = (
     c`\n{{save.bold}}Significance:{{restore}} ${methodName}, α = {{save.bright.yellow}}${alpha}{{restore}}${postHoc}\n`
   );
 
+  if (isPair && typeof testResult.a12 == 'number') {
+    // magnitude labels: Romano et al. 2006
+    const size = Math.abs(testResult.delta),
+      magnitude =
+        size < 0.147 ? 'negligible' : size < 0.33 ? 'small' : size < 0.474 ? 'medium' : 'large',
+      wins = Math.max(testResult.a12, 1 - testResult.a12);
+    writer.writeString(
+      c`{{save.bold}}Effect size:{{restore}} Cliff's δ = {{save.bright.yellow}}${size.toFixed(2)}{{restore}} (${magnitude}) — the faster wins {{save.bright.yellow}}${Math.round(100 * wins)}%{{restore}} of random run pairs\n`
+    );
+  }
+
   if (verbose) {
     const arrow = testResult.different ? 'reject H₀' : 'fail to reject H₀',
       rel = testResult.different ? '>' : '≤';

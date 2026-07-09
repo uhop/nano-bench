@@ -120,7 +120,10 @@ Kruskal-Wallis H test with a Conover-Iman pairwise post-hoc. Because running man
 pairwise comparisons inflates the chance of a false "significant", the post-hoc is
 corrected for multiple comparisons by default. Choose the method with
 `--correction <none|holm|bonferroni>` (default `holm`, which is uniformly more
-powerful than Bonferroni); `none` reproduces an uncorrected post-hoc. Add `-v` /
+powerful than Bonferroni); `none` reproduces an uncorrected post-hoc. For two
+functions the effect size is reported next to the verdict (Cliff's &delta; with
+a magnitude label, and how often the faster wins a random pair of runs) &mdash;
+significance says a difference exists, the effect size says how much. Add `-v` /
 `--verbose` to see the test statistic, critical value, and per-comparison &alpha;.
 
 ### Distribution histograms

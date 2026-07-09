@@ -27,6 +27,28 @@ test('mwtest()', t => {
     const result = mwtest(sort([8, 7, 6, 2, 5, 8, 7, 3]), sort([9, 9, 7, 8, 10, 9, 6]), 0.05);
     t.equal(result.different, true);
   });
+
+  t.test('effect size: complete separation', t => {
+    const result = mwtest(sort([3, 4]), sort([1, 2]), 0.05);
+    t.equal(result.a12, 1);
+    t.equal(result.delta, 1);
+    const flipped = mwtest(sort([1, 2]), sort([3, 4]), 0.05);
+    t.equal(flipped.a12, 0);
+    t.equal(flipped.delta, -1);
+  });
+
+  t.test('effect size: identical distributions with ties', t => {
+    const result = mwtest(sort([1, 2]), sort([1, 2]), 0.05);
+    t.equal(result.a12, 0.5);
+    t.equal(result.delta, 0);
+  });
+
+  t.test('effect size: known mixed case', t => {
+    // pairs of ([2,4], [1,3]): 2>1, 2<3, 4>1, 4>3 -> A12 = 3/4
+    const result = mwtest(sort([2, 4]), sort([1, 3]), 0.05);
+    t.equal(result.a12, 0.75);
+    t.equal(result.delta, 0.5);
+  });
 });
 
 test('kwtest()', t => {

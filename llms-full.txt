@@ -79,7 +79,7 @@ A styled table with columns:
 | op/s | Operations per second (1000 / median) |
 | batch | Iterations per sample (batch size) |
 
-When two or more functions are measured, a `Significance:` line names the test, α, and (for 3+ functions) the post-hoc method and correction, followed — if the difference is significant — by an N×N matrix of pairwise percentage/ratio differences. The fastest function is marked with 🐇 and the slowest with 🐢 (`F`/`S` under `--no-emoji`). With `--histogram`, a per-function distribution chart follows; with `--json`, a results file is written.
+When two or more functions are measured, a `Significance:` line names the test, α, and (for 3+ functions) the post-hoc method and correction. For two functions an `Effect size:` line follows — Cliff's δ with a magnitude label (Romano et al. thresholds) and how often the faster wins a random pair of runs (Vargha-Delaney A12, derived from the same rank sums; both persisted into the JSON `significance` object). If the difference is significant, an N×N matrix of pairwise percentage/ratio differences follows. The fastest function is marked with 🐇 and the slowest with 🐢 (`F`/`S` under `--no-emoji`). With `--histogram`, a per-function distribution chart follows; with `--json`, a results file is written.
 
 ### How it works
 
@@ -378,7 +378,7 @@ Used by nano-bench to estimate the median and its confidence interval. For each 
 
 ### Mann-Whitney U test
 
-Nonparametric two-sample test used when comparing exactly 2 functions; normal approximation, two-sided, tie-corrected. Tests whether the two timing distributions are significantly different at the given `--alpha` level. Does not assume a normal distribution. A single comparison, so no multiplicity correction applies.
+Nonparametric two-sample test used when comparing exactly 2 functions; normal approximation, two-sided, tie-corrected. Tests whether the two timing distributions are significantly different at the given `--alpha` level. Does not assume a normal distribution. A single comparison, so no multiplicity correction applies. Reports the effect size alongside: Vargha-Delaney A12 = U₁/(n₁·n₂) (probability a random run of one function exceeds a random run of the other, ties half-counted — derived from the same rank sums) and Cliff's δ = 2·A12 − 1, labeled negligible/small/medium/large per Romano et al. thresholds (0.147/0.33/0.474). Significance says a difference exists; the effect size says how much.
 
 ### Kruskal-Wallis H test + Conover-Iman post-hoc
 

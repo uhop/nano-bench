@@ -166,7 +166,7 @@ makes it explicit and reports each mode apart.
 - **Steady-state / warmup detection:** the changepoint/CV-based method from
   Kalibera & Jones, _Rigorous benchmarking in reasonable time_, for auto-discarding
   JIT/TCP/HPACK warmup in a small number of slow runs.
-- **Effect sizes:** Cliff's delta / Vargha–Delaney A12 (nonparametric, pair
+- **Effect sizes — shipped 2026-07-08** for the Mann–Whitney pair case: A12 derived from the U rank sums in `mwtest` (zero extra computation), δ = 2·A12 − 1, rendered with Romano magnitude labels wherever the shared significance renderer runs (all three binaries), persisted in the JSON `significance` object. Still open: a pairwise δ matrix for the Kruskal–Wallis post-hoc. Original note: Cliff's delta / Vargha–Delaney A12 (nonparametric, pair
   naturally with MW U) to report _how much_ faster beyond significance; MAD-based
   robust outliers; lag-1 autocorrelation to check run independence. All small
   pure-JS additions.

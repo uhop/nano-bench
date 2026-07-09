@@ -27,9 +27,11 @@ export const mwtest = (sorted1, sorted2, alpha = 0.05) => {
     s = Math.sqrt(((sorted1.length * sorted2.length) / 12) * (n + 1 - tiesC / n / (n - 1)));
 
   const z = (u - m) / s,
-    zc = zPpf(alpha / 2);
+    zc = zPpf(alpha / 2),
+    // Vargha–Delaney A12 = U1/(n1*n2): P(sample1 > sample2), ties half-counted
+    a12 = u1 / (sorted1.length * sorted2.length);
 
-  return {value: z, alpha, limit: zc, different: z < zc || z > -zc};
+  return {value: z, alpha, limit: zc, different: z < zc || z > -zc, a12, delta: 2 * a12 - 1};
 };
 
 export default mwtest;

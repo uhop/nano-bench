@@ -109,7 +109,7 @@ deno run -A `npx nano-bench --self` benchmark.js
 ## Statistical methods
 
 - **Bootstrap-percentile CI of the median** — the reported median and its confidence interval are the mean of weighted quantiles over `--bootstrap` resamples; seeded (`--seed`, else auto-recorded) so a recompute reproduces it exactly.
-- **Mann-Whitney U test** — two functions; normal approximation, two-sided, tie-corrected. No multiplicity correction (a single comparison).
+- **Mann-Whitney U test** — two functions; normal approximation, two-sided, tie-corrected. No multiplicity correction (a single comparison). Reports Cliff's δ / A12 effect size (magnitude label + probability the faster wins a random run pair).
 - **Kruskal-Wallis H test** — three or more functions; beta approximation for the null of H. If significant, **Conover-Iman** pairwise post-hoc (Fisher's LSD on ranks) identifies which pairs differ.
 - **Multiple-comparison correction** — `--correction` controls the family-wise error rate over the post-hoc pairwise comparisons: `holm` (default; step-down, uniformly more powerful than Bonferroni), `bonferroni` (single-step), or `none` (uncorrected). Scoped to one omnibus's k(k-1)/2 pairs; the CI's α is untouched.
 - **Kolmogorov-Smirnov test** — two-sample distribution comparison; available in the library API (`src/significance/kstest.js`), not wired into the CLI.
