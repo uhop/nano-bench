@@ -136,6 +136,40 @@ test('getPercentile()', t => {
   t.test('value between elements', t => {
     t.equal(getPercentile([10, 20, 30], 15), 1);
   });
+  t.test('counts past every tie, not just the first', t => {
+    t.equal(getPercentile([10, 20, 20, 30], 20), 3);
+    t.equal(getPercentile([10, 20, 20, 20, 30], 20), 4);
+    t.equal(getPercentile([20, 20], 20), 2);
+    t.equal(getPercentile([10, 10, 10], 10), 3);
+  });
+  t.test('empty array ranks everything at zero', t => {
+    t.equal(getPercentile([], 5), 0);
+  });
+  t.test('single element', t => {
+    t.equal(getPercentile([10], 5), 0);
+    t.equal(getPercentile([10], 10), 1);
+    t.equal(getPercentile([10], 35), 1);
+  });
+  t.test('counts the elements at or below the value, ties and gaps included', t => {
+    const pools = [
+      [],
+      [10],
+      [10, 20],
+      [10, 20, 30],
+      [10, 20, 20, 30],
+      [10, 10, 10],
+      [5, 5, 7, 7, 7, 9]
+    ];
+    for (const data of pools) {
+      for (let value = 0; value <= 12; ++value) {
+        t.equal(
+          getPercentile(data, value),
+          data.filter(x => x <= value).length,
+          `${JSON.stringify(data)} value=${value}`
+        );
+      }
+    }
+  });
 });
 
 test('bootstrap()', t => {

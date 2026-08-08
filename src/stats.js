@@ -68,18 +68,16 @@ export const excessKurtosis = (
 export const getPercentile = (sortedArray, value) => {
   // getting percentile (index) by value
   let lowerIndex = 0,
-    upperIndex = sortedArray.length - 1;
+    upperIndex = sortedArray.length;
   while (lowerIndex < upperIndex) {
     let middleIndex = (lowerIndex + upperIndex) >> 1;
-    if (sortedArray[middleIndex] < value) {
+    if (sortedArray[middleIndex] <= value) {
       lowerIndex = middleIndex + 1;
     } else {
       upperIndex = middleIndex;
     }
   }
-  return lowerIndex < sortedArray.length && value < sortedArray[lowerIndex]
-    ? lowerIndex
-    : lowerIndex + 1;
+  return lowerIndex;
 };
 
 export const getWeightedValue = (sortedArray, weight = 0.5) => {
