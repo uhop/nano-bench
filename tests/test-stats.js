@@ -93,6 +93,34 @@ test('getWeightedValue()', t => {
     t.ok(approx(getWeightedValue(data, 0.25), 3.5));
     t.ok(approx(getWeightedValue(data, 0.75), 8.5));
   });
+  t.test('median of three-element array', t => {
+    t.ok(approx(getWeightedValue([10, 20, 30], 0.5), 20));
+  });
+  t.test('median of two-element array', t => {
+    t.ok(approx(getWeightedValue([10, 20], 0.5), 15));
+  });
+  t.test('weight 1 returns last element of a two-element array', t => {
+    t.ok(approx(getWeightedValue([10, 20], 1), 20));
+  });
+  t.test('small weights interpolate rather than clamp to the first element', t => {
+    t.ok(approx(getWeightedValue([10, 20, 30], 0.25), 15));
+    t.ok(approx(getWeightedValue([10, 20, 30], 0.1), 12));
+  });
+  t.test('agrees with the linear-interpolation quantile across sizes and weights', t => {
+    const quantile = (a, w) => {
+      const q = w * (a.length - 1),
+        lo = Math.floor(q),
+        hi = Math.ceil(q);
+      return a[lo] + (a[hi] - a[lo]) * (q - lo);
+    };
+    for (let n = 1; n <= 12; ++n) {
+      const data = Array.from({length: n}, (_, i) => (i + 1) * 10);
+      for (let i = 0; i <= 40; ++i) {
+        const w = i / 40;
+        t.ok(approx(getWeightedValue(data, w), quantile(data, w)), `n=${n} weight=${w}`);
+      }
+    }
+  });
 });
 
 test('getPercentile()', t => {

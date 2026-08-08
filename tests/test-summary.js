@@ -35,7 +35,8 @@ test('bootstrapSummary()', t => {
   t.test('pinned CI for a fixed seed (bit-identical across runtimes)', t => {
     const s = bootstrapSummary(ramp(20), {alpha: 0.05, bootstrap: 200, random: mulberry32(12345)});
     t.equal(s.median, 10.829999999999993, 'median');
-    t.equal(s.lo, 1.4499999999999955, 'lo');
+    // re-pinned: the old 1.4499999999999955 was the sample minimum, not the 2.5th percentile
+    t.equal(s.lo, 1.9344999999999952, 'lo');
     t.equal(s.hi, 19.03000000000003, 'hi');
   });
 });

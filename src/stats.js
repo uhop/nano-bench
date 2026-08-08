@@ -87,7 +87,7 @@ export const getWeightedValue = (sortedArray, weight = 0.5) => {
   let pos = weight * (sortedArray.length - 1),
     upperIndex = Math.ceil(pos),
     lowerIndex = upperIndex - 1;
-  if (lowerIndex <= 0) {
+  if (lowerIndex < 0) {
     // return first element
     return sortedArray[0];
   }
