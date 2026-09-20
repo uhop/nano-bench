@@ -84,7 +84,7 @@
   "dependencies": {
     "commander": "^15.0.0",
     "console-toolkit": "^1.4.0",
-    "emoji-regex": "^10.6.0",
+    "emoji-regex": "^11.0.0",
     "get-east-asian-width": "^1.6.0"
   },
   "tape6": {
