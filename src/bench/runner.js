@@ -1,5 +1,3 @@
-import {performance} from 'node:perf_hooks';
-
 import {numericAsc} from '../utils/numeric-asc.js';
 
 /**
