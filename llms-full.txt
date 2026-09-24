@@ -38,7 +38,8 @@ Measurement:
 - `-i, --iterations <iterations>` — fixed iteration count per sample (overrides `--ms`, skips calibration).
 - `--min-iterations <n>` — minimum iterations per sample (default: 1).
 - `-s, --samples <samples>` — number of samples to collect (default: 100).
-- `-p, --parallel` — collect samples in parallel (useful for async benchmarks).
+- `-p, --parallel` — start all samples of a function at once, to measure an async operation with others in flight; it changes what is measured. Conflicts with `--order`.
+- `--order <order>` — `interleaved` (default): one sample of each function per round, rotating which goes first, so drift over the run lands on every function alike; `sequential`: each function's samples in turn (the pre-2026-09-24 order). Recorded as `params.order` (`interleaved`, `sequential`, or `parallel`).
 
 Statistics:
 
@@ -480,7 +481,8 @@ Mark and measure names follow the convention `nano-bench/<label>/<phase>`:
 Phases are:
 
 - `find-level` — calibration (auto-discovery of batch size).
-- `series` — sequential sample collection.
+- `rounds` — interleaved sample collection (the default); its label is `all`, since a round covers every function (`nano-bench/all/rounds`).
+- `series` — sequential sample collection (`--order sequential`).
 - `series-par` — parallel sample collection (when `--parallel` is set).
 
 The CLI uses each function's exported name as the label, so multiple benchmarks in one run produce distinct entries (e.g., `nano-bench/strings/find-level`, `nano-bench/backticks/series`, etc.).
@@ -506,7 +508,7 @@ The orchestrating runner functions accept an `observe` option (`boolean | string
 - `true` — emit marks with the default label `"default"`.
 - string — emit marks with the given label.
 
-The option is supported by `findLevel`, `benchmarkSeries`, `benchmarkSeriesPar`, `measure`, and `measurePar`. `measure` / `measurePar` thread it through to the inner `findLevel` and `benchmarkSeries` / `benchmarkSeriesPar` calls so a single `observe` argument produces both calibration and sample-collection entries.
+The option is supported by `findLevel`, `benchmarkSeries`, `benchmarkSeriesPar`, `benchmarkRounds`, `measure`, and `measurePar`. `measure` / `measurePar` thread it through to the inner `findLevel` and `benchmarkSeries` / `benchmarkSeriesPar` calls so a single `observe` argument produces both calibration and sample-collection entries.
 
 ```js
 import {measure} from 'nano-benchmark/bench/runner.js';

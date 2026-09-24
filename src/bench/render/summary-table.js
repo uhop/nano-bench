@@ -46,16 +46,26 @@ export const intervalCells = (lo, hi, median, format) =>
       ]
     : [null, null];
 
+/**
+ * One unit for every row, so magnitudes compare at a glance.
+ * @param {any[]} stats
+ * @param {(s: any) => number[]} [extra]
+ */
+export const sharedTimeFormat = (stats, extra = _s => []) =>
+  prepareTimeFormat(
+    stats
+      .filter(Boolean)
+      .flatMap(s => [s.median - s.lo, s.median, s.hi - s.median, ...ciDeltas(s), ...extra(s)]),
+    1000
+  );
+
 const makeTableData = (names, stats, iterations) => {
-  const tableData = /** @type {any[]} */ ([tableHeader1, tableHeader2]);
+  const tableData = /** @type {any[]} */ ([tableHeader1, tableHeader2]),
+    format = sharedTimeFormat(stats);
   for (let i = 0; i < names.length; ++i) {
     const row = /** @type {any[]} */ ([bold(names[i])]),
       s = stats[i];
     if (s) {
-      const format = prepareTimeFormat(
-        [s.median - s.lo, s.median, s.hi - s.median, ...ciDeltas(s)],
-        1000
-      );
       row.push(
         {value: bold(num(formatTime(s.median, format))), align: 'r'},
         ...intervalCells(s.ciLo, s.ciHi, s.median, format),

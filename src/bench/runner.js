@@ -136,6 +136,36 @@ export const benchmarkSeries = async (fn, n, opts = {}) => {
 };
 
 /**
+ * @param {Function[]} fns
+ * @param {number[]} ns batch size for each function
+ * @param {{nSeries?: number, timeout?: number, observe?: Observe}} [opts]
+ * @param {(round: number, data: number[][]) => unknown} [report] awaited after each round
+ * @returns {Promise<number[][]>} samples per function, in time order
+ */
+export const benchmarkRounds = async (fns, ns, opts = {}, report) => {
+  const {nSeries = 100, timeout = 5, observe} = opts;
+  const obs = makeObserver(observe, 'default');
+  obs?.mark('rounds');
+  try {
+    const k = fns.length,
+      data = fns.map(() => /** @type {number[]} */ ([])),
+      pause = () => new Promise(resolve => setTimeout(resolve, timeout));
+    for (let round = 0; round < nSeries; ++round) {
+      // rotate the start so no function always runs first in a round
+      for (let j = 0; j < k; ++j) {
+        const i = (round + j) % k;
+        data[i].push(await benchmark(fns[i], ns[i]));
+        await pause();
+      }
+      if (report) await report(round + 1, data);
+    }
+    return data;
+  } finally {
+    obs?.measure('rounds');
+  }
+};
+
+/**
  * @param {{nSeries?: number, DataArray?: ArrayConstructor, observe?: Observe}} [opts]
  */
 export const benchmarkSeriesPar = async (fn, n, opts = {}) => {

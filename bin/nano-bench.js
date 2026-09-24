@@ -18,7 +18,12 @@ import {c} from 'console-toolkit/style.js';
 import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
-import {findLevel, benchmarkSeries, benchmarkSeriesPar} from '../src/bench/runner.js';
+import {
+  findLevel,
+  benchmarkSeries,
+  benchmarkSeriesPar,
+  benchmarkRounds
+} from '../src/bench/runner.js';
 import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {corrections} from '../src/significance/correction.js';
@@ -80,6 +85,15 @@ program
   )
   .option('-s, --samples <samples>', 'number of samples', toInt, 100)
   .option('-p, --parallel', 'collect samples in parallel')
+  .addOption(
+    new Option(
+      '--order <order>',
+      'sample order: one sample of each function per round, or each function in turn'
+    )
+      .choices(['interleaved', 'sequential'])
+      .default('interleaved')
+      .conflicts('parallel')
+  )
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
   .option('--seed <seed>', 'bootstrap RNG seed (32-bit integer; default: random)', toInt)
   .option('--json <file>', 'write results to a JSON file')
@@ -250,19 +264,9 @@ while (iterations.length < names.length) {
 
 // run the benchmark
 
-for (let i = 0; i < iterations.length; ++i) {
-  const batchSize = iterations[i],
-    samples = await benchSeries(fns[names[i]], batchSize, {
-      nSeries: options.samples,
-      observe: options.observe ? names[i] : undefined
-    });
-  normalizeSamples(samples, batchSize);
-  results.push(samples);
-  stats.push({...exactSummary(samples, {alpha: options.alpha}), bootstrap: false});
-  await updater.update();
-  await sleep(5);
+const summarize = async i => {
   stats[i] = {
-    ...bootstrapSummary(samples, {
+    ...bootstrapSummary(results[i], {
       alpha: options.alpha,
       bootstrap: options.bootstrap,
       random: mulberry32((seed + Math.imul(i, 0x9e3779b9)) >>> 0)
@@ -271,6 +275,37 @@ for (let i = 0; i < iterations.length; ++i) {
   };
   await updater.update();
   await sleep(5);
+};
+
+if (!options.parallel && options.order === 'interleaved') {
+  const collected = await benchmarkRounds(
+    names.map(name => fns[name]),
+    iterations,
+    {nSeries: options.samples, observe: options.observe ? 'all' : undefined},
+    async (_, data) => {
+      for (let i = 0; i < data.length; ++i) {
+        const provisional = data[i].map(time => time / iterations[i]);
+        stats[i] = {...exactSummary(provisional, {alpha: options.alpha}), bootstrap: false};
+      }
+      await updater.update();
+    }
+  );
+  collected.forEach((samples, i) => normalizeSamples(samples, iterations[i]));
+  results.push(...collected);
+  for (let i = 0; i < results.length; ++i) await summarize(i);
+} else {
+  for (let i = 0; i < iterations.length; ++i) {
+    const samples = await benchSeries(fns[names[i]], iterations[i], {
+      nSeries: options.samples,
+      observe: options.observe ? names[i] : undefined
+    });
+    normalizeSamples(samples, iterations[i]);
+    results.push(samples);
+    stats.push({...exactSummary(samples, {alpha: options.alpha}), bootstrap: false});
+    await updater.update();
+    await sleep(5);
+    await summarize(i);
+  }
 }
 
 await updater.final();
@@ -338,7 +373,8 @@ if (options.json) {
       seed,
       alpha: options.alpha,
       correction: options.correction,
-      parallel: Boolean(options.parallel)
+      parallel: Boolean(options.parallel),
+      order: options.parallel ? 'parallel' : options.order
     },
     series: names.map((name, i) => ({
       name,

@@ -18,6 +18,7 @@ export {
   benchmark,
   benchmarkSeries,
   benchmarkSeriesPar,
+  benchmarkRounds,
   measure,
   measurePar,
   Stats,

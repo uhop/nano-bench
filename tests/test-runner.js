@@ -9,6 +9,7 @@ import {
   findLevel,
   benchmarkSeries,
   benchmarkSeriesPar,
+  benchmarkRounds,
   measure
 } from 'nano-benchmark/bench/runner.js';
 
@@ -141,6 +142,53 @@ test('benchmark()', t => {
     const time = await benchmark(fn, 100);
     t.equal(typeof time, 'number');
     t.ok(time >= 0);
+  });
+});
+
+test('benchmarkRounds()', t => {
+  t.test('one sample of every function per round, rotating the start', async t => {
+    const calls = [],
+      fns = ['a', 'b', 'c'].map(name => n => calls.push([name, n]));
+    const data = await benchmarkRounds(fns, [1, 2, 3], {nSeries: 4, timeout: 0});
+    t.deepEqual(
+      data.map(d => d.length),
+      [4, 4, 4],
+      'nSeries samples each'
+    );
+    t.deepEqual(
+      calls.map(([name]) => name).join(''),
+      'abcbcacababc',
+      'each round starts one function later'
+    );
+    t.ok(
+      calls.every(([name, n]) => n === {a: 1, b: 2, c: 3}[name]),
+      'each function gets its own batch size'
+    );
+  });
+
+  t.test('reports after every round with the samples so far', async t => {
+    const seen = [];
+    await benchmarkRounds([() => {}, () => {}], [1, 1], {nSeries: 3, timeout: 0}, (round, data) =>
+      seen.push([round, data[0].length, data[1].length])
+    );
+    t.deepEqual(seen, [
+      [1, 1, 1],
+      [2, 2, 2],
+      [3, 3, 3]
+    ]);
+  });
+
+  t.test('awaits async functions', async t => {
+    let active = 0,
+      overlap = false;
+    const fn = async () => {
+      overlap ||= active > 0;
+      ++active;
+      await new Promise(resolve => setTimeout(resolve, 1));
+      --active;
+    };
+    await benchmarkRounds([fn, fn], [1, 1], {nSeries: 3, timeout: 0});
+    t.notOk(overlap, 'samples never overlap');
   });
 });
 

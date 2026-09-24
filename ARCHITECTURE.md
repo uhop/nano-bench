@@ -20,7 +20,7 @@ web-app/                      # Browser viewer (shipped via npm; plain ES module
 src/                          # Internal source (shipped via npm)
 ├── index.js                        # Library entry — re-exports the public API
 ├── bench/
-│   ├── runner.js                   # Core engine: findLevel, benchmark, benchmarkSeries, measure, Stats
+│   ├── runner.js                   # Core engine: findLevel, benchmark, benchmarkSeries, benchmarkRounds, measure, Stats
 │   ├── compare.js                  # High-level compare() — measures + significance tests
 │   ├── significance.js             # computeSignificance (MW vs KW) + significanceMatrix
 │   ├── select-functions.js         # Resolve the [methods…] positional against the export
@@ -125,7 +125,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 ### nano-bench pipeline
 
 1. **Find level** (`findLevel`) — auto-discovers the batch size `n` where a single call takes ≥ threshold ms.
-2. **Collect samples** (`benchmarkSeries`) — runs the function `nSeries` times, collecting timing data, normalized to ms/iteration.
+2. **Collect samples** — by default `benchmarkRounds` takes one sample of every function per round, rotating which goes first, so drift over the run lands on all functions alike; the table fills in from the first round. `--order sequential` runs `benchmarkSeries` per function in turn; `-p` runs `benchmarkSeriesPar`. Timing data is normalized to ms/iteration.
 3. **Bootstrap** — `bootstrapSummary` resamples (`bootstrap()` + `getWeightedValue()`) to estimate the median, its percentile confidence interval (`ciLo`/`ciHi`, from the resampled medians), and the spread of the runs (`lo`/`hi`, the mean resampled α/2 and 1−α/2 quantiles), seeded by `--seed` (or an auto-recorded seed) via `mulberry32` for reproducibility.
 4. **Significance testing** (`computeSignificance`) — Mann-Whitney U (2 functions) or Kruskal-Wallis H + Conover-Iman pairwise post-hoc (3+ functions); the post-hoc family-wise error rate is controlled by `--correction` (none/Holm/Bonferroni, default Holm).
 5. **Output** — styled summary table + significance header/matrix via `console-toolkit`; optional per-function distribution histogram (`--histogram`); optional schema-v1 results file (`--json`). The run then ends with an explicit `process.exit(0)`, so a module holding live handles (servers, watchers) can't keep a finished run alive.

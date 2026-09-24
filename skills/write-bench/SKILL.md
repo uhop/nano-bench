@@ -157,7 +157,8 @@ a **baseline** — its stats are reported with no significance test.
 | Fixed iteration count        | `-i, --iterations`                              | Overrides `--ms`, skips calibration. Use for deterministic batch sizes. |
 | More precision               | `-s, --samples` (100), `-b, --bootstrap` (1000) | More samples tighten the test; more bootstrap resamples smooth the CI.  |
 | Stricter/looser significance | `-a, --alpha` (0.05)                            | 0.01 = 99% CI and a stricter test.                                      |
-| Async benchmarks             | `-p, --parallel`                                | Collect samples concurrently.                                           |
+| Sample order                 | `--order` (interleaved)                         | `sequential` measures each function in turn; interleaved is fairer.     |
+| Async under concurrency      | `-p, --parallel`                                | Starts all samples at once; measures a different thing.                 |
 | Multiple-comparison control  | `--correction` (holm)                           | See below.                                                              |
 | See the test internals       | `-v, --verbose`                                 | Prints statistic, critical value, per-comparison α.                     |
 | Inspect distribution shape   | `--histogram`                                   | See below.                                                              |

@@ -1,14 +1,10 @@
-import {
-  abbrNumber,
-  formatTime,
-  prepareTimeFormat
-} from 'console-toolkit/alphanumeric/number-formatters.js';
+import {abbrNumber, formatTime} from 'console-toolkit/alphanumeric/number-formatters.js';
 import {minus} from 'console-toolkit/symbols.js';
 import style from 'console-toolkit/style.js';
 import makeTable from 'console-toolkit/table';
 import lineTheme from 'console-toolkit/themes/lines/unicode-rounded.js';
 
-import {ciDeltas, intervalCells} from './summary-table.js';
+import {intervalCells, sharedTimeFormat} from './summary-table.js';
 
 const bold = s => style.bold.text(s),
   num = s => style.bright.yellow.text(s);
@@ -39,15 +35,12 @@ const tableHeader1 = [
   ].map(cell => (cell ? {...cell, value: bold(cell.value)} : null));
 
 const makeTableData = (names, stats, runs) => {
-  const tableData = /** @type {any[]} */ ([tableHeader1, tableHeader2]);
+  const tableData = /** @type {any[]} */ ([tableHeader1, tableHeader2]),
+    format = sharedTimeFormat(stats, s => [s.p90, s.p99]);
   for (let i = 0; i < names.length; ++i) {
     const row = /** @type {any[]} */ ([bold(names[i])]),
       s = stats[i];
     if (s) {
-      const format = prepareTimeFormat(
-        [s.median - s.lo, s.median, s.hi - s.median, ...ciDeltas(s), s.p90, s.p99],
-        1000
-      );
       row.push(
         {value: bold(num(formatTime(s.median, format))), align: 'r'},
         ...intervalCells(s.ciLo, s.ciHi, s.median, format),

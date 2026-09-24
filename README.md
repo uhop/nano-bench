@@ -242,7 +242,8 @@ visible in DevTools / `node --inspect` traces &mdash; useful for correlating
 benchmark variability with GC pauses, V8 optimization events, etc.
 
 Mark / measure names follow `nano-bench/<function-name>/<phase>`, where phase is
-`find-level` (calibration) or `series` / `series-par` (sample collection).
+`find-level` (calibration) or `rounds` / `series` / `series-par` (sample collection; `rounds`, the
+interleaved default, uses the label `all`).
 
 ```js
 import {PerformanceObserver} from 'node:perf_hooks';
@@ -259,7 +260,7 @@ Marks have a small fixed cost per phase (no per-sample overhead), so leaving
 `--observe` on does not affect measurement accuracy. Default is off.
 
 Library users can opt in directly: `findLevel` / `benchmarkSeries` /
-`benchmarkSeriesPar` / `measure` / `measurePar` all accept an `observe` option
+`benchmarkSeriesPar` / `benchmarkRounds` / `measure` / `measurePar` all accept an `observe` option
 (`boolean | string`) &mdash; `false` / unset for no marks, `true` for the default
 label, or a string for a custom label.
 
