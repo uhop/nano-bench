@@ -8,7 +8,7 @@ import {program} from 'commander';
 
 import {nanoBenchPlugin, PREFIX} from '../src/server/nano-bench-plugin.js';
 import {autoindexPlugin} from '../src/server/autoindex.js';
-import {isInside, toPosix} from '../src/server/files.js';
+import {encodeQueryPath, isInside, toPosix} from '../src/server/files.js';
 
 const pkgUrl = new URL('../package.json', import.meta.url),
   pkg = JSON.parse(await readFile(pkgUrl, {encoding: 'utf8'}));
@@ -79,8 +79,9 @@ try {
   throw error;
 }
 
-const appUrl = new URL(PREFIX + 'web-app/', server.base);
-for (const p of viewPaths) appUrl.searchParams.append('view', p);
+// the root redirects to the viewer and keeps the query
+const appUrl = new URL('/', server.base);
+appUrl.search = viewPaths.map(p => 'view=' + encodeQueryPath(p)).join('&');
 
 console.log(`nano-bench-view: serving ${rootFolder}`);
 console.log(`  viewer:  ${appUrl.href}`);

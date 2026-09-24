@@ -131,7 +131,7 @@ test('autoindex', async t => {
     r = await get(base, '/runs/');
     html = await r.text();
     t.ok(html.includes('href="../"'), 'a parent link below the root');
-    t.ok(html.includes('?view=runs%2Fb.json'), 'view links carry the full path');
+    t.ok(html.includes('?view=runs/b.json'), 'view links carry the full path, slashes readable');
 
     r = await get(base, '/site/');
     t.equal(await r.text(), '<p>site</p>', 'a folder with index.html is served as a site');

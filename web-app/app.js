@@ -6,7 +6,8 @@ const main = /** @type {HTMLElement} */ (document.querySelector('main'));
 
 const encodePath = p => p.split('/').map(encodeURIComponent).join('/');
 
-const viewHref = paths => '?' + paths.map(p => 'view=' + encodeURIComponent(p)).join('&');
+const viewHref = paths =>
+  '?' + paths.map(p => 'view=' + encodeURIComponent(p).replaceAll('%2F', '/')).join('&');
 
 const showError = message => {
   main.innerHTML = `<section class="error"><p>${esc(message)}</p><p><a href="./">Back to the results list</a></p></section>`;
@@ -38,7 +39,7 @@ const renderPicker = async () => {
   main.innerHTML = `<section>
 <h2>Results on the server</h2>
 <div class="picker-list"><p class="muted">Searching…</p></div>
-<div class="actions"><button type="button" class="compare" disabled>Compare selected</button></div>
+<div class="actions"><button type="button" class="compare" disabled>Compare selected</button> <button type="button" class="clear" disabled>Clear selection</button></div>
 </section>
 <section>
 <h2>Results on this computer</h2>
@@ -48,6 +49,7 @@ const renderPicker = async () => {
 
   const list = /** @type {HTMLElement} */ (main.querySelector('.picker-list')),
     compare = /** @type {HTMLButtonElement} */ (main.querySelector('.compare')),
+    clear = /** @type {HTMLButtonElement} */ (main.querySelector('.clear')),
     input = /** @type {HTMLInputElement} */ (main.querySelector('input[type=file]'));
 
   input.addEventListener('change', async () => {
@@ -87,13 +89,25 @@ const renderPicker = async () => {
     )
     .join('')}</tbody></table></div>`;
 
-  const selected = () =>
-    Array.from(list.querySelectorAll('input[type=checkbox]:checked'), box =>
-      Number(/** @type {HTMLElement} */ (box).dataset.index)
-    );
-  list.addEventListener('change', () => {
-    compare.disabled = selected().length < 1;
-    compare.textContent = selected().length > 1 ? 'Compare selected' : 'View selected';
+  const checked = () =>
+      /** @type {HTMLInputElement[]} */ (
+        Array.from(list.querySelectorAll('input[type=checkbox]:checked'))
+      ),
+    selected = () => checked().map(box => Number(box.dataset.index)),
+    update = () => {
+      const count = checked().length;
+      compare.disabled = clear.disabled = count < 1;
+      compare.textContent =
+        count > 1
+          ? `Compare selected (${count})`
+          : count === 1
+            ? 'View selected'
+            : 'Compare selected';
+    };
+  list.addEventListener('change', update);
+  clear.addEventListener('click', () => {
+    for (const box of checked()) box.checked = false;
+    update();
   });
   compare.addEventListener('click', () => {
     location.search = viewHref(selected().map(i => entries[i].path));

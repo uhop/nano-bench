@@ -202,6 +202,21 @@ button.compare,
   cursor: pointer;
 }
 
+button.clear {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+button.clear:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+button.clear:disabled,
 button.compare:disabled {
   background: transparent;
   color: var(--muted);

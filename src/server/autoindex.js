@@ -1,7 +1,7 @@
 import {readdir, stat} from 'node:fs/promises';
 import path from 'node:path';
 
-import {escapeHtml, isInside} from './files.js';
+import {encodeQueryPath, escapeHtml, isInside} from './files.js';
 import {PREFIX} from './nano-bench-plugin.js';
 
 const APP = PREFIX + 'web-app/';
@@ -103,7 +103,7 @@ export const autoindexPlugin = ({rootFolder}, {showDotFiles = false} = {}) => ({
         href = encodeURIComponent(e.name) + (isDirectory ? '/' : ''),
         viewHref =
           !isDirectory && e.name.endsWith('.json')
-            ? APP + '?view=' + encodeURIComponent(pathname.substring(1) + e.name)
+            ? APP + '?view=' + encodeQueryPath(pathname.substring(1) + e.name)
             : null;
       items.push({name: e.name, isDirectory, size: info.size, mtime: info.mtime, href, viewHref});
     }

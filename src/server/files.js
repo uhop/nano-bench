@@ -22,6 +22,9 @@ export const isInside = (base, fileName) => {
 export const toPosix = fileName =>
   path.sep === path.win32.sep ? fileName.replaceAll(path.win32.sep, path.posix.sep) : fileName;
 
+// a slash is legal in a query value; keeping it makes printed URLs readable
+export const encodeQueryPath = p => encodeURIComponent(p).replaceAll('%2F', '/');
+
 export const escapeHtml = s =>
   String(s).replace(
     /[&<>"']/g,
