@@ -142,6 +142,15 @@ npx nano-bench bench-strings-concat.js --histogram --bins 24       # override bi
 
 Use `--no-emoji` for ASCII markers on terminals with unreliable emoji widths.
 
+Without `--histogram`, `nano-bench` still runs a dip test on every function and prints a
+warning when its samples look multimodal. That usually means some batches paid a garbage
+collection or a slow path and others didn't, so the median describes only the fast clump.
+Measure such code with `nano-bench-io`, which times one call per run and reports the tail.
+
+Functions measured in one run also share JIT and heap state. To confirm a small difference,
+benchmark each variant in its own process and compare the saved runs with
+`nano-bench-compare`.
+
 ### Saving and comparing results
 
 Write a run to a JSON file with `--json`, then view or compare saved runs with

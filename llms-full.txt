@@ -79,6 +79,8 @@ A styled table with columns:
 | op/s | Operations per second (1000 / median) |
 | batch | Iterations per sample (batch size) |
 
+Under the table, a `⚠ name: distribution looks multimodal (dip test …)` line marks any function whose samples fail the dip test (p < 0.05, seeded with the run's seed, so `nano-bench-compare` flags the same series). A batched median then describes only the fast clump; `nano-bench-io` measures one call per run and reports p90/p99.
+
 When two or more functions are measured, a `Significance:` line names the test, α, and (for 3+ functions) the post-hoc method and correction. For two functions an `Effect size:` line follows — Cliff's δ with a magnitude label (Romano et al. thresholds) and how often the faster wins a random pair of runs (Vargha-Delaney A12, derived from the same rank sums; both persisted into the JSON `significance` object). If the difference is significant, an N×N matrix of pairwise percentage/ratio differences follows. The fastest function is marked with 🐇 and the slowest with 🐢 (`F`/`S` under `--no-emoji`). With `--histogram`, a per-function distribution chart follows; with `--json`, a results file is written.
 
 ### How it works

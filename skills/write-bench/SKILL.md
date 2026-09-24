@@ -30,10 +30,11 @@ export default {
 
 1. **ESM only.** Use `export default { ... }` — no CommonJS.
 2. **Every function takes `n`.** The loop `for (let i = 0; i < n; ++i)` is mandatory — it amortizes function-call overhead, which is critical for micro-benchmarks.
-3. **Keep variants equivalent.** Each function must perform the same logical work so the comparison is fair.
-4. **Move setup outside the loop.** Declare constants and prepare data before the `for` loop (or at module scope) so setup cost is not measured.
-5. **File naming convention:** `bench/bench-<descriptive-name>.js`.
-6. **Follow project code style:** single quotes, 2-space indent, no trailing commas, arrow parens avoided.
+3. **Keep variants equivalent.** Each function must perform the same logical work, in the same shape, so the comparison is fair.
+4. **One question per file.** Every variant in a file must differ from the others in exactly one respect, and only the within-file difference is a measurement. To compare along another axis, write another file (see § One question per file).
+5. **Move setup outside the loop.** Declare constants and prepare data before the `for` loop (or at module scope) so setup cost is not measured.
+6. **File naming convention:** `bench/bench-<descriptive-name>.js`.
+7. **Follow project code style:** single quotes, 2-space indent, no trailing commas, arrow parens avoided.
 
 ## Preventing dead-code elimination
 
@@ -65,6 +66,13 @@ export default {
 
 Use the `x.pop(); x.push(...)` pattern to keep the array at length ≤ 1 while still preventing elimination.
 
+**Returning the result is not enough when the input is constant.** V8 hoists loop-invariant
+work out of the loop even when the result is accumulated and returned: summing reads of one
+constant object (`t += o.a + o.b`) measured 528 ps per iteration, one or two CPU cycles, because only
+`t += k` stayed in the loop; reading from 1,000 distinct objects measured 4.23 ns. Vary the input per iteration as well, for example by reading from
+an array of distinct objects with `data[i % data.length]`. A returned constant is still a
+constant. If a variant measures at one or two cycles per iteration, suspect this first.
+
 ## Async functions
 
 Benchmark functions can be async. The tool detects thenables and measures time until resolution.
@@ -84,7 +92,7 @@ export default {
 };
 ```
 
-Use `--parallel` (`-p`) when benchmarking async code to collect samples concurrently.
+Samples are collected one after another by default, which is what you want for comparing implementations. `--parallel` (`-p`) is for a different question: how an asynchronous operation behaves with other operations in flight. It changes what is measured, so don't use it to finish a run faster.
 
 ## Named exports
 
@@ -156,6 +164,49 @@ a **baseline** — its stats are reported with no significance test.
 | Save / compare runs          | `--json`, then `nano-bench-compare`             | See below.                                                              |
 | Pin reproducibility          | `--seed <n>`                                    | Else a seed is auto-generated and recorded.                             |
 
+## One question per file
+
+Don't put every variant you can think of into one file. Write one file per question, each
+with variants that differ in exactly one respect, and run them all with a script:
+
+```bash
+#!/usr/bin/env bash
+# bench/run-all.sh — run every benchmark in its own process.
+#   bench/run-all.sh            # one pass
+#   bench/run-all.sh 5          # five passes: confirm the directions hold
+#   bench/run-all.sh 1 --json   # extra flags go to nano-bench
+set -u
+cd "$(dirname "$0")/.."
+repeats=${1:-1}
+[ $# -gt 0 ] && shift
+status=0
+for pass in $(seq 1 "$repeats"); do
+  [ "$repeats" -gt 1 ] && printf '\n===== pass %s of %s =====\n' "$pass" "$repeats"
+  for file in bench/bench-*.js; do
+    printf '\n----- %s -----\n' "$(basename "$file")"
+    npx nano-bench "$file" "$@" || status=1
+  done
+done
+exit $status
+```
+
+Wire it as a `bench` script in `package.json` (`"bench": "bench/run-all.sh"`). Separate
+processes matter: significance is measured within one process, so a repeat count over
+fresh processes is what checks that a direction survives.
+
+## What not to compare
+
+A significance test answers "do these two series differ", never "should these two be
+compared". Variants that differ in more than one respect (operand count and structure,
+data size and algorithm) differ significantly for reasons the file's name doesn't say.
+
+- **An impossible result means the harness is broken.** If a variant that does strictly more
+  work measures faster (a call beating the same code inlined, say), stop and fix the file
+  before reading any other number from it.
+- **Don't lower `-s` or `-m` below the defaults** to fit more runs into less time. Shortened
+  runs produced swings of 22–34% and an impossible result in the measurement arc behind
+  this section; the defaults agreed with independent measurements.
+
 ## Reading the significance output
 
 With ≥2 functions, a `Significance:` line names the test, α, and (for 3+) the
@@ -165,6 +216,16 @@ post-hoc method and correction:
 - **3+ functions** → Kruskal-Wallis H omnibus; if significant, a Conover-Iman
   pairwise post-hoc fills the N×N matrix showing which pairs differ. Fastest is
   marked 🐇, slowest 🐢 (`F`/`S` with `--no-emoji`).
+
+**Significance is within one process.** JIT decisions, code layout, and heap state are
+shared by every variant in a run and differ between runs, and the test can't see that. Before
+trusting a small difference, repeat it in fresh processes (`bench/run-all.sh 5`) and check
+that the direction holds; a direction that flips between processes is not a result.
+
+**A multimodal warning** (`⚠ name: distribution looks multimodal`) means the samples form
+two or more clumps, usually because some batches paid a garbage collection or a slow path
+and others didn't. The median then describes the fast clump only. Measure such code with
+`nano-bench-io`, which times one call per run and reports p90 and p99.
 
 ## Multiple-comparison correction (`--correction`)
 
@@ -179,7 +240,7 @@ Don't disable correction to make a result "look significant" — that defeats it
 
 ## Distribution histograms (`--histogram`)
 
-Reach for this when a median is surprising, or you suspect multimodality (fast/slow
+Use it when a median is surprising, or you suspect multimodality (fast/slow
 paths), heavy skew, or outlier tails (GC/JIT). The median+CI line can't show shape;
 the histogram can.
 
@@ -210,13 +271,13 @@ npx nano-bench-compare after.json                         # just re-render a sav
 - **Paired by name (default)** — one before/after test per function name shared across
   the files. This is the right mode for "did `fnA` get faster?". Keep the same function
   **names** across runs so they pair up.
-- **`--pooled`** — one omnibus over _all_ series at once. Use only when you genuinely want
+- **`--pooled`** — one omnibus over _all_ series at once. Use only when you want
   "which of these k series differ from which"; for a plain before/after it buries the
-  meaningful comparison, so don't reach for it by default.
+  meaningful comparison, so don't use it by default.
 - The bootstrap seed is recorded in each file, so a recompare reproduces the original
   intervals exactly. `nano-bench-compare` warns if the runs' environments (CPU, runtime,
-  OS) or the function bodies differ — heed it: a measured delta across machines may be the
-  environment, not the code.
+  OS) or the function bodies differ — heed it: a delta measured across machines may come from the
+  environment instead of the code.
 - Add `--host` / `--host-name <name>` to stamp the machine into the JSON (opt-in; the file
   is shareable).
 

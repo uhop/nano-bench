@@ -63,6 +63,10 @@ export default n => {
 };
 ```
 
+Returning the result doesn't help when the input is constant: V8 hoists loop-invariant work
+out of the loop. Vary the input per iteration too (`data[i % data.length]`); see the
+`write-bench` skill § Preventing dead-code elimination.
+
 ## Async functions
 
 ```js

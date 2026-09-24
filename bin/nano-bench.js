@@ -23,6 +23,8 @@ import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {corrections} from '../src/significance/correction.js';
 import {mulberry32} from '../src/utils/prng.js';
+import {numericAsc} from '../src/utils/numeric-asc.js';
+import {multimodalityP} from '../src/bench/results/series.js';
 import {summaryTable} from '../src/bench/render/summary-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {smokeTable} from '../src/bench/render/smoke-table.js';
@@ -33,6 +35,8 @@ import {captureEnvironment} from '../src/bench/results/environment.js';
 import {buildResultsObject} from '../src/bench/results/build.js';
 import {computeHistograms, binCount} from '../src/bench/histogram.js';
 import {writeHistograms} from '../src/bench/render/histogram-chart.js';
+
+const pText = p => (p <= 1 / 201 ? 'p < 0.01' : 'p ≈ ' + formatNumber(p, {decimals: 2}));
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
   toInt = value => parseInt(value),
@@ -271,6 +275,18 @@ for (let i = 0; i < iterations.length; ++i) {
 
 await updater.final();
 updater = null;
+
+{
+  const warn = options.emoji ? '⚠' : '!';
+  for (let i = 0; i < results.length; ++i) {
+    // same stream as nano-bench-compare, so a recompare flags the same series
+    const p = multimodalityP(results[i].slice().sort(numericAsc), seed, i);
+    if (p >= 0.05) continue;
+    await writer.write(
+      c`{{save.bright.yellow}}${warn}{{restore}} ${names[i]}: distribution looks multimodal (dip test ${pText(p)}) — the median may hide a slow mode; nano-bench-io measures one call per run and reports the tail`
+    );
+  }
+}
 
 let significance = null;
 if (results.length > 1) {
