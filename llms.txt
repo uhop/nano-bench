@@ -4,7 +4,7 @@
 
 ## Overview
 
-nano-benchmark provides four CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U for two functions; Kruskal-Wallis H with Conover-Iman pairwise post-hoc for three or more, with Holm/Bonferroni multiple-comparison correction) to produce statistically rigorous results. Saved runs can be re-rendered and compared with significance recomputed from the raw samples. Designed for micro-benchmarks where function-call overhead matters.
+nano-benchmark provides five CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U for two functions; Kruskal-Wallis H with Conover-Iman pairwise post-hoc for three or more, with Holm/Bonferroni multiple-comparison correction) to produce statistically rigorous results. Saved runs can be re-rendered and compared with significance recomputed from the raw samples, in the terminal or in a browser viewer. Designed for micro-benchmarks where function-call overhead matters.
 
 - NPM: https://npmjs.org/package/nano-benchmark
 - GitHub: https://github.com/uhop/nano-bench
@@ -66,6 +66,20 @@ npx nano-bench-compare base.json new.json --pooled  # one omnibus over all serie
 ```
 
 Options: `--alpha` (override the recompute α; default the first file's), `--correction` (override; default the first file's), `--pooled`, `--clusters`, `--verbose`, `--histogram` + `--chart` + `--bins`, `--no-emoji`. Files carrying per-run system metrics (from `nano-bench-io --metrics`) get a side-by-side metric-medians table after the summary; multimodal series are flagged by the dip test and split per cluster with `--clusters`.
+
+### nano-bench-view
+
+Serves a browser viewer for results JSON files found under a folder: the summary table, one histogram per series on a shared axis (linear, logarithmic, or one axis per row), and the significance matrix, all recomputed in the browser with the same code as `nano-bench-compare`. Folders without `index.html` get HTML listings with links into the viewer. Needs the optional peer `tape-six` (`npm install --save-dev tape-six`); without it the command prints that install line and exits 1.
+
+```bash
+npx nano-bench-view                  # list results under the current folder
+npx nano-bench-view base.json        # print a URL that opens this file directly
+npx nano-bench-view --host 0.0.0.0   # listen on every interface
+```
+
+Options: `-r, --root` (folder to serve and search; default the current folder), `--host` (default `localhost`), `-p, --port` (default 3000), `--show-dot-files`, `--trace`.
+
+The server is strictly a development tool: not hardened, not for general web serving. The user is responsible for its security; outside `localhost` they are on their own (prefer an SSH tunnel to `--host`). A non-loopback `--host` prints a warning.
 
 ### nano-watch
 

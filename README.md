@@ -6,7 +6,7 @@
 `nano-benchmark` provides command-line utilities for micro-benchmarking code
 with nonparametric statistics and significance testing.
 
-Four utilities are available:
+Five utilities are available:
 
 - `nano-watch` &mdash; continuously benchmarks a single function, showing live statistics
   and memory usage.
@@ -16,6 +16,8 @@ Four utilities are available:
   distributions and tail percentiles (p90/p99), no batching.
 - `nano-bench-compare` &mdash; views and compares saved results (JSON), recomputing
   significance from the raw samples &mdash; for before/after comparisons across runs.
+- `nano-bench-view` &mdash; serves a browser viewer for saved results: distribution plots,
+  summary, and significance, with folder listings for browsing a remote machine's files.
 
 Designed for performance tuning of small, fast code snippets used in tight loops.
 
@@ -160,6 +162,33 @@ npx nano-bench-compare after.json                         # just re-render a sav
 The seed for the bootstrap is always recorded, so a recompare reproduces the original
 intervals exactly. Add `--host` (or `--host-name <name>`) to stamp the machine into the
 JSON.
+
+### Viewing results in a browser
+
+`nano-bench-view` starts a local web server over a folder and opens a viewer for the results
+JSON files under it. The viewer plots each function's sample distribution next to the summary
+and significance tables. It computes the same numbers as `nano-bench-compare`, from the same
+saved samples. The server uses [tape-six](https://www.npmjs.com/package/tape-six), an optional
+peer dependency, so install it first:
+
+```bash
+npm install --save-dev tape-six
+
+npx nano-bench-view                     # list the results under the current folder
+npx nano-bench-view after.json          # print a URL that opens this file directly
+npx nano-bench-view --host 0.0.0.0      # listen on every interface, not only localhost
+```
+
+> [!WARNING]
+> The server is a development tool. It isn't hardened and isn't meant for general web serving.
+> You are responsible for its security, and outside `localhost` you are on your own. To reach
+> a remote machine, prefer an SSH tunnel to the default `localhost` binding over `--host`.
+
+The viewer lists result files found on the server, so it works when the results live on
+another machine: run the command there, forward its port over SSH (for example,
+`ssh -L 3000:localhost:3000 HOST`), then open the printed URL in a local browser. Folders
+without an `index.html` file show a directory listing with links into the viewer. The page
+follows the system's light or dark theme, and a switch overrides it.
 
 ### Benchmarking slow functions
 

@@ -372,6 +372,10 @@ Tiered plan, lightest first:
    here only so the schema stays forward-compatible (the raw samples it needs are
    already persisted by § 1).
 
+**Tier 3 shipped 2026-09-24** as `nano-bench-view`, a page served by tape-six's test server
+with no build step. It lists results on the server instead of taking a dropped file. See
+[`browser-viewer.md`](./browser-viewer.md).
+
 Recommendation: ship `nano-bench-compare` (tiers 1–2) now. Tier 3 is tracked
 separately in the queue as future work; the only thing the present design owes it
 is keeping raw samples in the schema (which § 1 already mandates).

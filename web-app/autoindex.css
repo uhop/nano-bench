@@ -1,0 +1,62 @@
+.crumbs {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.crumbs .sep {
+  margin: 0 4px;
+  color: var(--muted);
+}
+
+.listing {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.listing td {
+  font-size: 14px;
+}
+
+.listing .name {
+  width: 100%;
+}
+
+.listing td.name {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.listing .dir .name > a:first-child {
+  font-weight: 600;
+}
+
+.listing .size,
+.listing .time {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.listing .view {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font);
+  font-size: 12px;
+}
+
+.listing tbody tr:hover td {
+  background: var(--hover);
+}
+
+@media (max-width: 560px) {
+  .listing .time {
+    display: none;
+  }
+}

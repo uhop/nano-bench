@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 
 import {Option, program} from 'commander';
@@ -9,7 +8,6 @@ import {c} from 'console-toolkit/style.js';
 import Writer from 'console-toolkit/output/writer.js';
 
 import {bootstrapSummary} from '../src/stats.js';
-import dipTest from '../src/stats/dip.js';
 import kdeClusters from '../src/stats/kde-modes.js';
 import {clustersTable} from '../src/bench/render/clusters-table.js';
 import {numericAsc} from '../src/utils/numeric-asc.js';
@@ -26,7 +24,7 @@ import {
 } from '../src/bench/render/metrics-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {loadResults} from '../src/bench/results/load.js';
-import {diffEnvironments} from '../src/bench/results/environment.js';
+import {buildSeries, resultsWarnings, multimodalityP} from '../src/bench/results/series.js';
 import {planComparison} from '../src/bench/pair-series.js';
 import {computeHistograms, binCount} from '../src/bench/histogram.js';
 import {writeHistograms} from '../src/bench/render/histogram-chart.js';
@@ -80,55 +78,12 @@ try {
 const alpha = options.alpha ?? files[0].results.params.alpha ?? 0.05;
 const correction = options.correction ?? files[0].results.params.correction ?? 'holm';
 
-const nameCounts = {};
-for (const {results} of files) {
-  for (const series of results.results)
-    nameCounts[series.name] = (nameCounts[series.name] ?? 0) + 1;
-}
-
-const tagOf = ({file, results}) => results.label ?? path.basename(file).replace(/\.json$/, '');
-
-const series = [];
-for (const f of files) {
-  const tag = tagOf(f),
-    {seed, bootstrap} = f.results.params;
-  f.results.results.forEach((s, j) => {
-    const random = mulberry32((seed + Math.imul(j, 0x9e3779b9)) >>> 0);
-    series.push({
-      label: nameCounts[s.name] > 1 ? `${tag}/${s.name}` : s.name,
-      tag,
-      name: s.name,
-      reps: s.reps,
-      bodyHash: s.bodyHash,
-      samples: s.samples,
-      metrics: Array.isArray(s.metrics) ? s.metrics : null,
-      metricsKind: f.results.params.metrics,
-      summary: bootstrapSummary(s.samples, {alpha, bootstrap, random})
-    });
-  });
-}
+const series = buildSeries(files, {alpha});
 
 const writer = new Writer();
 const warn = message => writer.writeString(c`{{save.bright.yellow}}⚠ ${message}{{restore}}\n`);
 
-for (const {path: p, values} of diffEnvironments(files.map(f => f.results.environment))) {
-  warn(`environment differs — ${p}: ${values.map(v => JSON.stringify(v)).join(' vs ')}`);
-}
-
-for (const key of ['alpha', 'samples', 'bootstrap', 'correction']) {
-  const values = files.map(f => f.results.params[key]);
-  if (new Set(values).size > 1) warn(`params.${key} differs across files: ${values.join(' vs ')}`);
-}
-
-for (const name of Object.keys(nameCounts)) {
-  if (nameCounts[name] < 2) continue;
-  const hashes = files.flatMap(f =>
-    f.results.results.filter(s => s.name === name).map(s => s.bodyHash)
-  );
-  if (new Set(hashes).size > 1) {
-    warn(`"${name}" body differs across runs — a measured delta may be code, not noise`);
-  }
-}
+for (const message of resultsWarnings(files)) warn(message);
 
 await writer.write(
   summaryTable(
@@ -161,9 +116,7 @@ const pText = p => (p <= 1 / 201 ? 'p < 0.01' : 'p ≈ ' + formatNumber(p, {deci
   for (let j = 0; j < series.length; ++j) {
     const s = series[j],
       sortedSamples = s.samples.slice().sort(numericAsc),
-      {p} = dipTest(sortedSamples, {
-        random: mulberry32((dipSeed + Math.imul(j, 0x85ebca6b)) >>> 0)
-      });
+      p = multimodalityP(sortedSamples, dipSeed, j);
     if (p >= 0.05) continue;
     if (!options.clusters) {
       warn(

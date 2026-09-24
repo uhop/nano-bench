@@ -1,0 +1,264 @@
+h2 {
+  margin: 28px 0 10px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+h3 {
+  margin: 18px 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+section:first-child h2 {
+  margin-top: 8px;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+
+.muted,
+.note {
+  color: var(--ink-2);
+}
+
+.note {
+  font-size: 13px;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.scroll > table,
+.file-card,
+.chart,
+.block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.files {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.file-card {
+  padding: 10px 14px;
+}
+
+.file-head {
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.warnings ul {
+  margin: 12px 0 0;
+  padding: 10px 14px 10px 32px;
+  background: var(--warning-bg);
+  color: var(--warning-ink);
+  border-radius: 8px;
+}
+
+.summary .strong {
+  font-weight: 600;
+}
+
+.mark {
+  width: 1.6em;
+  text-align: center;
+}
+
+td.name {
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.chart {
+  padding: 8px 0;
+  overflow: hidden;
+}
+
+.dist {
+  display: block;
+  font-family: var(--font);
+}
+
+.dist .grid {
+  stroke: var(--grid);
+  stroke-width: 1;
+}
+
+.dist .baseline,
+.dist .tick {
+  stroke: var(--axis);
+  stroke-width: 1;
+}
+
+.dist .ci {
+  fill: var(--series-wash);
+}
+
+.dist .bar {
+  fill: var(--series);
+}
+
+.dist .hit {
+  fill: transparent;
+}
+
+.dist .bin:hover .hit {
+  fill: var(--hover);
+}
+
+.dist .median {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.dist .label {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dist .tail,
+.dist .tick-label {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.block {
+  padding: 4px 14px 8px;
+  margin-bottom: 10px;
+}
+
+.block .scroll > table {
+  border: 0;
+}
+
+.verdict {
+  font-weight: 600;
+}
+
+.verdict .muted {
+  font-weight: 400;
+  font-size: 13px;
+  margin-left: 6px;
+}
+
+.faster {
+  color: var(--faster);
+  font-weight: 600;
+}
+
+.slower {
+  color: var(--slower);
+  font-weight: 600;
+}
+
+.picker {
+  width: 100%;
+}
+
+.picker td.name {
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+.actions {
+  margin-top: 10px;
+}
+
+button.compare,
+.file-input {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--active);
+  color: var(--active-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+button.compare:disabled {
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+
+.file-input input {
+  display: none;
+}
+
+.error {
+  color: var(--slower);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.axis-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.axis-toggle button {
+  padding: 3px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.axis-toggle button + button {
+  border-left: 1px solid var(--border);
+}
+
+.axis-toggle button:hover {
+  background: var(--hover);
+}
+
+.axis-toggle[data-state='auto'] [data-axis='auto'],
+.axis-toggle[data-state='linear'] [data-axis='linear'],
+.axis-toggle[data-state='log'] [data-axis='log'],
+.axis-toggle[data-state='rows'] [data-axis='rows'] {
+  background: var(--active);
+  color: var(--active-ink);
+}
+
+.dist .tail {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}

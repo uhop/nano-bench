@@ -1,6 +1,6 @@
 # Architecture
 
-`nano-benchmark` is a pure JavaScript (ESM) CLI package for micro-benchmarking code with nonparametric statistics and significance testing. It runs on Node.js (every non-EOL release), Bun, and Deno; no `engines` floor is declared. Runtime dependencies: `commander` (CLI parsing), `console-toolkit` (styled terminal output, tables, charts), and `emoji-regex` + `get-east-asian-width` (so `console-toolkit` measures wide-glyph widths — emoji markers, CJK names — correctly).
+`nano-benchmark` is a pure JavaScript (ESM) CLI package for micro-benchmarking code with nonparametric statistics and significance testing. It runs on Node.js (every non-EOL release), Bun, and Deno; no `engines` floor is declared. Runtime dependencies: `commander` (CLI parsing), `console-toolkit` (styled terminal output, tables, charts), and `emoji-regex` + `get-east-asian-width` (so `console-toolkit` measures wide-glyph widths — emoji markers, CJK names — correctly). `tape-six` is an optional peer: `nano-bench-view` serves the browser viewer with its test server and prints an install hint when it is absent.
 
 ## Project layout
 
@@ -9,7 +9,14 @@ bin/                          # CLI entry points (shipped via npm)
 ├── nano-bench.js                   # Compare multiple functions with bootstrap CI + significance tests
 ├── nano-bench-io.js                # Benchmark slow (ms-scale) functions per run — tails, no batching
 ├── nano-watch.js                   # Continuously benchmark a single function with live streaming stats
-└── nano-bench-compare.js           # View/compare saved results JSON — recomputes significance, no measuring
+├── nano-bench-compare.js           # View/compare saved results JSON — recomputes significance, no measuring
+└── nano-bench-view.js              # Serve the browser viewer (tape-six test server + two plugins)
+web-app/                      # Browser viewer (shipped via npm; plain ES modules, no build)
+├── index.html                      # Shell + import map (console-toolkit/ → /--nano-bench/console-toolkit/)
+├── app.js                          # Routing (?view=<path>, repeatable) + the results picker
+├── view.js                         # Files, warnings, summary, distribution chart, significance
+├── theme-init.js / theme.js        # Auto / Light / Dark: applied before paint, saved in localStorage
+└── theme.css / app.css / autoindex.css
 src/                          # Internal source (shipped via npm)
 ├── index.js                        # Library entry — re-exports the public API
 ├── bench/
@@ -33,11 +40,19 @@ src/                          # Internal source (shipped via npm)
 │   │   ├── clusters-table.js       # Per-cluster weight/median/CI/range (--clusters)
 │   │   ├── smoke-table.js          # The --smoke report (shared by bench & io)
 │   │   ├── significance-table.js   # Significance header + N×N matrix (shared by bench & compare)
-│   │   └── histogram-chart.js      # Terminal distribution charts (columns ridgeline / rotated bars)
+│   │   ├── histogram-chart.js      # Terminal distribution charts (columns ridgeline / rotated bars)
+│   │   └── svg-distribution.js     # Viewer chart: small-multiple histograms as an SVG string
 │   └── results/
 │       ├── build.js                # buildResultsObject — schema v1
-│       ├── load.js                 # Read + validate a results file
-│       └── environment.js          # captureEnvironment + diffEnvironments (comparability banner)
+│       ├── parse.js                # Validate results JSON text (browser-safe)
+│       ├── load.js                 # Read a results file from disk (Node)
+│       ├── env-diff.js             # diffEnvironments — comparability banner (browser-safe)
+│       ├── environment.js          # captureEnvironment (Node)
+│       └── series.js               # buildSeries / resultsWarnings / multimodalityP — shared by compare + viewer
+├── server/                         # nano-bench-view plugins (Node)
+│   ├── nano-bench-plugin.js        # /--nano-bench/{web-app,src,console-toolkit}/ + /--nano-bench/results
+│   ├── autoindex.js                # HTML folder listings (algorithm from the static-server.mjs gist)
+│   └── files.js                    # MIME table, containment check, escaping
 ├── stats.js                        # Batch stats: mean, variance, stdDev, skewness, kurtosis, bootstrap, *Summary
 ├── median.js                       # Fast approximate median (median-of-medians variant)
 ├── stream-stats.js                 # StatCounter — online/streaming mean, variance, skewness, kurtosis
@@ -76,7 +91,7 @@ bench/                        # Example benchmark + sample results files
 ├── io-bimodal.js                   # Example: deterministic fast/slow mix for --clusters
 ├── io-warmup.js                    # Example: slow first calls for the warmup auto-detection
 ├── watch-sample.js                 # Example: single function for nano-watch
-└── *.json                          # Example saved results for nano-bench-compare
+└── *.json                          # Example saved results for nano-bench-compare and nano-bench-view
 skills/                       # AI coding skills (shipped via npm)
 ├── write-bench/SKILL.md           # How to write nano-bench benchmark files
 └── write-watch/SKILL.md           # How to write nano-watch benchmark files
@@ -132,6 +147,13 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 4. **Banner** (`diffEnvironments`) — warn on any environment field that differs (CPU, runtime, OS, …), and on `params`/`bodyHash` divergence, so an environment-confounded comparison is never read as clean.
 5. **Output** — the same summary + significance renderers as `nano-bench`, one block per comparison; optional `--histogram`.
 
+Steps 2 and 4 live in `src/bench/results/series.js`, so the browser viewer computes the same numbers.
+
+### nano-bench-view
+
+1. **Serve** — `createTestServer` from `tape-six/test-server.js` (lazy import) over `--root`, with `webAppPath` set to `/--nano-bench/web-app/` so `/` redirects to the viewer, remote plugin registration off, and two plugins. `nano-bench-plugin.js` serves `web-app/`, `src/`, and the `console-toolkit` sources from wherever they are installed (resolved with `import.meta.resolve`), so the viewer works when the package is outside the served root. It also answers `/--nano-bench/results`: every JSON file under the root whose first 512 bytes carry `schemaVersion: 1` and `tool: "nano-benchmark"`, skipping dot-folders and `node_modules`. `autoindex.js` lists folders without `index.html`; the root lists only with `/?list`.
+2. **View** — `web-app/app.js` loads `?view=` paths from the server (or local files through a file input), `parseResults` validates them, and `view.js` runs the compare pipeline's `buildSeries` / `resultsWarnings` / `planComparison` / `computeSignificance` in the browser. The chart is `computeHistograms` rendered by `svg-distribution.js`: a shared linear axis, a shared log axis (chosen automatically when the pooled 1st–99th percentile range exceeds 20×), or one axis per row.
+
 ### nano-watch pipeline
 
 1. **Find level** — same as above.
@@ -166,10 +188,17 @@ bin/nano-bench-io.js ──→ src/bench/macro-runner.js
                      ──→ src/stats.js (bootstrapSummary), src/stats/quantile.js
                      ──→ src/bench/significance.js, render/*, results/* (same as nano-bench)
 
-bin/nano-bench-compare.js ──→ src/bench/results/{load,environment}.js
+bin/nano-bench-compare.js ──→ src/bench/results/{load,series}.js
                           ──→ src/bench/pair-series.js
                           ──→ src/bench/significance.js (same tests, recomputed from saved samples)
                           ──→ src/bench/render/* (shared renderers)
+
+bin/nano-bench-view.js ──→ tape-six/test-server.js (optional peer, lazy)
+                       ──→ src/server/{nano-bench-plugin,autoindex}.js
+
+web-app/view.js ──→ src/bench/results/series.js, src/bench/pair-series.js, src/bench/significance.js
+                ──→ src/bench/histogram.js, src/bench/render/svg-distribution.js
+                ──→ console-toolkit/alphanumeric/number-formatters.js (via the import map)
 
 bin/nano-watch.js ──→ src/bench/runner.js
                   ──→ src/stream-stats.js

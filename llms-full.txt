@@ -219,6 +219,60 @@ npx nano-bench-compare base.json new.json -a 0.01      # recompute at a differen
 
 ---
 
+## CLI tool: nano-bench-view
+
+Serves a browser viewer for nano-bench results JSON. It runs tape-six's test server (`tape-six/test-server.js`, an optional peer dependency loaded lazily) over a root folder with two plugins, so it needs no build step and no configuration. Useful when the results sit on a remote machine: start it there, forward the port over SSH (`ssh -L 3000:localhost:3000 HOST`), and open the printed URL from a local browser.
+
+**Security:** the server is strictly a development tool. It is not hardened and not meant for general web serving: it serves every file under the root folder to anyone who can reach it, with no authentication. The user is responsible for its security; outside `localhost` they are on their own. `--host` with a non-loopback address prints a warning at startup.
+
+### Usage
+
+```
+nano-bench-view [options] [files...]
+```
+
+### Arguments
+
+- `files...` — optional results files inside the root folder; the printed viewer URL opens them directly (`?view=<path>` per file).
+
+### Options
+
+- `-r, --root <folder>` — folder to serve and search for results (default: the current folder).
+- `--host <host>` — interface to listen on (default: `localhost`). Anything else exposes the unhardened server beyond this machine; see **Security**.
+- `-p, --port <port>` — port (default: 3000; an occupied port is reported with a hint).
+- `--show-dot-files` — include dot-files in folder listings.
+- `--trace` — log every request.
+
+### Routes
+
+- `/` — redirects to the viewer at `/--nano-bench/web-app/`.
+- `/--nano-bench/web-app/?view=a.json&view=b.json` — view one file, or compare several (paired by name, as in `nano-bench-compare`).
+- `/--nano-bench/results` — JSON list of results files under the root (`path`, `size`, `mtime`, `label`, `createdAt`, `source`, `series`, `runtime`, `host`); dot-folders and `node_modules` are skipped, and a file qualifies when its first 512 bytes carry `schemaVersion: 1` and `tool: "nano-benchmark"`.
+- `/?list` and any folder URL without `index.html` — an HTML directory listing; JSON files get a **view** link.
+- Any other path — the file under the root, served by tape-six's static handler.
+
+Remote plugin registration (`PUT /--plugins`) is off. The viewer's own files, `src/`, and the `console-toolkit` formatters are served from wherever the package is installed, so the root can be any project.
+
+### Viewer
+
+- **Picker** — results on the server (select several to compare) and local files opened through a file input (read by the browser, not uploaded).
+- **Files** — source, creation time, runtime, OS, CPU, and parameters per file.
+- **Warnings** — the comparability banner of `nano-bench-compare` plus the dip-test multimodality flag.
+- **Summary** — median, interval, op/s, and batch per series, recomputed from the samples with the recorded seed; all rows share one time unit.
+- **Distribution** — one histogram row per series on a shared axis, with the median line and the summary interval shaded. Axis modes: **Auto** (logarithmic when the pooled 1st–99th percentile range spans more than 20×, else linear), **Linear**, **Log**, and **Per row** (each series on its own axis: shapes compare, positions do not). Hover a column for its range and count.
+- **Significance** — the test, effect size for pairs, and the pairwise matrix ("faster" or "slower", row against column).
+- **Theme** — Auto (follows the OS), Light, or Dark; saved in `localStorage`.
+
+### Example
+
+```bash
+npm install --save-dev tape-six
+npx nano-bench bench.js --json runs/base.json
+npx nano-bench-view runs/base.json
+```
+
+---
+
 ## Results JSON schema (v1)
 
 `nano-bench --json out.json` writes this shape. The **raw per-sample arrays are the source of truth** — significance and CIs are always recomputed from them; the stored summaries are FYI only.

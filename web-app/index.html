@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>nano-bench</title>
+    <script src="theme-init.js"></script>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="app.css" />
+    <script type="importmap">
+      {"imports": {"console-toolkit/": "/--nano-bench/console-toolkit/"}}
+    </script>
+    <script type="module" src="theme.js"></script>
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header class="bar">
+      <a class="title" href="./">nano-bench results</a>
+      <span class="spacer"></span>
+      <a href="/?list">Browse folders</a>
+      <div id="theme-toggle" role="group" aria-label="Color theme"></div>
+    </header>
+    <main></main>
+  </body>
+</html>
