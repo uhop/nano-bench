@@ -44,7 +44,11 @@ export const collectMacro = async (fn, options = {}, report) => {
     if (n >= maxRuns) break;
     if (n < minRuns) continue;
     if (stable > 0) {
-      if (n % checkEvery === 0 && ciWidth && ciWidth(samples) <= stable) break;
+      if (n % checkEvery === 0 && ciWidth) {
+        const width = ciWidth(samples);
+        await report?.('macro-check', {n, width});
+        if (width <= stable) break;
+      }
       continue;
     }
     if (performance.now() - started >= budget) break;

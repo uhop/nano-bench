@@ -44,6 +44,25 @@ test('collectMacro()', t => {
     t.deepEqual(consulted, [10, 20, 30]);
   });
 
+  t.test('each stability check is reported with its width', async t => {
+    const checks = [];
+    await collectMacro(
+      () => {},
+      {
+        minRuns: 5,
+        stable: 5,
+        checkEvery: 10,
+        maxRuns: 100,
+        ciWidth: s => (s.length >= 20 ? 4 : 50)
+      },
+      (name, data) => name === 'macro-check' && checks.push([data.n, data.width])
+    );
+    t.deepEqual(checks, [
+      [10, 50],
+      [20, 4]
+    ]);
+  });
+
   t.test('prepare/teardown wrap every run, warmup included', async t => {
     const log = [];
     await collectMacro(() => log.push('run'), {

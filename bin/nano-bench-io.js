@@ -40,6 +40,7 @@ import {corrections} from '../src/significance/correction.js';
 import {mulberry32} from '../src/utils/prng.js';
 import {numericAsc} from '../src/utils/numeric-asc.js';
 import {ioSummaryTable} from '../src/bench/render/io-summary-table.js';
+import {progressLine} from '../src/bench/render/progress.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {smokeTable} from '../src/bench/render/smoke-table.js';
 import selectFunctions from '../src/bench/select-functions.js';
@@ -256,7 +257,14 @@ const results = [],
 
 const pText = p => (p <= 1 / 201 ? 'p < 0.01' : 'p ≈ ' + formatNumber(p, {decimals: 2}));
 
-const report = () => ioSummaryTable(names, stats, runCounts);
+let progress = null;
+
+// the final frame drops the progress line: the table is all that remains
+const report = state => {
+  const lines = ioSummaryTable(names, stats, runCounts);
+  if (state !== 'finished' && progress) lines.push(progressLine(progress));
+  return lines;
+};
 
 updater = new Updater(
   report,
@@ -274,7 +282,41 @@ const ciWidth = samples => {
 };
 
 for (let i = 0; i < names.length; ++i) {
-  let samples;
+  const which = `${names[i]} (${i + 1} of ${names.length})`;
+  let samples,
+    started = performance.now(),
+    lastWidth = Infinity;
+  const measuring = n => {
+    const elapsed = performance.now() - started;
+    if (options.runs > 0) {
+      progress = {
+        label: `measuring ${which}: ${n} of ${options.runs} runs`,
+        done: n,
+        total: options.runs,
+        remainingMs: n > 0 ? (elapsed / n) * (options.runs - n) : undefined
+      };
+    } else if (options.stable > 0) {
+      const width = Number.isFinite(lastWidth) ? `${formatNumber(lastWidth, {decimals: 1})}%` : '…';
+      progress = {
+        label: `measuring ${which}: ${n} runs, CI width ${width} of ${options.stable}% target`,
+        done: Number.isFinite(lastWidth) ? Math.min(1, options.stable / lastWidth) : 0,
+        total: 1
+      };
+    } else {
+      const fraction = Math.min(1, n / options.minRuns, elapsed / options.budget);
+      progress = {
+        label: `measuring ${which}: ${n} runs`,
+        done: fraction,
+        total: 1,
+        remainingMs: Math.max(
+          options.budget - elapsed,
+          n > 0 ? (elapsed / n) * (options.minRuns - n) : 0
+        )
+      };
+    }
+  };
+  progress = {label: `measuring ${which}`, done: 0, total: 1};
+  await updater.update();
   try {
     samples = await collectMacro(
       fns[names[i]],
@@ -295,8 +337,19 @@ for (let i = 0; i < names.length; ++i) {
             : undefined
       },
       async (name, data) => {
-        if (name === 'macro-run') {
+        if (name === 'macro-warmup') {
+          progress = {
+            label: `warming up ${which}: ${data.n} of ${data.warmup}`,
+            done: data.n,
+            total: data.warmup
+          };
+          started = performance.now();
+          await updater.update();
+        } else if (name === 'macro-check') {
+          lastWidth = data.width;
+        } else if (name === 'macro-run') {
           runCounts[i] = data.n;
+          measuring(data.n);
           await updater.update();
         }
       }
@@ -325,6 +378,7 @@ for (let i = 0; i < names.length; ++i) {
   const sorted = samples.slice().sort(numericAsc),
     percentiles = {p90: quantileSorted(sorted, 0.9), p99: quantileSorted(sorted, 0.99)};
   stats.push({...exactSummary(samples, {alpha: options.alpha}), ...percentiles, bootstrap: false});
+  progress = {label: `bootstrapping ${which}`, done: 1, total: 1};
   await updater.update();
   await sleep(5);
   stats[i] = {

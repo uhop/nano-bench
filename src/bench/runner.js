@@ -104,10 +104,11 @@ export const benchmark = (fn, n) =>
   });
 
 /**
- * @param {{nSeries?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe}} [opts]
+ * @param {{nSeries?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe, onSample?: (done: number) => unknown}} [opts]
  */
 export const benchmarkSeries = async (fn, n, opts = {}) => {
-  const {nSeries = 100, timeout = 5, DataArray = Array, observe} = opts;
+  const {nSeries = 100, timeout = 5, DataArray = Array, observe, onSample} = opts;
+  const total = nSeries;
   const obs = makeObserver(observe, 'default');
   obs?.mark('series');
   try {
@@ -117,6 +118,7 @@ export const benchmarkSeries = async (fn, n, opts = {}) => {
       --nSeries;
       try {
         data[nSeries] = await benchmark(fn, n);
+        if (onSample) await onSample(total - nSeries);
         if (nSeries) {
           setTimeout(bench, timeout, nSeries, resolve, reject);
         } else {
@@ -138,12 +140,12 @@ export const benchmarkSeries = async (fn, n, opts = {}) => {
 /**
  * @param {Function[]} fns
  * @param {number[]} ns batch size for each function
- * @param {{nSeries?: number, timeout?: number, observe?: Observe}} [opts]
+ * @param {{nSeries?: number, timeout?: number, observe?: Observe, onSample?: (done: number, total: number) => unknown}} [opts]
  * @param {(round: number, data: number[][]) => unknown} [report] awaited after each round
  * @returns {Promise<number[][]>} samples per function, in time order
  */
 export const benchmarkRounds = async (fns, ns, opts = {}, report) => {
-  const {nSeries = 100, timeout = 5, observe} = opts;
+  const {nSeries = 100, timeout = 5, observe, onSample} = opts;
   const obs = makeObserver(observe, 'default');
   obs?.mark('rounds');
   try {
@@ -155,6 +157,7 @@ export const benchmarkRounds = async (fns, ns, opts = {}, report) => {
       for (let j = 0; j < k; ++j) {
         const i = (round + j) % k;
         data[i].push(await benchmark(fns[i], ns[i]));
+        if (onSample) await onSample(round * k + j + 1, nSeries * k);
         await pause();
       }
       if (report) await report(round + 1, data);

@@ -41,6 +41,7 @@ src/                          # Internal source (shipped via npm)
 │   │   ├── smoke-table.js          # The --smoke report (shared by bench & io)
 │   │   ├── significance-table.js   # Significance header + N×N matrix (shared by bench & compare)
 │   │   ├── histogram-chart.js      # Terminal distribution charts (columns ridgeline / rotated bars)
+│   │   ├── progress.js             # Progress bar + line shown under the live tables while measuring
 │   │   └── svg-distribution.js     # Viewer chart: small-multiple histograms as an SVG string
 │   └── results/
 │       ├── build.js                # buildResultsObject — schema v1

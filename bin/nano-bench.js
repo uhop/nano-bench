@@ -31,6 +31,7 @@ import {mulberry32} from '../src/utils/prng.js';
 import {numericAsc} from '../src/utils/numeric-asc.js';
 import {multimodalityP} from '../src/bench/results/series.js';
 import {summaryTable} from '../src/bench/render/summary-table.js';
+import {progressLine} from '../src/bench/render/progress.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {smokeTable} from '../src/bench/render/smoke-table.js';
 import selectFunctions from '../src/bench/select-functions.js';
@@ -228,7 +229,21 @@ await writer.write([
 const results = [],
   stats = [];
 
-const report = () => summaryTable(names, stats, iterations);
+let progress = null;
+const setProgress = (label, done, total, startedAt) => {
+  const remainingMs =
+    startedAt !== undefined && done > 0
+      ? ((performance.now() - startedAt) / done) * (total - done)
+      : undefined;
+  progress = {label, done, total, remainingMs};
+};
+
+// the final frame drops the progress line: the table is all that remains
+const report = state => {
+  const lines = summaryTable(names, stats, iterations);
+  if (state !== 'finished' && progress) lines.push(progressLine(progress));
+  return lines;
+};
 
 updater = new Updater(
   report,
@@ -241,6 +256,11 @@ while (iterations.length < names.length) {
     fn = fns[names[index]];
 
   iterations.push(0);
+  setProgress(
+    `calibrating ${names[index]} (${index + 1} of ${names.length})`,
+    index + 1,
+    names.length
+  );
 
   const batchSize = await findLevel(
     fn,
@@ -265,6 +285,8 @@ while (iterations.length < names.length) {
 // run the benchmark
 
 const summarize = async i => {
+  setProgress(`bootstrapping ${names[i]} (${i + 1} of ${names.length})`, i + 1, names.length);
+  await updater.update();
   stats[i] = {
     ...bootstrapSummary(results[i], {
       alpha: options.alpha,
@@ -278,10 +300,22 @@ const summarize = async i => {
 };
 
 if (!options.parallel && options.order === 'interleaved') {
+  const startedAt = performance.now();
+  const slices = names.length * options.samples,
+    sliceLabel = done =>
+      `sampling: round ${Math.min(options.samples, Math.floor(done / names.length) + 1)} of ${options.samples}`;
+  setProgress(sliceLabel(0), 0, slices, startedAt);
   const collected = await benchmarkRounds(
     names.map(name => fns[name]),
     iterations,
-    {nSeries: options.samples, observe: options.observe ? 'all' : undefined},
+    {
+      nSeries: options.samples,
+      observe: options.observe ? 'all' : undefined,
+      onSample: async done => {
+        setProgress(sliceLabel(done), done, slices, startedAt);
+        await updater.update();
+      }
+    },
     async (_, data) => {
       for (let i = 0; i < data.length; ++i) {
         const provisional = data[i].map(time => time / iterations[i]);
@@ -294,10 +328,27 @@ if (!options.parallel && options.order === 'interleaved') {
   results.push(...collected);
   for (let i = 0; i < results.length; ++i) await summarize(i);
 } else {
+  const startedAt = performance.now(),
+    total = names.length * options.samples,
+    sampling = (i, done) =>
+      setProgress(
+        options.parallel
+          ? `sampling ${names[i]} in parallel (${i + 1} of ${names.length})`
+          : `sampling ${names[i]} (${i + 1} of ${names.length}): ${done} of ${options.samples}`,
+        i * options.samples + done,
+        total,
+        startedAt
+      );
   for (let i = 0; i < iterations.length; ++i) {
+    sampling(i, 0);
+    await updater.update();
     const samples = await benchSeries(fns[names[i]], iterations[i], {
       nSeries: options.samples,
-      observe: options.observe ? names[i] : undefined
+      observe: options.observe ? names[i] : undefined,
+      onSample: async done => {
+        sampling(i, done);
+        await updater.update();
+      }
     });
     normalizeSamples(samples, iterations[i]);
     results.push(samples);

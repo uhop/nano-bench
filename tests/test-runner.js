@@ -145,6 +145,17 @@ test('benchmark()', t => {
   });
 });
 
+test('benchmarkSeries() onSample', async t => {
+  const seen = [];
+  const data = await benchmarkSeries(() => {}, 1, {
+    nSeries: 4,
+    timeout: 0,
+    onSample: done => seen.push(done)
+  });
+  t.equal(data.length, 4);
+  t.deepEqual(seen, [1, 2, 3, 4]);
+});
+
 test('benchmarkRounds()', t => {
   t.test('one sample of every function per round, rotating the start', async t => {
     const calls = [],
@@ -176,6 +187,16 @@ test('benchmarkRounds()', t => {
       [2, 2, 2],
       [3, 3, 3]
     ]);
+  });
+
+  t.test('reports every slice with the total', async t => {
+    const slices = [];
+    await benchmarkRounds([() => {}, () => {}], [1, 1], {
+      nSeries: 3,
+      timeout: 0,
+      onSample: (done, total) => slices.push(`${done}/${total}`)
+    });
+    t.deepEqual(slices, ['1/6', '2/6', '3/6', '4/6', '5/6', '6/6']);
   });
 
   t.test('awaits async functions', async t => {
