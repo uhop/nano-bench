@@ -265,6 +265,14 @@ const setProgress = (label, done, total, startedAt) => {
   progress = {label, done, total, remainingMs};
 };
 
+// the final frame drops the progress line, so it is one line shorter than the frame before
+// it; the updater does not clear the leftover line
+const finishUpdater = async () => {
+  await updater.final();
+  updater = null;
+  if (progress && writer.isTTY) await writer.writeString(CLEAR_EOL);
+};
+
 // the final frame drops the progress line: the table is all that remains
 const report = state => {
   const lines = summaryTable(names, stats, iterations);
@@ -361,8 +369,7 @@ if (options.isolate) {
         '--emit-samples'
       ]);
     } catch (error) {
-      await updater.final();
-      updater = null;
+      await finishUpdater();
       program.error(`${names[i]}: ${error.message}`);
     }
     // a fresh process's first sample pays for JIT warmup
@@ -435,8 +442,7 @@ if (options.isolate) {
   }
 }
 
-await updater.final();
-updater = null;
+await finishUpdater();
 
 {
   const warn = options.emoji ? '⚠' : '!';

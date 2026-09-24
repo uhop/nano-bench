@@ -73,6 +73,14 @@ constant object (`t += o.a + o.b`) measured 528 ps per iteration, one or two CPU
 an array of distinct objects with `data[i % data.length]`. A returned constant is still a
 constant. If a variant measures at one or two cycles per iteration, suspect this first.
 
+**Build string inputs flat.** A string built with `+=` or `concat` is a rope in V8, and
+indexing into a rope (`s[i]`, `charCodeAt`) is slower until something flattens it, usually a
+garbage collection. Then a variant that allocates speeds up the variants measured beside it:
+`bench/bench-substrings.js` measured `using index` at 497–527 ns next to two allocating
+variants, and at 637–643 ns alone in its own process (`--isolate`), where no collection
+flattened its input. Flatten such inputs once at module scope, for example with
+`s = JSON.parse(JSON.stringify(s))`; after that both measured 501–527 ns.
+
 ## Async functions
 
 Benchmark functions can be async. The tool detects thenables and measures time until resolution.

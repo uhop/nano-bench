@@ -33,6 +33,8 @@ const charCodeA = 'A'.charCodeAt(0);
 let sample = '';
 for (let i = 100; i--; sample += String.fromCharCode(Math.floor(Math.random() * 26) + charCodeA));
 sample += [...sample].reverse().join('');
+// `+=` leaves a rope, which a GC flattens only when something allocates; flatten it up front
+sample = JSON.parse(JSON.stringify(sample));
 
 export default {
   'using slice()': n => {

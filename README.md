@@ -153,12 +153,13 @@ benchmark each variant in its own process and compare the saved runs with
 
 ### Measuring in separate processes
 
-Functions measured in one run share a process: its JIT decisions, code layout, and heap. A
-fresh process of the same code can land differently. In one measurement, eight processes of
-one function gave medians up to 22% apart, and 12 of 28 process pairs tested as different. A
-significant difference inside one process can therefore be partly the luck of that process.
-`--isolate` measures each function in its own process, and `--repeat N` runs N processes per
-function:
+Functions measured in one run share a process: its JIT decisions, code layout, and heap, so
+one function can change what another measures. In `bench/bench-substrings.js`, the variants
+that allocate triggered garbage collections that flattened the shared input string, and
+`using index` measured 20% faster beside them than alone. `--isolate` measures each function
+in its own process, and `--repeat N` runs N processes per function to show how much a result
+varies between processes of the same code (under 1% for that function once its input was
+flat):
 
 ```bash
 npx nano-bench bench-strings-concat.js --isolate              # one process per function

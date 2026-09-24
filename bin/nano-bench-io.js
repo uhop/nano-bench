@@ -259,6 +259,14 @@ const pText = p => (p <= 1 / 201 ? 'p < 0.01' : 'p ≈ ' + formatNumber(p, {deci
 
 let progress = null;
 
+// the final frame drops the progress line, so it is one line shorter than the frame before
+// it; the updater does not clear the leftover line
+const finishUpdater = async () => {
+  await updater.final();
+  updater = null;
+  if (progress && writer.isTTY) await writer.writeString(CLEAR_EOL);
+};
+
 // the final frame drops the progress line: the table is all that remains
 const report = state => {
   const lines = ioSummaryTable(names, stats, runCounts);
@@ -411,8 +419,7 @@ for (let i = 0; i < names.length; ++i) {
   }
 }
 
-await updater.final();
-updater = null;
+await finishUpdater();
 
 if (options.metrics) {
   if (metricsOn) {
@@ -482,7 +489,8 @@ if (results.some(samples => samples.length < 100)) {
 for (const {name, note} of notes) {
   await writer.write(c`{{save.bright.yellow}}${warn}{{restore}} ${name ? name + ': ' : ''}${note}`);
 }
-if (notes.length) await writer.write('');
+// the significance block opens with its own blank line
+if (notes.length && results.length < 2) await writer.write('');
 
 let significance = null;
 if (results.length > 1) {
