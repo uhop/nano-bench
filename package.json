@@ -27,7 +27,8 @@
     "test:seq:deno": "deno run -A `tape6-seq --self` --flags FO",
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
-    "js-check": "tsc --project tsconfig.check.json"
+    "js-check": "tsc --project tsconfig.check.json",
+    "view": "node bin/nano-bench-view.js"
   },
   "repository": {
     "type": "git",
