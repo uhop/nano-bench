@@ -74,8 +74,8 @@ A styled table with columns:
 |--------|-------------|
 | name | Function name |
 | median | Median execution time |
-| + | Upper bound of confidence interval (median to high) |
-| − | Lower bound of confidence interval (median to low) |
+| CI + / − | The median's bootstrap confidence interval, as distances from the median: how precisely the median is known; narrows as samples accumulate |
+| spread + / − | The range most samples fall in (bootstrap estimates of the α/2 and 1−α/2 quantiles), as distances from the median: how noisy the runs are |
 | op/s | Operations per second (1000 / median) |
 | batch | Iterations per sample (batch size) |
 
@@ -85,7 +85,7 @@ When two or more functions are measured, a `Significance:` line names the test, 
 
 1. **Find level**: auto-discovers batch size `n` where `fn(n)` takes ≥ `--ms` milliseconds.
 2. **Collect samples**: runs `fn(n)` `--samples` times, collecting timing data (normalized to ms/iteration).
-3. **Bootstrap CI**: seeded bootstrap resampling estimates the median and its percentile confidence interval.
+3. **Bootstrap**: seeded resampling estimates the median, its percentile confidence interval, and the spread of the samples.
 4. **Significance test**: Mann-Whitney U (2 functions) or Kruskal-Wallis H + Conover-Iman pairwise post-hoc (3+ functions), with `--correction` controlling the post-hoc family-wise error rate.
 5. **Optional outputs**: a distribution histogram (`--histogram`) and/or a schema-v1 results file (`--json`).
 
@@ -258,8 +258,8 @@ Remote plugin registration (`PUT /--plugins`) is off. The viewer's own files, `s
 - **Picker** — results on the server (select several to compare) and local files opened through a file input (read by the browser, not uploaded).
 - **Files** — source, creation time, runtime, OS, CPU, and parameters per file.
 - **Warnings** — the comparability banner of `nano-bench-compare` plus the dip-test multimodality flag.
-- **Summary** — median, interval, op/s, and batch per series, recomputed from the samples with the recorded seed; all rows share one time unit.
-- **Distribution** — one histogram row per series on a shared axis, with the median line and the summary interval shaded. Axis modes: **Auto** (logarithmic when the pooled 1st–99th percentile range spans more than 20×, else linear), **Linear**, **Log**, and **Per row** (each series on its own axis: shapes compare, positions do not). Hover a column for its range and count.
+- **Summary** — median, CI, spread, op/s, and batch per series, recomputed from the samples with the recorded seed; all rows share one time unit.
+- **Distribution** — one histogram row per series on a shared axis, with the median line, the median's CI as a bar on top of it, and the spread shaded. Axis modes: **Auto** (logarithmic when the pooled 1st–99th percentile range spans more than 20×, else linear), **Linear**, **Log**, and **Per row** (each series on its own axis: shapes compare, positions do not). Hover a column for its range and count.
 - **Significance** — the test, effect size for pairs, and the pairwise matrix ("faster" or "slower", row against column).
 - **Theme** — Auto (follows the OS), Light, or Dark; saved in `localStorage`.
 
@@ -299,7 +299,7 @@ npx nano-bench-view runs/base.json
       "bodyHash": "sha256:…",
       "reps": 100000,
       "samples": [0.000123, "… ms/iteration, full precision …"],
-      "summary": {"median": 0.000124, "lo": 0.000119, "hi": 0.000131, "mean": 0.000126, "stdDev": 0.0000044, "opsPerSec": 8064516, "ci": "bootstrap-percentile"}
+      "summary": {"median": 0.000124, "lo": 0.000119, "hi": 0.000131, "ciLo": 0.0001236, "ciHi": 0.0001245, "mean": 0.000126, "stdDev": 0.0000044, "opsPerSec": 8064516, "ci": "bootstrap-percentile"}
     }
   ],
   "significance": {"test": "mann-whitney-u", "value": -3.42, "alpha": 0.05, "limit": -1.959, "different": true}
@@ -308,6 +308,7 @@ npx nano-bench-view runs/base.json
 
 - `label`, `environment.host` and `params.iterations` (in place of `ms`) appear only when their flags are used; `significance` is present only when ≥2 series were measured.
 - `params.seed` is always recorded (the `--seed` value or an auto-generated one), making every run reproducible.
+- `summary.lo` / `summary.hi` are the spread (bootstrapped α/2 and 1−α/2 quantiles of the samples); `summary.ciLo` / `summary.ciHi` are the median's bootstrap percentile confidence interval, written since 2026-09-24. Tools recompute both from `samples`, so older files without `ciLo` / `ciHi` still render them.
 - `results[].bodyHash` is `sha256(fn.toString())` — the per-function comparability guard. Blind spots: closures (source text doesn't capture closed-over values) and imported implementations.
 
 ---
@@ -426,9 +427,9 @@ For Deno, `--allow-read` is required and `--allow-hrtime` is recommended. Use `-
 
 ## Statistical methods
 
-### Bootstrap-percentile CI of the median
+### Bootstrap median, CI, and spread
 
-Used by nano-bench to estimate the median and its confidence interval. For each of `--bootstrap` resamples (sampling the timing data with replacement), it computes a weighted quantile — 0.5 for the median, α/2 and 1−α/2 for the interval bounds — and reports the **mean of those quantiles across resamples**. The RNG is `mulberry32` seeded by `--seed` (or an auto-recorded seed), with a distinct per-series stream, so the CI is reproducible exactly on recompute. Before the bootstrap completes, an exact order-statistic estimate is shown and then overwritten.
+`bootstrapSummary` resamples the timing data with replacement `--bootstrap` times and reports three things. The **median** is the mean of the resampled medians. The **CI** (`ciLo`, `ciHi`) is the bootstrap percentile confidence interval of the median: the α/2 and 1−α/2 percentiles of those resampled medians; it narrows roughly with the square root of the sample count, and `nano-bench-io --stable` stops on its width. The **spread** (`lo`, `hi`) is the mean across resamples of the α/2 and 1−α/2 quantiles of the samples: the range most runs fall in, which does not narrow with more samples. The CI reuses the medians already drawn, so adding it left the seeded median and spread unchanged. The RNG is `mulberry32` seeded by `--seed` (or an auto-recorded seed), with a distinct per-series stream, so all three are reproducible exactly on recompute. Before the bootstrap completes, an exact order-statistic estimate of the median and spread is shown and then overwritten.
 
 ### Mann-Whitney U test
 

@@ -8,13 +8,17 @@ import style from 'console-toolkit/style.js';
 import makeTable from 'console-toolkit/table';
 import lineTheme from 'console-toolkit/themes/lines/unicode-rounded.js';
 
+import {ciDeltas, intervalCells} from './summary-table.js';
+
 const bold = s => style.bold.text(s),
   num = s => style.bright.yellow.text(s);
 
 const tableHeader1 = [
     {value: 'name', height: 2, align: 'dc'},
-    {value: 'time', width: 3, align: 'c'},
+    {value: 'median', height: 2, align: 'dc'},
+    {value: 'CI', width: 2, align: 'c'},
     null,
+    {value: 'spread', width: 2, align: 'c'},
     null,
     {value: 'p90', height: 2, align: 'dc'},
     {value: 'p99', height: 2, align: 'dc'},
@@ -23,7 +27,9 @@ const tableHeader1 = [
   ].map(cell => (cell ? {...cell, value: bold(cell.value)} : null)),
   tableHeader2 = [
     null,
-    {value: 'median', align: 'c'},
+    null,
+    {value: '+', align: 'c'},
+    {value: minus, align: 'c'},
     {value: '+', align: 'c'},
     {value: minus, align: 'c'},
     null,
@@ -39,21 +45,21 @@ const makeTableData = (names, stats, runs) => {
       s = stats[i];
     if (s) {
       const format = prepareTimeFormat(
-        [s.median - s.lo, s.median, s.hi - s.median, s.p90, s.p99],
+        [s.median - s.lo, s.median, s.hi - s.median, ...ciDeltas(s), s.p90, s.p99],
         1000
       );
       row.push(
         {value: bold(num(formatTime(s.median, format))), align: 'r'},
-        {value: num('+' + formatTime(s.hi - s.median, format)), align: 'r'},
-        {value: num(minus + formatTime(s.median - s.lo, format)), align: 'r'},
+        ...intervalCells(s.ciLo, s.ciHi, s.median, format),
+        ...intervalCells(s.lo, s.hi, s.median, format),
         {value: num(formatTime(s.p90, format)), align: 'r'},
         {value: num(formatTime(s.p99, format)), align: 'r'},
         {value: num(abbrNumber(1000 / s.median)), align: 'r'}
       );
     } else if (i == stats.length) {
-      row.push({value: 'measuring...', width: 6}, null, null, null, null, null);
+      row.push({value: 'measuring...', width: 8}, null, null, null, null, null, null, null);
     } else {
-      row.push(null, null, null, null, null, null);
+      row.push(null, null, null, null, null, null, null, null);
     }
     row.push(i < runs.length ? {value: num(abbrNumber(runs[i])), align: 'r'} : null);
     tableData.push(row);

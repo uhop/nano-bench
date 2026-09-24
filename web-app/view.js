@@ -77,6 +77,8 @@ const summarySection = (series, format) => {
 <td class="mark">${marks[i]}</td>
 <td class="name">${esc(s.label)}</td>
 <td class="num strong">${esc(formatTime(s.summary.median, format))}</td>
+<td class="num">+${esc(formatTime(s.summary.ciHi - s.summary.median, format))}</td>
+<td class="num">−${esc(formatTime(s.summary.median - s.summary.ciLo, format))}</td>
 <td class="num">+${esc(formatTime(s.summary.hi - s.summary.median, format))}</td>
 <td class="num">−${esc(formatTime(s.summary.median - s.summary.lo, format))}</td>
 <td class="num">${esc(abbrNumber(MS / s.summary.median))}</td>
@@ -86,10 +88,13 @@ const summarySection = (series, format) => {
   return `<section>
 <h2>Summary</h2>
 <div class="scroll"><table class="summary">
-<thead><tr><th></th><th>Name</th><th class="num">Median</th><th class="num">+</th><th class="num">−</th><th class="num">op/s</th><th class="num">Batch</th></tr></thead>
+<thead>
+<tr><th rowspan="2"></th><th rowspan="2">Name</th><th rowspan="2" class="num">Median</th><th colspan="2" class="group">CI</th><th colspan="2" class="group">Spread</th><th rowspan="2" class="num">op/s</th><th rowspan="2" class="num">Batch</th></tr>
+<tr><th class="num">+</th><th class="num">−</th><th class="num">+</th><th class="num">−</th></tr>
+</thead>
 <tbody>${rows.join('')}</tbody>
 </table></div>
-<p class="note">Median time per call and the interval around it: bootstrap estimates of the α/2 and 1 − α/2 quantiles, recomputed from the saved samples. These are the numbers <code>nano-bench-compare</code> prints. All rows share one unit.</p>
+<p class="note">Median time per call. <strong>CI</strong> is the median’s bootstrap confidence interval: how precisely the median is known. <strong>Spread</strong> is the range most runs fall in (bootstrap estimates of the α/2 and 1 − α/2 quantiles): how noisy the runs are. Both are recomputed from the saved samples, as <code>nano-bench-compare</code> does. All rows share one unit.</p>
 </section>`;
 };
 
@@ -209,7 +214,9 @@ const chartSvg = (series, format, log, width) => {
     stats: series.map(({summary: s}) => ({
       median: toAxis(s.median),
       lo: toAxis(s.lo),
-      hi: toAxis(s.hi)
+      hi: toAxis(s.hi),
+      ciLo: toAxis(s.ciLo),
+      ciHi: toAxis(s.ciHi)
     })),
     width,
     ticks: log ? logTicks(hist.lo, hist.hi, Math.max(2, Math.round(width / 110))) : undefined,
@@ -223,7 +230,7 @@ const chartSvg = (series, format, log, width) => {
     },
     describeRow: i => {
       const s = series[i].summary;
-      return `${series[i].label}: median ${fmt(s.median)} (${fmt(s.lo)} … ${fmt(s.hi)})`;
+      return `${series[i].label}: median ${fmt(s.median)}, CI ${fmt(s.ciLo)} … ${fmt(s.ciHi)}, spread ${fmt(s.lo)} … ${fmt(s.hi)}`;
     },
     describeBin: (i, j) => {
       const from = fromAxis(hist.lo + j * hist.binWidth),
@@ -266,7 +273,9 @@ export const renderView = (root, files) => {
     series.flatMap(s => [
       s.summary.median - s.summary.lo,
       s.summary.median,
-      s.summary.hi - s.summary.median
+      s.summary.hi - s.summary.median,
+      s.summary.median - s.summary.ciLo,
+      s.summary.ciHi - s.summary.median
     ]),
     MS
   );
@@ -280,7 +289,7 @@ ${summarySection(series, format)}
 <button type="button" data-axis="auto">Auto</button><button type="button" data-axis="linear">Linear</button><button type="button" data-axis="log">Log</button><button type="button" data-axis="rows">Per row</button>
 </div></div>
 <div class="chart"></div>
-<p class="note">Each row is a histogram of per-call times <span class="axis-note"></span>. The shaded band spans the summary’s interval; the vertical line is the median. Counts at the edges are samples outside the 1st–99th percentile range. Hover a column for its range and count.</p>
+<p class="note">Each row is a histogram of per-call times <span class="axis-note"></span>. The shaded band is the spread; the vertical line is the median, and the dark bar on top of it is the median’s CI (drawn at least 4&nbsp;px wide). Counts at the edges are samples outside the 1st–99th percentile range. Hover a column for its range and count.</p>
 </section>
 ${significanceSection(series, files.length, {alpha, correction})}`;
 

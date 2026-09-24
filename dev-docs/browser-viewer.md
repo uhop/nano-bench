@@ -69,8 +69,8 @@ sample files in `bench/` (six invocations checked, including `--pooled -v` and `
 
 ### Chart: small multiples on one axis
 
-One histogram row per series, all on one time axis, with the median as a line and the
-summary interval as a shaded band. Rows are labeled, so every row uses one color and identity
+One histogram row per series, all on one time axis, with the median as a line, the
+median's CI as a bar on top of it, and the spread as a shaded band. Rows are labeled, so every row uses one color and identity
 never depends on hue. A hover target covers each bin's full row height and carries its range
 and count.
 
@@ -96,11 +96,11 @@ the dataviz reference palette, redefined for dark under `prefers-color-scheme` a
 
 ## Open
 
-- **The interval's name.** The docs call the summary's `lo`&ndash;`hi` a bootstrap confidence
-  interval of the median, but `bootstrapSummary` averages bootstrapped &alpha;/2 and
-  1&nbsp;&minus;&nbsp;&alpha;/2 quantiles of the samples, which estimates the central range of
-  the runs. The viewer's captions describe what is computed; the naming question is on the
-  queue.
+- **The interval's name** &mdash; resolved 2026-09-24. The summary's `lo`&ndash;`hi` turned
+  out to be the spread of the runs, not the median's confidence interval the docs promised.
+  `bootstrapSummary` now also returns `ciLo`&ndash;`ciHi` (the percentile CI of the resampled
+  medians), every table shows both, and the chart draws the CI as a bar on the median line
+  over the shaded spread.
 - **A standalone server package.** The plugin mechanism was enough here. Splitting tape-six's
   server into a generic core plus test plugins would retire the gist and remove the
   tape-six peer; see the 2026-09-24 entry in the vault decisions.

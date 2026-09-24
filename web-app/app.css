@@ -78,6 +78,11 @@ code {
   border-radius: 8px;
 }
 
+th.group {
+  text-align: center;
+  border-bottom: 1px solid var(--grid);
+}
+
 .summary .strong {
   font-weight: 600;
 }
@@ -113,8 +118,12 @@ td.name {
   stroke-width: 1;
 }
 
-.dist .ci {
+.dist .spread {
   fill: var(--series-wash);
+}
+
+.dist .median-ci {
+  fill: var(--ink);
 }
 
 .dist .bar {

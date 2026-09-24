@@ -127,10 +127,19 @@ export const bootstrapSummary = (
   data,
   {alpha = 0.05, bootstrap: n = 1000, random = Math.random} = {}
 ) => {
-  const percentile = weight => sample => getWeightedValue(sample.sort(numericAsc), weight);
+  const percentile = weight => sample => getWeightedValue(sample.sort(numericAsc), weight),
+    medians = bootstrap(percentile(0.5), data, n, random),
+    median = mean(medians),
+    lo = mean(bootstrap(percentile(alpha / 2), data, n, random)),
+    hi = mean(bootstrap(percentile(1 - alpha / 2), data, n, random));
+  // lo/hi: the spread of the runs; ciLo/ciHi: the median's percentile CI (Efron),
+  // taken from the medians already drawn so the seeded stream is unchanged
+  medians.sort(numericAsc);
   return {
-    median: mean(bootstrap(percentile(0.5), data, n, random)),
-    lo: mean(bootstrap(percentile(alpha / 2), data, n, random)),
-    hi: mean(bootstrap(percentile(1 - alpha / 2), data, n, random))
+    median,
+    lo,
+    hi,
+    ciLo: getWeightedValue(medians, alpha / 2),
+    ciHi: getWeightedValue(medians, 1 - alpha / 2)
   };
 };

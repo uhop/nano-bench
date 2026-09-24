@@ -75,7 +75,8 @@ test('distributionSvg()', t => {
     const nonEmpty = hist.series.flatMap(s => s.counts).filter(c => c > 0).length;
     t.equal(count(svg, /class="bar"/g), nonEmpty, 'a bar for every non-empty bin');
     t.equal(count(svg, /class="median"/g), 2);
-    t.equal(count(svg, /class="ci"/g), 2);
+    t.equal(count(svg, /class="spread"/g), 2);
+    t.equal(count(svg, /class="median-ci"/g), 0, 'no CI bar without ciLo/ciHi');
   });
 
   t.test('names and tooltips are escaped', t => {

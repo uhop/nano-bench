@@ -270,7 +270,7 @@ const ciWidth = samples => {
     bootstrap: options.bootstrap,
     random: mulberry32(seed)
   });
-  return (100 * (s.hi - s.lo)) / s.median;
+  return (100 * (s.ciHi - s.ciLo)) / s.median;
 };
 
 for (let i = 0; i < names.length; ++i) {
@@ -498,6 +498,8 @@ if (options.json) {
         median: stats[i].median,
         lo: stats[i].lo,
         hi: stats[i].hi,
+        ciLo: stats[i].ciLo,
+        ciHi: stats[i].ciHi,
         p90: stats[i].p90,
         p99: stats[i].p99,
         mean: mean(results[i]),

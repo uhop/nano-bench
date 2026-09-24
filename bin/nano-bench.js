@@ -333,6 +333,8 @@ if (options.json) {
         median: stats[i].median,
         lo: stats[i].lo,
         hi: stats[i].hi,
+        ciLo: stats[i].ciLo,
+        ciHi: stats[i].ciHi,
         mean: mean(results[i]),
         stdDev: stdDev(results[i]),
         opsPerSec: 1000 / stats[i].median,

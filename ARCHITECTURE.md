@@ -34,10 +34,10 @@ src/                          # Internal source (shipped via npm)
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
 │   ├── histogram.js                # Sample binning: computeHistograms, binCount, percentile
 │   ├── render/
-│   │   ├── summary-table.js        # The median/CI/ops summary table
-│   │   ├── io-summary-table.js     # The macro variant: median/CI + p90/p99 + runs
+│   │   ├── summary-table.js        # The median / CI / spread / ops summary table
+│   │   ├── io-summary-table.js     # The macro variant: median / CI / spread + p90/p99 + runs
 │   │   ├── metrics-table.js        # System-metric medians per function (--metrics)
-│   │   ├── clusters-table.js       # Per-cluster weight/median/CI/range (--clusters)
+│   │   ├── clusters-table.js       # Per-cluster weight / median / CI / spread / range (--clusters)
 │   │   ├── smoke-table.js          # The --smoke report (shared by bench & io)
 │   │   ├── significance-table.js   # Significance header + N×N matrix (shared by bench & compare)
 │   │   ├── histogram-chart.js      # Terminal distribution charts (columns ridgeline / rotated bars)
@@ -126,7 +126,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 
 1. **Find level** (`findLevel`) — auto-discovers the batch size `n` where a single call takes ≥ threshold ms.
 2. **Collect samples** (`benchmarkSeries`) — runs the function `nSeries` times, collecting timing data, normalized to ms/iteration.
-3. **Bootstrap CI** — `bootstrapSummary` resamples (`bootstrap()` + `getWeightedValue()`) to estimate the median and its percentile confidence interval, seeded by `--seed` (or an auto-recorded seed) via `mulberry32` for reproducibility.
+3. **Bootstrap** — `bootstrapSummary` resamples (`bootstrap()` + `getWeightedValue()`) to estimate the median, its percentile confidence interval (`ciLo`/`ciHi`, from the resampled medians), and the spread of the runs (`lo`/`hi`, the mean resampled α/2 and 1−α/2 quantiles), seeded by `--seed` (or an auto-recorded seed) via `mulberry32` for reproducibility.
 4. **Significance testing** (`computeSignificance`) — Mann-Whitney U (2 functions) or Kruskal-Wallis H + Conover-Iman pairwise post-hoc (3+ functions); the post-hoc family-wise error rate is controlled by `--correction` (none/Holm/Bonferroni, default Holm).
 5. **Output** — styled summary table + significance header/matrix via `console-toolkit`; optional per-function distribution histogram (`--histogram`); optional schema-v1 results file (`--json`). The run then ends with an explicit `process.exit(0)`, so a module holding live handles (servers, watchers) can't keep a finished run alive.
 
@@ -164,7 +164,7 @@ Steps 2 and 4 live in `src/bench/results/series.js`, so the browser viewer compu
 
 - **ESM-only**: All files use `import`/`export`. The package uses `"type": "module"`.
 - **No build step**: Source JS is shipped directly. No TypeScript.
-- **Nonparametric statistics**: No normal-distribution assumptions. Uses bootstrap resampling, quantile-based CI, and rank-based significance tests.
+- **Nonparametric statistics**: No normal-distribution assumptions. Uses bootstrap resampling (a percentile CI of the median plus a quantile spread), and rank-based significance tests.
 - **Online algorithms**: `StatCounter` and `MedianCounter` use constant-memory streaming algorithms for indefinite monitoring.
 - **Async-aware**: `benchmark()` and `findLevel()` handle both sync and thenable (async) benchmark functions.
 

@@ -54,7 +54,7 @@ const truncate = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
  * @param {object} options
  * @param {string[]} options.names
  * @param {ReturnType<typeof import('../histogram.js').computeHistograms>} options.hist
- * @param {{median: number, lo: number, hi: number}[]} options.stats
+ * @param {{median: number, lo: number, hi: number, ciLo?: number, ciHi?: number}[]} options.stats
  * @param {(values: number[]) => string[]} options.formatTicks
  * @param {(series: number, bin: number) => string} options.describeBin
  * @param {(series: number) => string} [options.describeRow]
@@ -118,7 +118,7 @@ export const distributionSvg = ({
       const a = round(X(st.lo)),
         b = round(X(st.hi));
       out.push(
-        `<rect class="ci" x="${a}" y="${top}" width="${round(Math.max(1, b - a))}" height="${rowHeight}"/>`
+        `<rect class="spread" x="${a}" y="${top}" width="${round(Math.max(1, b - a))}" height="${rowHeight}"/>`
       );
     }
     for (let j = 0; j < k; ++j) {
@@ -139,6 +139,13 @@ export const distributionSvg = ({
     if (st) {
       const m = round(X(st.median));
       out.push(`<line class="median" x1="${m}" y1="${top}" x2="${m}" y2="${base}"/>`);
+      if (typeof st.ciLo == 'number' && typeof st.ciHi == 'number') {
+        const a = X(st.ciLo),
+          w = Math.max(4, X(st.ciHi) - a);
+        out.push(
+          `<rect class="median-ci" x="${round(Math.min(a, m - w / 2))}" y="${top}" width="${round(w)}" height="4" rx="2"/>`
+        );
+      }
     }
     if (s.below)
       out.push(

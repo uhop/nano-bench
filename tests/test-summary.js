@@ -32,7 +32,27 @@ test('bootstrapSummary()', t => {
     t.ok(s.lo <= s.median && s.median <= s.hi, 'lo <= median <= hi');
     t.ok(Number.isFinite(s.median) && Number.isFinite(s.lo) && Number.isFinite(s.hi), 'finite');
   });
-  t.test('pinned CI for a fixed seed (bit-identical across runtimes)', t => {
+  t.test('the median CI brackets the median inside the spread', t => {
+    const s = bootstrapSummary(data, {bootstrap: 200, random: mulberry32(7)});
+    t.ok(s.ciLo <= s.median && s.median <= s.ciHi, 'ciLo <= median <= ciHi');
+    t.ok(s.lo < s.ciLo && s.ciHi < s.hi, 'the CI is inside the spread');
+  });
+  t.test('the median CI narrows with more runs; the spread does not', t => {
+    const random = mulberry32(99),
+      noisy = n => Array.from({length: n}, () => 100 + 20 * random()),
+      width = (s, a, b) => (s[b] - s[a]) / s.median,
+      small = bootstrapSummary(noisy(25), {bootstrap: 400, random: mulberry32(1)}),
+      large = bootstrapSummary(noisy(1600), {bootstrap: 400, random: mulberry32(1)});
+    t.ok(
+      width(large, 'ciLo', 'ciHi') < width(small, 'ciLo', 'ciHi') / 4,
+      '64× the runs: CI at least 4× narrower (√64 = 8)'
+    );
+    t.ok(
+      width(large, 'lo', 'hi') > width(small, 'lo', 'hi') * 0.7,
+      'the spread stays roughly the width of the data'
+    );
+  });
+  t.test('pinned summary for a fixed seed (bit-identical across runtimes)', t => {
     const s = bootstrapSummary(ramp(20), {alpha: 0.05, bootstrap: 200, random: mulberry32(12345)});
     t.equal(s.median, 10.829999999999993, 'median');
     // re-pinned: the old 1.4499999999999955 was the sample minimum, not the 2.5th percentile
