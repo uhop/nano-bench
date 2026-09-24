@@ -39,6 +39,8 @@ Measurement:
 - `--min-iterations <n>` — minimum iterations per sample (default: 1).
 - `-s, --samples <samples>` — number of samples to collect (default: 100).
 - `-p, --parallel` — start all samples of a function at once, to measure an async operation with others in flight; it changes what is measured. Conflicts with `--order`.
+- `--isolate` — measure each function in its own child process (same runtime; Deno gets `run -A`). The parent calibrates once and passes `-i` to every child; each child runs `--samples` + 1 samples and the first is dropped (JIT warmup). Conflicts with `--parallel`.
+- `--repeat <n>` — with `--isolate`: processes per function (default 1), started in `--order` order (interleaved rotates the first function per round). With n > 1 the significance test compares per-process medians and a line reports the fastest function in each round of processes; per-process medians of one function were measured up to 22% apart, so a within-process verdict can be process luck.
 - `--order <order>` — `interleaved` (default): one sample of each function per round, rotating which goes first, so drift over the run lands on every function alike; `sequential`: each function's samples in turn (the pre-2026-09-24 order). Recorded as `params.order` (`interleaved`, `sequential`, or `parallel`).
 
 Statistics:
@@ -314,6 +316,7 @@ npx nano-bench-view runs/base.json
 - `label`, `environment.host` and `params.iterations` (in place of `ms`) appear only when their flags are used; `significance` is present only when ≥2 series were measured.
 - `params.seed` is always recorded (the `--seed` value or an auto-generated one), making every run reproducible.
 - `summary.lo` / `summary.hi` are the spread (bootstrapped α/2 and 1−α/2 quantiles of the samples); `summary.ciLo` / `summary.ciHi` are the median's bootstrap percentile confidence interval, written since 2026-09-24. Tools recompute both from `samples`, so older files without `ciLo` / `ciHi` still render them.
+- With `--isolate`: `params.isolate: true`, `params.repeat`, and `results[].processSizes` (sample counts per process, in round order; `samples` is their concatenation). With `repeat` > 1, `significance.unit` is `"process-medians"`, and `nano-bench-compare` and the viewer test per-process medians whenever every compared series has more than one process.
 - `results[].bodyHash` is `sha256(fn.toString())` — the per-function comparability guard. Blind spots: closures (source text doesn't capture closed-over values) and imported implementations.
 
 ---

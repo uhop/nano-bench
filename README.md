@@ -151,6 +151,26 @@ Functions measured in one run also share JIT and heap state. To confirm a small 
 benchmark each variant in its own process and compare the saved runs with
 `nano-bench-compare`.
 
+### Measuring in separate processes
+
+Functions measured in one run share a process: its JIT decisions, code layout, and heap. A
+fresh process of the same code can land differently. In one measurement, eight processes of
+one function gave medians up to 22% apart, and 12 of 28 process pairs tested as different. A
+significant difference inside one process can therefore be partly the luck of that process.
+`--isolate` measures each function in its own process, and `--repeat N` runs N processes per
+function:
+
+```bash
+npx nano-bench bench-strings-concat.js --isolate              # one process per function
+npx nano-bench bench-strings-concat.js --isolate --repeat 5   # five per function
+```
+
+The parent calibrates once and gives every process the same batch size, and each process
+drops its first sample, which pays for JIT warmup. With `--repeat` above 1, the significance
+test compares the per-process medians, and a line reports which function was fastest in each
+round of processes. `--order` sets the order the processes start in (interleaved by default).
+Each extra process costs roughly its startup (about 0.15 seconds on Node.js) plus its samples.
+
 ### Saving and comparing results
 
 Write a run to a JSON file with `--json`, then view or compare saved runs with

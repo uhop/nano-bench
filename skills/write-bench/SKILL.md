@@ -158,6 +158,7 @@ a **baseline** — its stats are reported with no significance test.
 | More precision               | `-s, --samples` (100), `-b, --bootstrap` (1000) | More samples tighten the test; more bootstrap resamples smooth the CI.  |
 | Stricter/looser significance | `-a, --alpha` (0.05)                            | 0.01 = 99% CI and a stricter test.                                      |
 | Sample order                 | `--order` (interleaved)                         | `sequential` measures each function in turn; interleaved is fairer.     |
+| Process isolation            | `--isolate`, `--repeat N`                       | Each function in its own processes; N > 1 tests per-process medians.    |
 | Async under concurrency      | `-p, --parallel`                                | Starts all samples at once; measures a different thing.                 |
 | Multiple-comparison control  | `--correction` (holm)                           | See below.                                                              |
 | See the test internals       | `-v, --verbose`                                 | Prints statistic, critical value, per-comparison α.                     |
@@ -220,8 +221,10 @@ post-hoc method and correction:
 
 **Significance is within one process.** JIT decisions, code layout, and heap state are
 shared by every variant in a run and differ between runs, and the test can't see that. Before
-trusting a small difference, repeat it in fresh processes (`bench/run-all.sh 5`) and check
-that the direction holds; a direction that flips between processes is not a result.
+trusting a small difference, measure each function in its own processes with
+`--isolate --repeat 5`: the test then compares per-process medians, and a line reports which
+function was fastest in each round of processes. A direction that flips between processes is
+not a result.
 
 **A multimodal warning** (`⚠ name: distribution looks multimodal`) means the samples form
 two or more clumps, usually because some batches paid a garbage collection or a slow path

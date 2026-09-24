@@ -2,6 +2,7 @@ import test from 'tape-six';
 
 import {
   buildSeries,
+  comparisonArrays,
   fileTag,
   multimodalityP,
   resultsWarnings
@@ -107,4 +108,31 @@ test('multimodalityP()', t => {
     bimodal = [...samples(1, 50), ...samples(3, 50)].sort((a, b) => a - b);
   t.ok(multimodalityP(bimodal, 1, 0) < 0.05, 'two separated clumps are flagged');
   t.equal(multimodalityP(unimodal, 1, 0), multimodalityP(unimodal, 1, 0), 'seeded: repeatable');
+});
+
+test('comparisonArrays()', t => {
+  const pooled = [1, 2, 3, 10, 11, 12];
+  t.deepEqual(
+    comparisonArrays([
+      {samples: pooled, processSizes: [3, 3]},
+      {samples: pooled, processSizes: [2, 4]}
+    ]),
+    {
+      arrays: [
+        [2, 11],
+        [1.5, 10.5]
+      ],
+      unit: 'process-medians'
+    },
+    'several processes each: per-process medians'
+  );
+  t.equal(
+    comparisonArrays([
+      {samples: pooled, processSizes: [6]},
+      {samples: pooled, processSizes: [3, 3]}
+    ]).unit,
+    'samples',
+    'a single-process series keeps the sample test'
+  );
+  t.equal(comparisonArrays([{samples: pooled}, {samples: pooled}]).unit, 'samples', 'older files');
 });

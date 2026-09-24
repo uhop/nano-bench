@@ -24,7 +24,8 @@ import {
   benchmarkSeriesPar,
   benchmarkRounds
 } from '../src/bench/runner.js';
-import {exactSummary, bootstrapSummary, mean, stdDev} from '../src/stats.js';
+import {exactSummary, bootstrapSummary, mean, stdDev, getWeightedValue} from '../src/stats.js';
+import {runChild, isolationPlan, fastestPerRound} from '../src/bench/isolate.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {corrections} from '../src/significance/correction.js';
 import {mulberry32} from '../src/utils/prng.js';
@@ -95,6 +96,11 @@ program
       .default('interleaved')
       .conflicts('parallel')
   )
+  .addOption(
+    new Option('--isolate', 'measure each function in its own process').conflicts('parallel')
+  )
+  .option('--repeat <n>', 'with --isolate: processes per function', toInt, 1)
+  .addOption(new Option('--emit-samples', 'internal: child mode of --isolate').hideHelp())
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
   .option('--seed <seed>', 'bootstrap RNG seed (32-bit integer; default: random)', toInt)
   .option('--json <file>', 'write results to a JSON file')
@@ -138,6 +144,8 @@ if (options.alpha <= 0 || options.alpha >= 1)
   program.error('The significance level must be > 0 and < 1');
 if (options.samples < 1) program.error('The number of samples must be >= 1');
 if (options.bootstrap < 1) program.error('The number of bootstrap samples must be >= 1');
+if (options.repeat < 1) program.error('The number of processes per function must be >= 1');
+if (options.repeat > 1 && !options.isolate) program.error('--repeat needs --isolate');
 
 // open the file
 
@@ -158,6 +166,18 @@ try {
   names = selectFunctions(fns, args.slice(1));
 } catch (error) {
   program.error(error.message);
+}
+
+if (options.emitSamples) {
+  if (!(options.iterations > 0) || names.length !== 1)
+    program.error('--emit-samples is internal to --isolate: it needs -i and one function');
+  // benchmarkRounds keeps time order, so the parent knows which sample came first
+  const [samples] = await benchmarkRounds([fns[names[0]]], [options.iterations], {
+    nSeries: options.samples
+  });
+  const out = JSON.stringify(samples.map(time => time / options.iterations)) + '\n';
+  await new Promise(resolve => process.stdout.write(out, () => resolve(undefined)));
+  process.exit(0);
 }
 
 // set up the writer and the updater
@@ -223,6 +243,13 @@ await writer.write([
         options.ms * 2 * options.samples,
         prepareTimeFormat([options.ms * 2 * options.samples], 1000)
       )}{{restore}} per function)`,
+  ...(options.isolate
+    ? [
+        c`Isolated: each function in its own process, {{save.bright.yellow}}${formatInteger(
+          options.repeat
+        )}{{restore}} per function (${options.order}); the first sample of each process is dropped`
+      ]
+    : []),
   ''
 ]);
 
@@ -299,7 +326,56 @@ const summarize = async i => {
   await sleep(5);
 };
 
-if (!options.parallel && options.order === 'interleaved') {
+const median = samples => getWeightedValue(samples.slice().sort(numericAsc), 0.5);
+
+// perProcess[fn][round]: the samples of one child process, first sample dropped
+let perProcess = null;
+
+if (options.isolate) {
+  const script = fileURLToPath(import.meta.url),
+    file = fileURLToPath(fileName),
+    plan = isolationPlan(names.length, options.repeat, options.order),
+    startedAt = performance.now();
+  perProcess = names.map(() => []);
+  for (let p = 0; p < plan.length; ++p) {
+    const {fn: i, round} = plan[p];
+    setProgress(
+      `process ${p + 1} of ${plan.length}: ${names[i]}` +
+        (options.repeat > 1 ? ` (round ${round + 1} of ${options.repeat})` : ''),
+      p,
+      plan.length,
+      startedAt
+    );
+    await updater.update();
+    let samples;
+    try {
+      samples = await runChild(script, [
+        file,
+        names[i],
+        '-e',
+        options.export,
+        '-i',
+        String(iterations[i]),
+        '-s',
+        String(options.samples + 1),
+        '--emit-samples'
+      ]);
+    } catch (error) {
+      await updater.final();
+      updater = null;
+      program.error(`${names[i]}: ${error.message}`);
+    }
+    // a fresh process's first sample pays for JIT warmup
+    perProcess[i][round] = samples.slice(1);
+    stats[i] = {
+      ...exactSummary(perProcess[i].filter(Boolean).flat(), {alpha: options.alpha}),
+      bootstrap: false
+    };
+    await updater.update();
+  }
+  results.push(...perProcess.map(list => list.flat()));
+  for (let i = 0; i < results.length; ++i) await summarize(i);
+} else if (!options.parallel && options.order === 'interleaved') {
   const startedAt = performance.now();
   const slices = names.length * options.samples,
     sliceLabel = done =>
@@ -376,15 +452,32 @@ updater = null;
 
 let significance = null;
 if (results.length > 1) {
-  const testResult = computeSignificance(results, options.alpha, options.correction),
+  // with several processes per function the process is the unit: pooling their samples
+  // would treat a per-process offset as independent evidence
+  const byProcess = perProcess && options.repeat > 1,
+    tested = byProcess ? perProcess.map(list => list.map(median)) : results,
+    testResult = computeSignificance(tested, options.alpha, options.correction),
     matrix = significanceMatrix(testResult);
-  significance = testResult;
+  significance = byProcess ? {...testResult, unit: 'process-medians'} : testResult;
+  if (byProcess) {
+    const wins = fastestPerRound(tested),
+      tally = names
+        .map((name, i) => [name, wins[i]])
+        .filter(([, count]) => count > 0)
+        .map(([name, count]) => `${name} ${count} of ${options.repeat}`)
+        .join(', ');
+    await writer.write([
+      '',
+      c`{{save.bold}}Processes:{{restore}} ${options.repeat} per function; the test below compares per-process medians`,
+      c`Fastest median in each round of processes: ${tally}`
+    ]);
+  }
   writeSignificance(writer, {
     testResult,
     matrix,
     stats,
     names,
-    results,
+    results: tested,
     alpha: options.alpha,
     correction: options.correction,
     verbose: options.verbose,
@@ -425,13 +518,15 @@ if (options.json) {
       alpha: options.alpha,
       correction: options.correction,
       parallel: Boolean(options.parallel),
-      order: options.parallel ? 'parallel' : options.order
+      order: options.parallel ? 'parallel' : options.order,
+      ...(options.isolate ? {isolate: true, repeat: options.repeat} : {})
     },
     series: names.map((name, i) => ({
       name,
       bodyHash: bodyHash(fns[name]),
       reps: iterations[i],
       samples: results[i],
+      ...(perProcess ? {processSizes: perProcess[i].map(list => list.length)} : {}),
       summary: {
         median: stats[i].median,
         lo: stats[i].lo,

@@ -31,6 +31,7 @@ src/                          # Internal source (shipped via npm)
 │   ├── proc-metrics.js             # Linux /proc/[pid]/{io,status} readings for spawned children
 │   ├── outlier-notes.js            # Modified-z slow-side outliers: caching vs interference notes
 │   ├── warmup-detect.js            # Windowed MW screen: size the leading slow (warmup) segment
+│   ├── isolate.js                  # --isolate: runChild, isolationPlan, fastestPerRound
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
 │   ├── histogram.js                # Sample binning: computeHistograms, binCount, percentile
 │   ├── render/
@@ -126,7 +127,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 ### nano-bench pipeline
 
 1. **Find level** (`findLevel`) — auto-discovers the batch size `n` where a single call takes ≥ threshold ms.
-2. **Collect samples** — by default `benchmarkRounds` takes one sample of every function per round, rotating which goes first, so drift over the run lands on all functions alike; the table fills in from the first round. `--order sequential` runs `benchmarkSeries` per function in turn; `-p` runs `benchmarkSeriesPar`. Timing data is normalized to ms/iteration.
+2. **Collect samples** — with `--isolate`, the parent spawns one child per function and repetition (`isolate.js`; the child is `nano-bench --emit-samples -i <n> -s <samples+1>`), drops each child's first sample, and pools the rest; with `--repeat` above 1 the test later runs on per-process medians (`comparisonArrays`). Otherwise, by default `benchmarkRounds` takes one sample of every function per round, rotating which goes first, so drift over the run lands on all functions alike; the table fills in from the first round. `--order sequential` runs `benchmarkSeries` per function in turn; `-p` runs `benchmarkSeriesPar`. Timing data is normalized to ms/iteration.
 3. **Bootstrap** — `bootstrapSummary` resamples (`bootstrap()` + `getWeightedValue()`) to estimate the median, its percentile confidence interval (`ciLo`/`ciHi`, from the resampled medians), and the spread of the runs (`lo`/`hi`, the mean resampled α/2 and 1−α/2 quantiles), seeded by `--seed` (or an auto-recorded seed) via `mulberry32` for reproducibility.
 4. **Significance testing** (`computeSignificance`) — Mann-Whitney U (2 functions) or Kruskal-Wallis H + Conover-Iman pairwise post-hoc (3+ functions); the post-hoc family-wise error rate is controlled by `--correction` (none/Holm/Bonferroni, default Holm).
 5. **Output** — styled summary table + significance header/matrix via `console-toolkit`; optional per-function distribution histogram (`--histogram`); optional schema-v1 results file (`--json`). The run then ends with an explicit `process.exit(0)`, so a module holding live handles (servers, watchers) can't keep a finished run alive.

@@ -24,7 +24,12 @@ import {
 } from '../src/bench/render/metrics-table.js';
 import {writeSignificance} from '../src/bench/render/significance-table.js';
 import {loadResults} from '../src/bench/results/load.js';
-import {buildSeries, resultsWarnings, multimodalityP} from '../src/bench/results/series.js';
+import {
+  buildSeries,
+  comparisonArrays,
+  resultsWarnings,
+  multimodalityP
+} from '../src/bench/results/series.js';
 import {planComparison} from '../src/bench/pair-series.js';
 import {computeHistograms, binCount} from '../src/bench/histogram.js';
 import {writeHistograms} from '../src/bench/render/histogram-chart.js';
@@ -154,10 +159,14 @@ const pText = p => (p <= 1 / 201 ? 'p < 0.01' : 'p ≈ ' + formatNumber(p, {deci
 
 const renderBlock = (members, name) => {
   if (members.length < 2) return;
-  const arrays = members.map(s => s.samples),
+  const {arrays, unit} = comparisonArrays(members),
     testResult = computeSignificance(arrays, alpha, correction),
     matrix = significanceMatrix(testResult);
   if (name) writer.writeString(c`\n{{save.bold.cyan}}${name}{{restore}}\n`);
+  if (unit === 'process-medians')
+    writer.writeString(
+      c`\n{{save.bold}}Processes:{{restore}} the test compares per-process medians (${arrays.map(a => a.length).join(' vs ')})\n`
+    );
   writeSignificance(writer, {
     testResult,
     matrix,

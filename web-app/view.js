@@ -1,5 +1,6 @@
 import {
   buildSeries,
+  comparisonArrays,
   resultsWarnings,
   multimodalityP,
   fileTag
@@ -107,7 +108,7 @@ const differenceText = (a, b) => {
 };
 
 const significanceBlock = (members, name, {alpha, correction}) => {
-  const arrays = members.map(s => s.samples),
+  const {arrays, unit} = comparisonArrays(members),
     test = computeSignificance(arrays, alpha, correction),
     matrix = significanceMatrix(test),
     isPair = members.length === 2,
@@ -118,6 +119,10 @@ const significanceBlock = (members, name, {alpha, correction}) => {
 
   out.push(`<div class="block">`);
   if (name) out.push(`<h3>${esc(name)}</h3>`);
+  if (unit === 'process-medians')
+    out.push(
+      `<p>Each function was measured in several processes, so the test compares per-process medians (${arrays.map(a => a.length).join(' vs ')}).</p>`
+    );
   out.push(
     `<p>${isPair ? 'Mann–Whitney U test (two-sided, tie-corrected)' : 'Kruskal–Wallis H test'}, α = ${esc(alpha)}${
       isPair

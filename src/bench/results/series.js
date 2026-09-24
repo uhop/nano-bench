@@ -1,4 +1,5 @@
-import {bootstrapSummary} from '../../stats.js';
+import {bootstrapSummary, getWeightedValue} from '../../stats.js';
+import {numericAsc} from '../../utils/numeric-asc.js';
 import dipTest from '../../stats/dip.js';
 import {mulberry32} from '../../utils/prng.js';
 import {diffEnvironments} from './env-diff.js';
@@ -40,6 +41,7 @@ export const buildSeries = (files, {alpha}) => {
         bodyHash: s.bodyHash,
         samples: s.samples,
         metrics: Array.isArray(s.metrics) ? s.metrics : null,
+        processSizes: Array.isArray(s.processSizes) ? s.processSizes : null,
         metricsKind: f.results.params.metrics,
         summary: bootstrapSummary(s.samples, {alpha, bootstrap, random})
       });
@@ -47,6 +49,29 @@ export const buildSeries = (files, {alpha}) => {
   }
   return series;
 };
+
+const median = samples => getWeightedValue(samples.slice().sort(numericAsc), 0.5);
+
+const splitProcesses = s => {
+  const parts = [];
+  let start = 0;
+  for (const size of s.processSizes) {
+    parts.push(s.samples.slice(start, start + size));
+    start += size;
+  }
+  return parts;
+};
+
+/**
+ * What a significance test compares: per-process medians when every series was measured in
+ * more than one process (`nano-bench --isolate --repeat N`), the samples otherwise.
+ * @param {{samples: number[], processSizes?: number[] | null}[]} members
+ * @returns {{arrays: number[][], unit: 'samples' | 'process-medians'}}
+ */
+export const comparisonArrays = members =>
+  members.every(s => s.processSizes && s.processSizes.length > 1)
+    ? {arrays: members.map(s => splitProcesses(s).map(median)), unit: 'process-medians'}
+    : {arrays: members.map(s => s.samples), unit: 'samples'};
 
 export const resultsWarnings = files => {
   const warnings = [];
