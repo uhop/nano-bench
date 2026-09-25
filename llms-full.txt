@@ -255,6 +255,11 @@ nano-bench-view [options] [files...]
 - `/` — redirects to the viewer at `/--nano-bench/web-app/`.
 - `/--nano-bench/web-app/?view=a.json&view=b.json` — view one file, or compare several (paired by name, as in `nano-bench-compare`).
 - `/--nano-bench/results` — JSON list of results files under the root (`path`, `size`, `mtime`, `label`, `createdAt`, `source`, `series`, `runtime`, `host`); dot-folders and `node_modules` are skipped, and a file qualifies when its first 512 bytes carry `schemaVersion: 1` and `tool: "nano-benchmark"`.
+- `/--nano-bench/web-app/?run=bench/bench-x.js` — run a bench file in the browser (see **Browser runner**); optional `ms`, `samples`, and `export` query parameters.
+- `/--nano-bench/benches` — JSON list of bench files under the root (`path`, `size`, `mtime`): `bench[-_.]*.js` and `*.bench.js` (`.mjs` too), skipping dot-folders and `node_modules`.
+- `/--nano-bench/save?name=<name>` — `POST` a results JSON body to write it to `nano-bench-results/<name>.json` under the root. The reply is `{path}`. A name collision adds `-2`, `-3`, and so on, so no file is overwritten. Anything but schema v1 from `nano-benchmark` is refused with `400`; the body is capped at 50 MB.
+- `/--nano-bench/frame?file=<url>&fn=<name>` — the benchmark iframe page, with the root's tape6 import map inlined so bench files can use bare imports.
+- `/--nano-bench/meta` — `{name, version}` of the package.
 - `/?list` and any folder URL without `index.html` — an HTML directory listing; JSON files get a **view** link.
 - Any other path — the file under the root, served by tape-six's static handler.
 
@@ -269,6 +274,14 @@ Remote plugin registration (`PUT /--plugins`) is off. The viewer's own files, `s
 - **Distribution** — one histogram row per series on a shared axis, with the median line, the median's CI as a bar on top of it, and the spread shaded. Axis modes: **Auto** (logarithmic when the pooled 1st–99th percentile range spans more than 20×, else linear), **Linear**, **Log**, and **Per row** (each series on its own axis: shapes compare, positions do not). Hover a column for its range and count.
 - **Significance** — the test, effect size for pairs, and the pairwise matrix ("faster" or "slower", row against column).
 - **Theme** — Auto (follows the OS), Light, or Dark; saved in `localStorage`.
+
+### Browser runner
+
+- **Start** — the picker lists bench files on the server (`?run=<path>`) and opens a local one through a file input (run from a blob URL, so it can't import relative files). Its bare imports still resolve through the import map.
+- **Isolation** — one same-origin iframe per function, so each function gets its own global object and module instance; the iframes share the tab's thread and heap. Every page the server sends carries COOP `same-origin` and COEP `require-corp`, so the page is cross-origin isolated and `performance.now()` steps 5 µs (Chromium) or 20 µs (Firefox, WebKit) instead of 100 µs or 1 ms. The runner records `crossOriginIsolated` and the measured step and runs either way.
+- **Sampling** — each function is calibrated to `ms` per sample (`findLevel`), then sampled in interleaved rounds (one sample of each function per round, starting position rotated), with a 5 ms pause between samples. The runner waits while the tab is hidden and counts those pauses. **Stop** ends the run early; at least 2 samples per function are needed to save.
+- **Output** — a schema-v1 results object: `environment.runtime` is the browser (`chromium`, `edge`, `firefox`, `webkit`) with its engine. `environment.browser` holds `userAgent`, `crossOriginIsolated`, `timerResolutionMs`, `isolation`, `hiddenPauses`, and `stoppedEarly`, and `params.order` is `interleaved`. It is saved through `/--nano-bench/save` and opened in the viewer. If saving fails, it is shown locally with a download link.
+- **Not measured in a browser** — CPU contention (no CPU-time clock) and process isolation.
 
 ### Example
 

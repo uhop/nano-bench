@@ -87,7 +87,8 @@ launching and serving, Playwright and Puppeteer as optional peers for automation
 
 ## What this means for the browser runner
 
-A sketch, to be confirmed:
+The runner was built on 2026-09-24 along steps 1&ndash;5; step 6, the drivers, is still open.
+The plan as sketched:
 
 1. A run route in the web app (`?run=<bench file>`), served by `nano-bench-view`'s server with
    COOP and COEP headers added by the nano-bench plugin.
@@ -151,7 +152,7 @@ What this means:
 
 ## Cross-origin isolation
 
-To be decided after the details below. A page is cross-origin isolated when it is served with
+Decided 2026-09-24: isolate by default, as proposed at the end of this section. A page is cross-origin isolated when it is served with
 `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (or
 `credentialless`), and every iframe it embeds is served with COEP too. `crossOriginIsolated`
 then reads `true`. Isolation unlocks precise timers (Chrome 100&nbsp;&micro;s &rarr;
@@ -163,6 +164,29 @@ bench file that fetches from another origin needs CORS or `Cross-Origin-Resource
 the measured timer resolution with the results, and warn instead of refusing when isolation is
 missing. For scale, 1&nbsp;ms of resolution on a 50&nbsp;ms sample is up to &plusmn;2% per sample.
 
+## The runner as built
+
+Built 2026-09-24 (`web-app/run.js`, `web-app/frame.js`, and the plugin's `benches`, `save`,
+`frame`, and `meta` routes):
+
+- **Isolation:** a same-origin iframe per function, plus one short-lived iframe that lists the
+  functions. Each has its own global object and module instance; they share the thread and the
+  heap, as measured in &sect; Isolation with iframes. Cross-site iframes aren't built.
+- **Order:** calibration per function, then interleaved rounds with the starting function
+  rotated, a 5&nbsp;ms pause between samples, and a wait while the tab is hidden.
+- **Cross-origin isolation:** on by default, since the plugin sends COOP and COEP with every
+  page it serves. The first runs read `crossOriginIsolated: true` in Chromium, Firefox, and
+  Playwright WebKit, with a measured step of 5&nbsp;&micro;s in Chromium and 20&nbsp;&micro;s in
+  the other two.
+- **Stale files:** tape-six's static handler sends no caching headers, and an edited bench file
+  was picked up on reload in all three engines (measured 2026-09-24). No cache-busting was
+  added.
+- **Results:** saved to `nano-bench-results/<bench>-<browser>.json` under the root and opened
+  in the viewer.
+
+Not built yet: the Playwright and Puppeteer drivers, cross-site iframes, drag and drop, and
+pasted snippets. A local file runs from a blob URL, so it can't import relative files.
+
 ## Answered questions
 
 Eugene, 2026-09-24:
@@ -171,5 +195,6 @@ Eugene, 2026-09-24:
   drag and drop). Pasted snippets can be allowed too, though he expects few people to use them.
 - **Isolation:** an `<iframe>` per function, without automatic refreshes if possible. Other
   forms of measurement are open to discussion. See &sect; Isolation with iframes.
-- **Cross-origin isolation:** asked for the technical details before deciding. See &sect;
-  Cross-origin isolation.
+- **Cross-origin isolation:** asked for the technical details, then took the recommendation:
+  isolate by default, record `crossOriginIsolated` and the timer step, and warn instead of
+  refusing. See &sect; Cross-origin isolation.

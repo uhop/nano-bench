@@ -1,14 +1,20 @@
 import test from 'tape-six';
 
 import {spawn} from 'node:child_process';
-import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 import {createTestServer} from 'tape-six/test-server.js';
 
-import {nanoBenchPlugin, listResults} from 'nano-benchmark/server/nano-bench-plugin.js';
+import {
+  nanoBenchPlugin,
+  listBenches,
+  listResults,
+  saveResults,
+  RESULTS_FOLDER
+} from 'nano-benchmark/server/nano-bench-plugin.js';
 import {autoindexPlugin, formatSize} from 'nano-benchmark/server/autoindex.js';
 
 const results = name =>
@@ -35,6 +41,14 @@ const makeRoot = async () => {
   await writeFile(path.join(root, 'broken.json'), '{"schemaVersion": 1, "tool": "nano-benchmark",');
   await writeFile(path.join(root, 'site', 'index.html'), '<p>site</p>');
   await writeFile(path.join(root, '.dotfile'), 'x');
+  await mkdir(path.join(root, 'bench'));
+  await writeFile(path.join(root, 'bench', 'bench-x.js'), 'export default {};');
+  await writeFile(path.join(root, 'bench', 'helper.js'), 'export default {};');
+  await writeFile(path.join(root, 'runs', 'y.bench.mjs'), 'export default {};');
+  await writeFile(
+    path.join(root, 'tape6.json'),
+    JSON.stringify({importmap: {imports: {lib: '/lib/index.js', '</script>': '/x.js'}}})
+  );
   return root;
 };
 
@@ -82,6 +96,39 @@ test('listResults()', async t => {
   }
 });
 
+test('listBenches()', async t => {
+  const root = await makeRoot();
+  try {
+    t.deepEqual(
+      (await listBenches(root)).map(e => e.path),
+      ['bench/bench-x.js', 'runs/y.bench.mjs'],
+      'both naming conventions; other modules skipped'
+    );
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+test('saveResults()', async t => {
+  const root = await makeRoot();
+  try {
+    const first = await saveResults(root, 'my run.json', results('a'));
+    t.equal(first, RESULTS_FOLDER + '/my-run.json', 'the name is sanitized');
+    t.deepEqual(JSON.parse(await readFile(path.join(root, first), 'utf8')).results[0].name, 'a');
+    t.equal(await saveResults(root, 'my run', results('b')), RESULTS_FOLDER + '/my-run-2.json');
+    t.equal(
+      await saveResults(root, '../../escape', results('c')),
+      RESULTS_FOLDER + '/..-..-escape.json',
+      'no path separators survive'
+    );
+    t.equal(await saveResults(root, null, results('d')), RESULTS_FOLDER + '/results.json');
+    await t.rejects(saveResults(root, 'x', '{"schemaVersion": 1, "tool": "else", "results": []}'));
+    await t.rejects(saveResults(root, 'x', '{'), 'malformed JSON');
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
 test('viewer server', async t => {
   await withServer(async base => {
     let r = await get(base, '/');
@@ -113,6 +160,48 @@ test('viewer server', async t => {
 
     r = await get(base, '/runs/b.json');
     t.equal(r.status, 200, 'results files are served by path');
+  });
+});
+
+test('runner routes', async t => {
+  await withServer(async (base, root) => {
+    let r = await get(base, '/--nano-bench/benches');
+    t.deepEqual(
+      (await r.json()).map(e => e.path),
+      ['bench/bench-x.js', 'runs/y.bench.mjs']
+    );
+
+    r = await get(base, '/--nano-bench/meta');
+    const meta = await r.json();
+    t.equal(meta.name, 'nano-benchmark');
+    t.ok(meta.version, 'a version');
+
+    r = await get(base, '/--nano-bench/frame');
+    t.equal(r.status, 200);
+    t.equal(r.headers.get('cross-origin-opener-policy'), 'same-origin');
+    t.equal(r.headers.get('cross-origin-embedder-policy'), 'require-corp');
+    t.equal(r.headers.get('cache-control'), 'no-store');
+    const html = await r.text();
+    t.ok(html.includes('"lib":"/lib/index.js"'), 'the project import map is inlined');
+    t.notOk(html.includes('"</script>"'), 'a closing tag inside the map is escaped');
+    t.ok(html.includes('/--nano-bench/web-app/frame.js'), 'the frame script');
+
+    r = await get(base, '/--nano-bench/web-app/app.js');
+    t.equal(r.headers.get('cross-origin-embedder-policy'), 'require-corp', 'mounts are isolated');
+
+    r = await get(base, '/--nano-bench/save?name=run');
+    t.equal(r.status, 405, 'save takes POST only');
+    t.equal(r.headers.get('allow'), 'POST');
+
+    r = await fetch(base + '/--nano-bench/save?name=run', {method: 'POST', body: results('a')});
+    t.equal(r.status, 200);
+    const {path: saved} = await r.json();
+    t.equal(saved, RESULTS_FOLDER + '/run.json');
+    t.ok(await readFile(path.join(root, saved), 'utf8'), 'written under the root');
+
+    r = await fetch(base + '/--nano-bench/save', {method: 'POST', body: '{"tool": "else"}'});
+    t.equal(r.status, 400, 'not a results file');
+    t.ok((await r.text()).includes('not a nano-bench results file'));
   });
 });
 

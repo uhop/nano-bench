@@ -227,6 +227,20 @@ another machine: run the command there, forward its port over SSH (for example,
 without an `index.html` file show a directory listing with links into the viewer. The page
 follows the system's light or dark theme, and a switch overrides it.
 
+### Running benchmarks in a browser
+
+The same server runs bench files in the browser. The start page lists the bench files under the
+root (`bench/bench-*.js` and `*.bench.js`), and **Open a bench file…** runs a local one. Each
+function runs in its own iframe, one sample of each function per round, as in `nano-bench`. The
+results are saved to `nano-bench-results/<bench>-<browser>.json` under the root and open in the
+viewer, so `nano-bench-compare` can read them too. The page is cross-origin isolated, which
+gives `performance.now()` a 5&ndash;20&nbsp;µs step instead of 0.1&ndash;1&nbsp;ms.
+
+Add `ms` and `samples` to the run URL to change the sample length and count, for example
+`/--nano-bench/web-app/?run=bench/bench-sort.js&samples=50`. Keep the tab visible: the runner
+pauses while the tab is hidden and records the pauses. A local file can't import other local
+files, so bench it from the server when it has relative imports.
+
 ### Benchmarking slow functions
 
 Batching is right for nanosecond loops but erases the run-to-run distribution of

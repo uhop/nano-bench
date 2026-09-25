@@ -1,6 +1,7 @@
 import {parseResults} from '../src/bench/results/parse.js';
 import {escapeXml as esc} from '../src/bench/render/svg-distribution.js';
 import {renderView} from './view.js';
+import {runBench} from './run.js';
 
 const main = /** @type {HTMLElement} */ (document.querySelector('main'));
 
@@ -32,11 +33,52 @@ const show = files => {
   renderView(main, files);
 };
 
+const query = new URLSearchParams(location.search),
+  numberParam = (name, fallback) => {
+    const value = Number(query.get(name));
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+  };
+
+const saveAndShow = async (results, name) => {
+  try {
+    const response = await fetch('/--nano-bench/save?name=' + encodeURIComponent(name), {
+      method: 'POST',
+      body: JSON.stringify(results)
+    });
+    if (!response.ok) throw new Error(await response.text());
+    const {path} = await response.json();
+    location.search = viewHref([path]);
+  } catch (error) {
+    show([{file: name + '.json', results}]);
+    const blob = new Blob([JSON.stringify(results, null, 2) + '\n'], {type: 'application/json'}),
+      note = document.createElement('p');
+    note.className = 'note';
+    note.innerHTML = `Not saved on the server (${esc(error.message)}). <a download="${esc(name)}.json" href="${URL.createObjectURL(blob)}">Download the results</a>.`;
+    main.prepend(note);
+  }
+};
+
+const run = (file, url) =>
+  runBench(main, {
+    file,
+    url,
+    exportName: query.get('export') || 'default',
+    ms: numberParam('ms', 50),
+    samples: numberParam('samples', 100),
+    onDone: saveAndShow
+  });
+
 const formatDate = iso => (iso ? iso.replace(/^([^T]+)T(\d\d:\d\d).*$/, '$1 $2') : '');
 
 const renderPicker = async () => {
   document.title = 'Results · nano-bench';
   main.innerHTML = `<section>
+<h2>Run a benchmark</h2>
+<div class="bench-list"><p class="muted">Searching…</p></div>
+<p><label class="file-input">Open a bench file… <input type="file" class="bench-input" accept=".js,.mjs,text/javascript"></label></p>
+<p class="note">Each function runs in its own iframe, in interleaved rounds. A local file must be self-contained: its own imports can't be resolved. Results are saved under <code>nano-bench-results/</code> on the server.</p>
+</section>
+<section>
 <h2>Results on the server</h2>
 <div class="picker-list"><p class="muted">Searching…</p></div>
 <div class="actions"><button type="button" class="compare" disabled>Compare selected</button> <button type="button" class="clear" disabled>Clear selection</button></div>
@@ -50,7 +92,31 @@ const renderPicker = async () => {
   const list = /** @type {HTMLElement} */ (main.querySelector('.picker-list')),
     compare = /** @type {HTMLButtonElement} */ (main.querySelector('.compare')),
     clear = /** @type {HTMLButtonElement} */ (main.querySelector('.clear')),
-    input = /** @type {HTMLInputElement} */ (main.querySelector('input[type=file]'));
+    input = /** @type {HTMLInputElement} */ (main.querySelector('input[accept^=".json"]')),
+    benchList = /** @type {HTMLElement} */ (main.querySelector('.bench-list')),
+    benchInput = /** @type {HTMLInputElement} */ (main.querySelector('.bench-input'));
+
+  benchInput.addEventListener('change', () => {
+    const file = benchInput.files?.[0];
+    if (file) run(file.name, URL.createObjectURL(file));
+  });
+
+  fetch('/--nano-bench/benches')
+    .then(r => r.json())
+    .then(benches => {
+      benchList.innerHTML = benches.length
+        ? `<ul class="benches">${benches
+            .map(
+              b =>
+                `<li><a href="?run=${encodeURIComponent(b.path).replaceAll('%2F', '/')}">${esc(b.path)}</a></li>`
+            )
+            .join('')}</ul>`
+        : '<p class="muted">No bench files (<code>bench-*.js</code> or <code>*.bench.js</code>) were found under the server’s root folder.</p>';
+    })
+    .catch(
+      error =>
+        (benchList.innerHTML = `<p class="error">Cannot list bench files: ${esc(error.message)}</p>`)
+    );
 
   input.addEventListener('change', async () => {
     if (!input.files?.length) return;
@@ -114,8 +180,12 @@ const renderPicker = async () => {
   });
 };
 
-const paths = new URLSearchParams(location.search).getAll('view');
-if (paths.length) {
+const paths = query.getAll('view'),
+  runPath = query.get('run');
+if (runPath) {
+  document.title = runPath.split('/').pop() + ' · running · nano-bench';
+  await run(runPath, '/' + encodePath(runPath));
+} else if (paths.length) {
   main.innerHTML = '<p class="muted">Loading…</p>';
   try {
     show(await loadRemote(paths));

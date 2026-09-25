@@ -13,8 +13,10 @@ bin/                          # CLI entry points (shipped via npm)
 └── nano-bench-view.js              # Serve the browser viewer (tape-six test server + two plugins)
 web-app/                      # Browser viewer (shipped via npm; plain ES modules, no build)
 ├── index.html                      # Shell + import map (console-toolkit/ → /--nano-bench/console-toolkit/)
-├── app.js                          # Routing (?view=<path>, repeatable) + the results picker
+├── app.js                          # Routing (?view=<path>, repeatable; ?run=<path>) + the picker
 ├── view.js                         # Files, warnings, summary, distribution chart, significance
+├── run.js                          # Browser runner: an iframe per function, interleaved rounds
+├── frame.js                        # The iframe side: loads one function, answers calibrate/sample
 ├── theme-init.js / theme.js        # Auto / Light / Dark: applied before paint, saved in localStorage
 └── theme.css / app.css / autoindex.css
 src/                          # Internal source (shipped via npm)
@@ -53,7 +55,7 @@ src/                          # Internal source (shipped via npm)
 │       ├── environment.js          # captureEnvironment (Node)
 │       └── series.js               # buildSeries / resultsWarnings / multimodalityP — shared by compare + viewer
 ├── server/                         # nano-bench-view plugins (Node)
-│   ├── nano-bench-plugin.js        # /--nano-bench/{web-app,src,console-toolkit}/ + /--nano-bench/results
+│   ├── nano-bench-plugin.js        # /--nano-bench/{web-app,src,console-toolkit}/ + results, benches, save, frame, meta
 │   ├── autoindex.js                # HTML folder listings (algorithm from the static-server.mjs gist)
 │   └── files.js                    # MIME table, containment check, escaping
 ├── stats.js                        # Batch stats: mean, variance, stdDev, skewness, kurtosis, bootstrap, *Summary
@@ -156,6 +158,7 @@ Steps 2 and 4 live in `src/bench/results/series.js`, so the browser viewer compu
 
 1. **Serve** — `createTestServer` from `tape-six/test-server.js` (lazy import) over `--root`, with `webAppPath` set to `/--nano-bench/web-app/` so `/` redirects to the viewer, remote plugin registration off, and two plugins. `nano-bench-plugin.js` serves `web-app/`, `src/`, and the `console-toolkit` sources from wherever they are installed (resolved with `import.meta.resolve`), so the viewer works when the package is outside the served root. It also answers `/--nano-bench/results`: every JSON file under the root whose first 512 bytes carry `schemaVersion: 1` and `tool: "nano-benchmark"`, skipping dot-folders and `node_modules`. `autoindex.js` lists folders without `index.html`; the root lists only with `/?list`.
 2. **View** — `web-app/app.js` loads `?view=` paths from the server (or local files through a file input), `parseResults` validates them, and `view.js` runs the compare pipeline's `buildSeries` / `resultsWarnings` / `planComparison` / `computeSignificance` in the browser. The chart is `computeHistograms` rendered by `svg-distribution.js`: a shared linear axis, a shared log axis (chosen automatically when the pooled 1st–99th percentile range exceeds 20×), or one axis per row.
+3. **Run** — `?run=<path>` (or a local file through a blob URL) hands the bench file to `web-app/run.js`. A lister iframe returns the function names, then one same-origin iframe per function loads `/--nano-bench/frame`, which inlines the root's import map and runs `web-app/frame.js`. The parent calibrates each function (`findLevel`) and samples them in interleaved rounds (`benchmark`) over `postMessage`, waiting while the tab is hidden. It then builds a schema-v1 object with `bootstrapSummary` and `computeSignificance`, `POST`s it to `/--nano-bench/save` (written under `nano-bench-results/`, never overwriting), and opens it in the viewer. The plugin sends COOP and COEP with every page, so `performance.now()` steps 5–20 µs.
 
 ### nano-watch pipeline
 

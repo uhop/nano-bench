@@ -286,3 +286,56 @@ button.compare:disabled {
   stroke-width: 3px;
   stroke-linejoin: round;
 }
+
+.run-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0;
+}
+
+.run-progress .bar {
+  flex: 0 0 240px;
+  height: 8px;
+  background: var(--grid);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.run-progress .fill {
+  width: 0;
+  height: 100%;
+  background: var(--series);
+  transition: width 0.2s;
+}
+
+.run-progress .label {
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.bench-frame {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.benches {
+  margin: 0;
+  padding-left: 20px;
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+button.stop {
+  padding: 5px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
