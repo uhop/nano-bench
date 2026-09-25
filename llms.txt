@@ -83,6 +83,14 @@ The same page runs bench files in the browser: `?run=<path>` (listed on the star
 
 The server is strictly a development tool: not hardened, not for general web serving. The user is responsible for its security; outside `localhost` they are on their own (prefer an SSH tunnel to `--host`). A non-loopback `--host` prints a warning.
 
+### nano-bench-suite
+
+Runs several bench files, each in its own process, over `--passes N` passes, and closes with a table of each file's fastest function and in how many passes it was fastest with a significant difference. Globs are expanded (quoted patterns work); options after `--` go to every run; `--io` runs nano-bench-io instead of nano-bench. Exits 1 if any run failed.
+
+```bash
+npx nano-bench-suite 'bench/bench-*.js' --passes 5 -- -s 200
+```
+
 ### nano-bench-playwright, nano-bench-puppeteer
 
 Run a bench file in browsers from the command line: start the server on `localhost`, run the page in each browser in turn, print each browser's tables as `nano-bench-compare` does, and exit non-zero if a browser fails. Results are saved to `nano-bench-results/<bench>-<browser>.json` under the root. Need the optional peers `tape-six` and `playwright` or `puppeteer`, plus the browsers.
@@ -123,6 +131,8 @@ export default {
   }
 };
 ```
+
+For a scaling question, `nano-bench` and `nano-bench-io` also accept a factory: `export const params = [100, 1000]` plus a default export `size => ({...functions})`. Each value runs in its own process as its own comparison, setup inside the factory stays untimed, and a `Scaling:` table closes the run; `--params 10,100` overrides the list, and `--json out.json` writes `out-<value>.json` per value.
 
 ## Deno and Bun support
 

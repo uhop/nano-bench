@@ -12,7 +12,8 @@ bin/                          # CLI entry points (shipped via npm)
 ├── nano-bench-compare.js           # View/compare saved results JSON — recomputes significance, no measuring
 ├── nano-bench-view.js              # Serve the browser viewer (tape-six test server + two plugins)
 ├── nano-bench-playwright.js        # Run a bench file in Playwright browsers (src/driver/browser-cli.js)
-└── nano-bench-puppeteer.js         # Run a bench file in Puppeteer browsers (src/driver/browser-cli.js)
+├── nano-bench-puppeteer.js         # Run a bench file in Puppeteer browsers (src/driver/browser-cli.js)
+└── nano-bench-suite.js             # Run several bench files, each in its own process, over passes
 web-app/                      # Browser viewer (shipped via npm; plain ES modules, no build)
 ├── index.html                      # Shell + import map (console-toolkit/ → /--nano-bench/console-toolkit/)
 ├── app.js                          # Routing (?view=<path>, repeatable; ?run=<path>) + the picker
@@ -39,6 +40,7 @@ src/                          # Internal source (shipped via npm)
 │   ├── contention.js               # CPU contention check: per-sample CPU time / elapsed time
 │   ├── gc.js                       # --gc: findGc, a forced collection per runtime
 │   ├── isolate.js                  # --isolate: runChild, isolationPlan, fastestPerRound
+│   ├── params.js                   # factory files: one child per parameter value, the scaling table
 │   ├── settle.js                   # --settle: per-pair median-ratio CI against ±threshold
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
 │   ├── histogram.js                # Sample binning: computeHistograms, binCount, percentile
@@ -221,6 +223,8 @@ bin/nano-bench-compare.js ──→ src/bench/results/{load,series}.js
 
 bin/nano-bench-view.js ──→ src/server/start.js ──→ tape-six/test-server.js (optional peer, lazy)
                                             ──→ src/server/{nano-bench-plugin,autoindex}.js
+
+bin/nano-bench-suite.js ──→ src/bench/params.js (runInherited, readResults) ──→ bin/nano-bench{,-io}.js
 
 bin/nano-bench-{playwright,puppeteer}.js ──→ src/driver/browser-cli.js
     ──→ playwright | puppeteer (optional peers, lazy)

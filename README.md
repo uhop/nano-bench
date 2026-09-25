@@ -21,6 +21,8 @@ Five utilities are available:
   same page runs bench files in a browser.
 - `nano-bench-playwright` and `nano-bench-puppeteer` &mdash; run a bench file in browsers from
   the command line and print the results as `nano-bench` does.
+- `nano-bench-suite` &mdash; runs several bench files, each in its own process, over one or more
+  passes, and reports which function was fastest in each file and how often that held.
 
 Designed for performance tuning of small, fast code snippets used in tight loops.
 
@@ -191,6 +193,47 @@ drops its first sample, which pays for JIT warmup. With `--repeat` above 1, the 
 test compares the per-process medians, and a line reports which function was fastest in each
 round of processes. `--order` sets the order the processes start in (interleaved by default).
 Each extra process costs roughly its startup (about 0.15 seconds on Node.js) plus its samples.
+With `--verbose`, each function's per-process medians are listed too.
+
+### Running a suite of files
+
+`nano-bench-suite` runs every file in its own process, as many passes as you ask for, and
+closes with a table: the fastest function in each file, and in how many passes it was fastest
+with a significant difference. Options after `--` go to every run:
+
+```bash
+npx nano-bench-suite 'bench/bench-*.js' --passes 5 -- -s 200
+npx nano-bench-suite --io 'bench/io-*.js' -- -r 50
+```
+
+### Parameterized benchmarks
+
+To see how functions scale, export a factory and the values to run it with. The factory's
+setup stays outside the timing, each value runs in its own process as its own comparison, and
+a closing table gives the median per call for every function and value:
+
+```js
+export const params = [100, 1000, 10000];
+
+export default size => {
+  const data = Array.from({length: size}, (_, i) => i); // setup, outside the timing
+  return {
+    'for loop': n => {
+      let sum = 0;
+      for (let k = 0; k < n; ++k) for (let i = 0; i < data.length; ++i) sum += data[i];
+      return sum;
+    },
+    reduce: n => {
+      let sum = 0;
+      for (let k = 0; k < n; ++k) sum += data.reduce((a, b) => a + b, 0);
+      return sum;
+    }
+  };
+};
+```
+
+`--params 10,100` overrides the list from the command line. Both `nano-bench` and
+`nano-bench-io` accept such files, and `nano-bench-suite` reports each value on its own row.
 
 ### Saving and comparing results
 

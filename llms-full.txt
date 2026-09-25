@@ -40,7 +40,7 @@ Measurement:
 - `-s, --samples <samples>` — number of samples to collect (default: 100).
 - `-p, --parallel <n>` — for asynchronous functions: each sample becomes a round of `n` calls started together, and the next round starts after all of them settle and a 5 ms window. `-s` counts rounds, so `-s 100 -p 10` records 1,000 latencies per function. Calls in one round share the load, so the significance test compares per-round medians (`significance.unit: "round-medians"`). Works with either `--order`. It measures latency with `n - 1` neighbors in flight, so it changes what is measured; don't use it to finish a run faster. A value is required; `-p` with no value was one burst of all samples before 2026-09-24. Conflicts with `--isolate`.
 - `--isolate` — measure each function in its own child process (same runtime; Deno gets `run -A`). The parent calibrates once and passes `-i` to every child; each child runs `--samples` + 1 samples and the first is dropped (JIT warmup). Conflicts with `--parallel`.
-- `--repeat <n>` — with `--isolate`: processes per function (default 1), started in `--order` order (interleaved rotates the first function per round). With n > 1 the significance test compares per-process medians and a line reports the fastest function in each round of processes; use it to see whether a small difference survives across processes. Measured 2026-09-24 on `bench/bench-substrings.js`: `using index` varied under 1% between processes once its input was flat, while in-process it had measured 20% faster beside allocating variants, whose GCs flattened the shared input rope — the cross-function effect `--isolate` removes.
+- `--repeat <n>` — with `--isolate`: processes per function (default 1), started in `--order` order (interleaved rotates the first function per round). With `--verbose`, each function's per-process medians are listed under the tally. With n > 1 the significance test compares per-process medians and a line reports the fastest function in each round of processes; use it to see whether a small difference survives across processes. Measured 2026-09-24 on `bench/bench-substrings.js`: `using index` varied under 1% between processes once its input was flat, while in-process it had measured 20% faster beside allocating variants, whose GCs flattened the shared input rope — the cross-function effect `--isolate` removes.
 - `--gc <mode>` — force a garbage collection outside the timed window: `once` before sampling (per function in sequential order, once in interleaved order), `each` before every sample (before every round with `-p`); `none` (default) leaves collection to the runtime. The collector is found per runtime: an exposed `gc`, `Bun.gc`, or V8's `--expose-gc` turned on at run time (Node, Deno); a runtime without one gets a note and the flag is ignored. Isolated children get the same mode. Recorded as `params.gc` when a collector ran.
 - `--order <order>` — `interleaved` (default): one sample of each function per round, rotating which goes first, so drift over the run lands on every function alike; `sequential`: each function's samples in turn (the pre-2026-09-24 order). Recorded as `params.order` (`interleaved` or `sequential`; files from before 2026-09-24 made with `-p` record `parallel`).
 
@@ -341,6 +341,40 @@ npx nano-bench-playwright bench/bench-sort.js -b chromium,firefox -s 50
 
 ---
 
+## CLI tool: nano-bench-suite
+
+Runs several bench files, each in its own process, over one or more passes, and closes with a table of which function was fastest in each file and how often that held. It replaces a shell loop such as `write-bench`'s `bench/run-all.sh`.
+
+### Usage
+
+```
+nano-bench-suite [options] <files...> [-- <options for every run>]
+```
+
+### Options
+
+- `<files...>` — bench files or glob patterns. Patterns are expanded with `fs.glob` (so a quoted pattern works where the shell does not expand it), sorted, and deduplicated; a pattern that matches nothing is an error.
+- `--passes <n>` — passes over all the files (default: 1). Separate processes are what show that a direction survives: significance is measured within one process.
+- `--io` — run `nano-bench-io` for every file instead of `nano-bench`.
+- Everything after `--` is passed to every run, for example `-- -s 200 --gc each`.
+
+### Behavior
+
+- Each run's output streams as it would on its own, under a `----- file (pass p of N) -----` header.
+- Each run writes its results to a temporary `--json` file; a parameterized file leaves one per value, and each value gets its own row.
+- The closing `Suite:` table lists each file (with `[value]` for a parameter value), the function that was fastest in the most passes, and `held`: in how many passes that function was fastest with a significant difference (`—` for a file with one function).
+- Exit status: 0 when every run succeeded, 1 otherwise (a failed run's rows are missing, and a line counts the failures).
+
+### Example
+
+```bash
+npx nano-bench-suite 'bench/bench-*.js'                 # every file once
+npx nano-bench-suite 'bench/bench-*.js' --passes 5      # five passes: do the directions hold?
+npx nano-bench-suite --io 'bench/io-*.js' -- -r 50      # nano-bench-io, 50 runs per function
+```
+
+---
+
 ## Results JSON schema (v1)
 
 `nano-bench --json out.json` writes this shape. The **raw per-sample arrays are the source of truth** — significance and CIs are always recomputed from them; the stored summaries are FYI only.
@@ -454,6 +488,32 @@ export default {
   }
 };
 ```
+
+### Parameterized files (a factory export, for nano-bench / nano-bench-io)
+
+To ask how the functions scale, export a factory that takes one parameter value and returns the object of functions, plus the values in `params`:
+
+```js
+export const params = [100, 1000, 10000];
+
+export default size => {
+  const data = Array.from({length: size}, (_, i) => i); // setup, outside the timing
+  return {
+    'for loop': n => {
+      let sum = 0;
+      for (let k = 0; k < n; ++k) for (let i = 0; i < data.length; ++i) sum += data[i];
+      return sum;
+    },
+    reduce: n => {
+      let sum = 0;
+      for (let k = 0; k < n; ++k) sum += data.reduce((a, b) => a + b, 0);
+      return sum;
+    }
+  };
+};
+```
+
+The factory runs once per value, so per-value setup stays outside the timing. The tool runs each value in its own child process (the parent spawns itself with a hidden `--param-json` flag), with every other option passed through, and each value is its own comparison block: summary, significance, histograms. A closing `Scaling:` table gives the median per call by function and value. `--params 10,100` overrides the file's `params` (numbers are parsed, anything else stays a string). With `--json out.json`, each value writes `out-<value>.json` and records `params.param`. A factory without `params` or `--params` is an error. `--isolate` works inside each value's run.
 
 ### Single function (for nano-watch without method argument)
 

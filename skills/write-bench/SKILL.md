@@ -178,32 +178,43 @@ a **baseline** — its stats are reported with no significance test.
 ## One question per file
 
 Don't put every variant you can think of into one file. Write one file per question, each
-with variants that differ in exactly one respect, and run them all with a script:
+with variants that differ in exactly one respect, and run them all with `nano-bench-suite`:
 
 ```bash
-#!/usr/bin/env bash
-# bench/run-all.sh — run every benchmark in its own process.
-#   bench/run-all.sh            # one pass
-#   bench/run-all.sh 5          # five passes: confirm the directions hold
-#   bench/run-all.sh 1 --json   # extra flags go to nano-bench
-set -u
-cd "$(dirname "$0")/.."
-repeats=${1:-1}
-[ $# -gt 0 ] && shift
-status=0
-for pass in $(seq 1 "$repeats"); do
-  [ "$repeats" -gt 1 ] && printf '\n===== pass %s of %s =====\n' "$pass" "$repeats"
-  for file in bench/bench-*.js; do
-    printf '\n----- %s -----\n' "$(basename "$file")"
-    npx nano-bench "$file" "$@" || status=1
-  done
-done
-exit $status
+npx nano-bench-suite 'bench/bench-*.js'                # one pass, each file in its own process
+npx nano-bench-suite 'bench/bench-*.js' --passes 5     # five passes: confirm the directions hold
+npx nano-bench-suite 'bench/bench-*.js' -- -s 200      # options after -- go to every run
 ```
 
-Wire it as a `bench` script in `package.json` (`"bench": "bench/run-all.sh"`). Separate
-processes matter: significance is measured within one process, so a repeat count over
-fresh processes is what checks that a direction survives.
+Wire it as a `bench` script in `package.json`
+(`"bench": "nano-bench-suite 'bench/bench-*.js'"`). Separate processes matter: significance
+is measured within one process, so passes over fresh processes are what check that a
+direction survives. The closing table lists each file's fastest function and in how many
+passes it was fastest with a significant difference.
+
+When the question is how the variants scale with input size, don't write a file per size.
+Export a factory and its values; each value runs in its own process, and a closing table
+shows the median per call for every function and value:
+
+```js
+export const params = [100, 1000, 10000];
+
+export default size => {
+  const data = Array.from({length: size}, (_, i) => i); // untimed setup
+  return {
+    'for loop': n => {
+      let sum = 0;
+      for (let k = 0; k < n; ++k) for (let i = 0; i < data.length; ++i) sum += data[i];
+      return sum;
+    },
+    reduce: n => {
+      let sum = 0;
+      for (let k = 0; k < n; ++k) sum += data.reduce((a, b) => a + b, 0);
+      return sum;
+    }
+  };
+};
+```
 
 ## What not to compare
 

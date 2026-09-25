@@ -27,6 +27,7 @@ import {
 import {exactSummary, bootstrapSummary, mean, stdDev, getWeightedValue} from '../src/stats.js';
 import {runChild, isolationPlan, fastestPerRound} from '../src/bench/isolate.js';
 import findGc, {gcModes} from '../src/bench/gc.js';
+import {parseParams, paramsMain} from '../src/bench/params.js';
 import {contentionSummary, contentionWarning, isContended} from '../src/bench/contention.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {corrections} from '../src/significance/correction.js';
@@ -117,6 +118,11 @@ program
       .choices(gcModes)
       .default('none')
   )
+  .option(
+    '--params <values>',
+    'comma-separated parameter values for a factory export (overrides its params)'
+  )
+  .addOption(new Option('--param-json <json>', 'internal: one parameter value').hideHelp())
   .addOption(new Option('--emit-samples', 'internal: child mode of --isolate').hideHelp())
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
   .option('--seed <seed>', 'bootstrap RNG seed (32-bit integer; default: random)', toInt)
@@ -168,15 +174,34 @@ if (options.repeat > 1 && !options.isolate) program.error('--repeat needs --isol
 
 const fileName = pathToFileURL(path.resolve(process.cwd(), args[0]));
 
-let fns;
+let fns, file;
 try {
-  const file = await import(fileName.href);
+  file = await import(fileName.href);
   fns = file[options.export];
 } catch (error) {
   program.error(`File not found: ${args[0]} (${fileName})`);
 }
 
 if (!fns) program.error(`Export not found: ${options.export}`);
+
+if (typeof fns == 'function') {
+  if (options.paramJson === undefined) {
+    const values = options.params ? parseParams(options.params) : file.params;
+    if (!Array.isArray(values) || !values.length)
+      program.error(
+        'A factory export needs parameter values: export const params = [...], or pass --params'
+      );
+    await paramsMain({
+      script: fileURLToPath(import.meta.url),
+      argv: process.argv.slice(2),
+      values,
+      json: options.json
+    });
+  }
+  fns = await fns(JSON.parse(options.paramJson));
+  if (!fns || typeof fns != 'object')
+    program.error('The factory export must return an object of functions');
+}
 
 let names;
 try {
@@ -415,6 +440,7 @@ if (options.isolate) {
         String(options.samples + 1),
         '--gc',
         options.gc,
+        ...(options.paramJson !== undefined ? ['--param-json', options.paramJson] : []),
         '--emit-samples'
       ]);
     } catch (error) {
@@ -560,6 +586,14 @@ if (results.length > 1) {
       c`{{save.bold}}Processes:{{restore}} ${options.repeat} per function; the test below compares per-process medians`,
       c`Fastest median in each round of processes: ${tally}`
     ]);
+    if (options.verbose) {
+      const format = prepareTimeFormat(tested.flat(), 1000);
+      await writer.write(
+        names.map(
+          (name, i) => `  ${name}: ${tested[i].map(value => formatTime(value, format)).join(', ')}`
+        )
+      );
+    }
   }
   writeSignificance(writer, {
     testResult,
@@ -609,6 +643,7 @@ if (options.json) {
       parallel: options.parallel ?? false,
       order: options.order,
       ...(gc ? {gc: options.gc} : {}),
+      ...(options.paramJson !== undefined ? {param: JSON.parse(options.paramJson)} : {}),
       ...(options.isolate ? {isolate: true, repeat: options.repeat} : {})
     },
     series: names.map((name, i) => ({

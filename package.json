@@ -15,7 +15,8 @@
     "nano-bench-compare": "./bin/nano-bench-compare.js",
     "nano-bench-view": "./bin/nano-bench-view.js",
     "nano-bench-playwright": "./bin/nano-bench-playwright.js",
-    "nano-bench-puppeteer": "./bin/nano-bench-puppeteer.js"
+    "nano-bench-puppeteer": "./bin/nano-bench-puppeteer.js",
+    "nano-bench-suite": "./bin/nano-bench-suite.js"
   },
   "scripts": {
     "test": "tape6 --flags FO",
@@ -32,7 +33,8 @@
     "js-check": "tsc --project tsconfig.check.json",
     "view": "node bin/nano-bench-view.js",
     "playwright": "node bin/nano-bench-playwright.js",
-    "puppeteer": "node bin/nano-bench-puppeteer.js"
+    "puppeteer": "node bin/nano-bench-puppeteer.js",
+    "suite": "node bin/nano-bench-suite.js"
   },
   "repository": {
     "type": "git",

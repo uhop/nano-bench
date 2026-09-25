@@ -21,6 +21,7 @@ import Updater from 'console-toolkit/output/updater.js';
 import {collectMacro, collectMacroRounds} from '../src/bench/macro-runner.js';
 import {runChild, isolationPlan, fastestPerRound} from '../src/bench/isolate.js';
 import findGc, {gcModes} from '../src/bench/gc.js';
+import {parseParams, paramsMain} from '../src/bench/params.js';
 import detectWarmup from '../src/bench/warmup-detect.js';
 import runCommand, {commandFunctions} from '../src/bench/command-runner.js';
 import {rusageAvailable, rusageDelta} from '../src/bench/metrics.js';
@@ -129,6 +130,11 @@ program
       .default('none')
       .conflicts('command')
   )
+  .option(
+    '--params <values>',
+    'comma-separated parameter values for a factory export (overrides its params)'
+  )
+  .addOption(new Option('--param-json <json>', 'internal: one parameter value').hideHelp())
   .addOption(new Option('--emit-runs', 'internal: child mode of --isolate').hideHelp())
   .option('-c, --command', 'treat the arguments as shell commands to benchmark, not a module file')
   .option('--prepare <cmd>', 'shell command run (untimed) before every run in command mode')
@@ -255,8 +261,9 @@ if (options.command) {
   }
 } else {
   fileName = pathToFileURL(path.resolve(process.cwd(), args[0]));
+  let file;
   try {
-    const file = await import(fileName.href);
+    file = await import(fileName.href);
     fns = file[options.export];
     if (typeof file.prepare == 'function') prepare = file.prepare;
     if (typeof file.teardown == 'function') teardown = file.teardown;
@@ -265,6 +272,25 @@ if (options.command) {
   }
 
   if (!fns) program.error(`Export not found: ${options.export}`);
+
+  if (typeof fns == 'function') {
+    if (options.paramJson === undefined) {
+      const values = options.params ? parseParams(options.params) : file.params;
+      if (!Array.isArray(values) || !values.length)
+        program.error(
+          'A factory export needs parameter values: export const params = [...], or pass --params'
+        );
+      await paramsMain({
+        script: fileURLToPath(import.meta.url),
+        argv: process.argv.slice(2),
+        values,
+        json: options.json
+      });
+    }
+    fns = await fns(JSON.parse(options.paramJson));
+    if (!fns || typeof fns != 'object')
+      program.error('The factory export must return an object of functions');
+  }
 
   try {
     names = selectFunctions(fns, args.slice(1));
@@ -519,6 +545,7 @@ if (options.isolate) {
       ...(metricsOn ? ['-M'] : []),
       '--gc',
       options.gc,
+      ...(options.paramJson !== undefined ? ['--param-json', options.paramJson] : []),
       '--emit-runs'
     ],
     processMetrics = names.map(() => []),
@@ -820,6 +847,14 @@ if (results.length > 1) {
       c`{{save.bold}}Processes:{{restore}} ${options.repeat} per function; the test below compares per-process medians`,
       c`Fastest median in each round of processes: ${tally}`
     ]);
+    if (options.verbose) {
+      const format = prepareTimeFormat(tested.flat(), 1000);
+      await writer.write(
+        names.map(
+          (name, i) => `  ${name}: ${tested[i].map(value => formatTime(value, format)).join(', ')}`
+        )
+      );
+    }
   }
   writeSignificance(writer, {
     testResult,
@@ -875,6 +910,7 @@ if (options.json) {
       correction: options.correction,
       order: options.order,
       ...(gc ? {gc: options.gc} : {}),
+      ...(options.paramJson !== undefined ? {param: JSON.parse(options.paramJson)} : {}),
       ...(options.isolate ? {isolate: true, repeat: options.repeat} : {})
     },
     series: names.map((name, i) => ({
