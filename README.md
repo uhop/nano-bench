@@ -157,6 +157,13 @@ function's samples were, the run says so, and the numbers read slow and noisy, o
 multimodal warning too. Rerun when the machine is quiet. It can't see slowdowns that don't
 take the CPU away, such as a busy sibling hyperthread.
 
+Those slowdowns are large. On a 2-core, 4-thread laptop CPU (Intel i3-10110U) with Node.js 26,
+two concurrent copies of a CPU-bound benchmark ran 8.5% slower in every run, and the warning
+stayed quiet in all of them. Four copies slowed both a CPU-bound and a memory-bound benchmark by
+25&ndash;30%, and the warning fired in a quarter to a half of those runs. Run one benchmark at a
+time. For the method and the numbers, see
+[Parallel benchmark processes](./dev-docs/parallel-processes.md).
+
 Functions measured in one run also share JIT and heap state. To confirm a small difference,
 benchmark each variant in its own process and compare the saved runs with
 `nano-bench-compare`.

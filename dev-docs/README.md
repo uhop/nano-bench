@@ -37,6 +37,11 @@ Browser work, designed separately:
 - [`browser-benchmarking.md`](./browser-benchmarking.md) &mdash; the survey of browser
   benchmarking tools and the plan for the browser runner (2026-09-24).
 
+Measurements:
+
+- [`parallel-processes.md`](./parallel-processes.md) &mdash; how much concurrent benchmark
+  processes distort each other on a 2-core, 4-thread laptop CPU (2026-09-24).
+
 ## The one principle the whole design rests on
 
 nano-bench's significance tests are **nonparametric and rank-based**:
