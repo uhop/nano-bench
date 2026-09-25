@@ -2,6 +2,7 @@ import {parseResults} from '../src/bench/results/parse.js';
 import {escapeXml as esc} from '../src/bench/render/svg-distribution.js';
 import {renderView} from './view.js';
 import {runBench} from './run.js';
+import './components/nano-bench-progress.js';
 
 const main = /** @type {HTMLElement} */ (document.querySelector('main'));
 

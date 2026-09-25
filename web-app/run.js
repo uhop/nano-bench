@@ -106,7 +106,7 @@ export const runBench = async (main, options) => {
   main.innerHTML = `<section class="run">
 <h2>Running <code>${esc(file)}</code></h2>
 <p class="meta run-params">${esc(ms)} ms per sample, ${esc(samples)} samples per function, one iframe per function, interleaved rounds</p>
-<div class="run-progress"><div class="bar"><div class="fill"></div></div><span class="label">starting…</span></div>
+<div class="run-progress"><nano-bench-progress aria-label="benchmark progress"></nano-bench-progress><span class="label">starting…</span></div>
 <section class="warnings" hidden><ul><li></li></ul></section>
 <p class="run-notes muted"></p>
 <div class="scroll"><table class="summary run-table"><thead><tr><th>Name</th><th class="num">Median so far</th><th class="num">Samples</th><th class="num">Batch</th></tr></thead><tbody></tbody></table></div>
@@ -114,7 +114,7 @@ export const runBench = async (main, options) => {
 <div class="frames" aria-hidden="true"></div>
 </section>`;
 
-  const fill = /** @type {HTMLElement} */ (main.querySelector('.fill')),
+  const bar = /** @type {any} */ (main.querySelector('nano-bench-progress')),
     label = /** @type {HTMLElement} */ (main.querySelector('.run-progress .label')),
     notes = /** @type {HTMLElement} */ (main.querySelector('.run-notes')),
     body = /** @type {HTMLElement} */ (main.querySelector('.run-table tbody')),
@@ -129,15 +129,18 @@ export const runBench = async (main, options) => {
     stop.textContent = 'Stopping…';
   });
 
-  // ?trace logs each update with the width the page computed, for engines we can't run
+  // ?trace logs each update with the fill's rendered box, for engines we can't run
   const trace = new URLSearchParams(location.search).has('trace'),
-    progress = (text, fraction) => {
-      fill.style.width = `${Math.round(100 * Math.min(1, Math.max(0, fraction)))}%`;
+    progress = (text, value = null, max = 1) => {
+      bar.max = max;
+      bar.value = value;
       label.textContent = text;
-      if (trace)
-        console.log(
-          `nano-bench ${performance.now().toFixed(1)} ms: ${fill.style.width} set, ${getComputedStyle(fill).width} computed: ${text}`
-        );
+      if (!trace) return;
+      const box = bar.firstElementChild.getBoundingClientRect(),
+        where = value === null ? 'indeterminate' : `${value} of ${max}`;
+      console.log(
+        `nano-bench ${performance.now().toFixed(1)} ms: ${where}, fill ${box.width.toFixed(1)}x${box.height.toFixed(1)} px: ${text}`
+      );
     };
 
   // a hidden tab clamps timers to 1 s or more and changes the GC window: wait for the tab
@@ -171,7 +174,7 @@ export const runBench = async (main, options) => {
       box.hidden = false;
     }
 
-    progress('loading the module', 0);
+    progress('loading the module');
     const lister = frames.open({file: url, export: exportName}),
       listed = await lister.ready;
     if (listed.type === 'error') throw new Error(listed.message);
@@ -197,7 +200,7 @@ export const runBench = async (main, options) => {
     // one step per calibration, then one per sample, so the bar never moves backwards
     const steps = k + k * samples;
     for (let i = 0; i < k && !stopped; ++i) {
-      progress(`calibrating ${names[i]} (${i + 1} of ${k})`, i / steps);
+      progress(`calibrating ${names[i]} (${i + 1} of ${k})`, i, steps);
       await visible();
       iterations[i] = await frames.ask(opened[i].frame, {
         op: 'calibrate',
@@ -221,7 +224,8 @@ export const runBench = async (main, options) => {
         progress(
           `sampling: round ${round + 1} of ${samples}` +
             (done > k ? ` · about ${Math.max(1, Math.round(left / 1000))} s left` : ''),
-          (k + done) / steps
+          k + done,
+          steps
         );
         // the GC window between samples, as in the CLI
         await sleep(5);
@@ -234,7 +238,7 @@ export const runBench = async (main, options) => {
     }
     if (data.some(series => series.length < 2)) throw new Error('stopped before enough samples');
 
-    progress('computing statistics', 1);
+    progress('computing statistics');
     await sleep(0);
     const seed = (Math.random() * 2 ** 32) >>> 0,
       browser = detectBrowser(navigator.userAgent),

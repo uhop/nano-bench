@@ -294,18 +294,47 @@ button.compare:disabled {
   margin: 10px 0;
 }
 
-.run-progress .bar {
-  flex: 0 0 240px;
+nano-bench-progress {
+  display: block;
+  width: 240px;
   height: 8px;
   background: var(--grid);
   border-radius: 4px;
   overflow: hidden;
 }
 
-.run-progress .fill {
+nano-bench-progress > span {
+  display: block;
   width: 0;
   height: 100%;
   background: var(--series);
+}
+
+/* transform only: the compositor animates it without the page's main thread */
+nano-bench-progress:not([value]) > span {
+  width: 40%;
+  animation: nano-bench-progress-pending 1.5s ease-in-out infinite;
+}
+
+@keyframes nano-bench-progress-pending {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  nano-bench-progress:not([value]) > span {
+    animation: none;
+    width: 100%;
+    opacity: 0.4;
+  }
+}
+
+.run-progress nano-bench-progress {
+  flex: 0 0 240px;
 }
 
 .run-progress .label {

@@ -17,6 +17,7 @@ web-app/                      # Browser viewer (shipped via npm; plain ES module
 ├── view.js                         # Files, warnings, summary, distribution chart, significance
 ├── run.js                          # Browser runner: an iframe per function, interleaved rounds
 ├── frame.js                        # The iframe side: loads one function, answers calibrate/sample
+├── components/nano-bench-progress.js  # <nano-bench-progress value max>: the runner's bar, indeterminate without value
 ├── theme-init.js / theme.js        # Auto / Light / Dark: applied before paint, saved in localStorage
 └── theme.css / app.css / autoindex.css
 src/                          # Internal source (shipped via npm)
