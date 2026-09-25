@@ -124,6 +124,10 @@ const significanceBlock = (members, name, {alpha, correction}) => {
     out.push(
       `<p>Each function was measured in several processes, so the test compares per-process medians (${arrays.map(a => a.length).join(' vs ')}).</p>`
     );
+  else if (unit === 'phase-medians')
+    out.push(
+      `<p>Each function ran in phases under load, so the test compares per-phase medians (${arrays.map(a => a.length).join(' vs ')}).</p>`
+    );
   else if (unit === 'round-medians')
     out.push(
       `<p>Each function ran in rounds of concurrent calls, so the test compares per-round medians (${arrays.map(a => a.length).join(' vs ')}).</p>`

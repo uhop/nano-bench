@@ -163,6 +163,22 @@ Opt-in per-run system metrics: printed as a second table of medians and persiste
 
 Latency distributions are often multimodal (fast path vs slow path, cache hit vs miss) — one median then lies the same way one mean does. Every run set is gated by a Hartigan-style dip test (the statistic is bootstrap-calibrated against the uniform null with a seeded RNG, so the p-value stays honest): a multimodal distribution gets a note suggesting `--clusters`, and the flag splits the samples at the KDE density minima (Gaussian kernel, Silverman bandwidth), reporting per cluster: weight (the fast/slow split as a %), median with bootstrap CI, and its min/max bounds (separate columns). The **mode count is a labeled heuristic** — reported for confirmation, never asserted. When the dip test fires but KDE finds a single mode (heavy skew), a note says so instead. The same gate and flag exist on `nano-bench-compare` for saved runs.
 
+### Load: closed and open loops
+
+`--in-flight <n>` and `--rate <r>` run each function under load instead of one call at a time. Both run in phases of `--phase <ms>` (default 1000); each function gets `--budget` / `--phase` phases (at least one), rotated across functions round by round with `--order interleaved` (the default) or in turn with `sequential`. `--warmup N` discards N phases per function; warmup auto-detection does not run under load.
+
+- **Closed loop** (`--in-flight <n>`): n workers, each starting its next call when the last one settles, until the phase ends; calls already started finish. Latency is each call's own duration. A closed loop slows its own arrivals when the target slows, so it under-samples slow periods (coordinated omission).
+- **Open loop** (`--rate <r>`): a call is due every 1000 / r ms whether or not earlier calls have settled. Latency counts from the call's **intended** start (the wrk2 correction for coordinated omission), so a backlog shows in the tail; the service time from the actual start is kept too. A call due while `--max-in-flight` calls (default 1000) are running is dropped and counted, as k6's dropped iterations; the harness never starts a call before its time.
+- `prepare()` / `teardown()` run around each phase, since calls overlap. `--gc once` collects after warmup, `--gc each` before every phase.
+- Output: a `Load:` table after the summary: calls and achieved calls/s per function, plus, for an open loop, the dropped calls, the median service time, and the median start lag of the harness itself. A note fires when calls were dropped. Calls in one phase share the load, so the significance test compares per-phase medians (`significance.unit: "phase-medians"`), and with two functions a note says when the phase count is too small for the test to reach α.
+- Refused together with `--runs`, `--min-runs`, `--max-runs`, `--stable`, `--settle`, `--isolate`, and `-M`; `--phase` and `--max-in-flight` need a load mode. Command mode (`-c`) works under load.
+- JSON: `params.load` (`{mode: "closed", inFlight}` or `{mode: "open", rate, maxInFlight}`), `params.phase`, `params.phases`; per series `phaseSizes`, `load` (`calls`, `throughput`, and for an open loop `scheduled`, `dropped`, `serviceMedian`, `lagMedian`), and for an open loop `serviceSamples`. `nano-bench-compare` and the viewer test per-phase medians whenever every compared series has more than one phase.
+
+```bash
+npx nano-bench-io api-bench.js --in-flight 8             # 8 calls in flight, 5 phases of 1 s
+npx nano-bench-io api-bench.js --rate 200 -t 10000       # 200 calls/s, 10 phases per function
+```
+
 ### Other options
 
 Shared with nano-bench: `-e, --export`, `-a, --alpha`, `-b, --bootstrap`, `--seed`, `--correction`, `-v, --verbose`, `--histogram` / `--chart` / `--bins`, `--no-emoji`, `--json` / `--label` / `-H, --host` / `--host-name`, `--smoke`, `--self`.

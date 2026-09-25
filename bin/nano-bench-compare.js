@@ -167,6 +167,10 @@ const renderBlock = (members, name) => {
     writer.writeString(
       c`\n{{save.bold}}Processes:{{restore}} the test compares per-process medians (${arrays.map(a => a.length).join(' vs ')})\n`
     );
+  else if (unit === 'phase-medians')
+    writer.writeString(
+      c`\n{{save.bold}}Phases:{{restore}} the test compares per-phase medians of calls under load (${arrays.map(a => a.length).join(' vs ')})\n`
+    );
   else if (unit === 'round-medians')
     writer.writeString(
       c`\n{{save.bold}}Rounds:{{restore}} the test compares per-round medians of concurrent calls (${arrays.map(a => a.length).join(' vs ')})\n`

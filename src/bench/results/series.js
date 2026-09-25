@@ -43,6 +43,7 @@ export const buildSeries = (files, {alpha}) => {
         samples: s.samples,
         metrics: Array.isArray(s.metrics) ? s.metrics : null,
         processSizes: Array.isArray(s.processSizes) ? s.processSizes : null,
+        phaseSizes: Array.isArray(s.phaseSizes) ? s.phaseSizes : null,
         // `-p N` stores N; files before it store `true`, a single burst with no rounds
         roundSize: typeof f.results.params.parallel == 'number' ? f.results.params.parallel : null,
         metricsKind: f.results.params.metrics,
@@ -55,10 +56,10 @@ export const buildSeries = (files, {alpha}) => {
 
 const median = samples => getWeightedValue(samples.slice().sort(numericAsc), 0.5);
 
-const splitProcesses = s => {
+const splitBySizes = (s, sizes) => {
   const parts = [];
   let start = 0;
-  for (const size of s.processSizes) {
+  for (const size of sizes) {
     parts.push(s.samples.slice(start, start + size));
     start += size;
   }
@@ -75,13 +76,22 @@ const splitRounds = s => {
 /**
  * What a significance test compares: per-process medians when every series was measured in
  * more than one process (`nano-bench --isolate --repeat N`), per-round medians when every series
- * ran in rounds of concurrent calls (`nano-bench -p N`), the samples otherwise.
- * @param {{samples: number[], processSizes?: number[] | null, roundSize?: number | null}[]} members
- * @returns {{arrays: number[][], unit: 'samples' | 'process-medians' | 'round-medians'}}
+ * ran in rounds of concurrent calls (`nano-bench -p N`), per-phase medians when every series
+ * ran in more than one load phase (`nano-bench-io --in-flight` or `--rate`), the samples otherwise.
+ * @param {{samples: number[], processSizes?: number[] | null, phaseSizes?: number[] | null, roundSize?: number | null}[]} members
+ * @returns {{arrays: number[][], unit: 'samples' | 'process-medians' | 'round-medians' | 'phase-medians'}}
  */
 export const comparisonArrays = members => {
   if (members.every(s => s.processSizes && s.processSizes.length > 1))
-    return {arrays: members.map(s => splitProcesses(s).map(median)), unit: 'process-medians'};
+    return {
+      arrays: members.map(s => splitBySizes(s, s.processSizes).map(median)),
+      unit: 'process-medians'
+    };
+  if (members.every(s => s.phaseSizes && s.phaseSizes.length > 1))
+    return {
+      arrays: members.map(s => splitBySizes(s, s.phaseSizes).map(median)),
+      unit: 'phase-medians'
+    };
   if (members.every(s => s.roundSize > 1))
     return {arrays: members.map(s => splitRounds(s).map(median)), unit: 'round-medians'};
   return {arrays: members.map(s => s.samples), unit: 'samples'};

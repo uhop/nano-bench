@@ -40,6 +40,7 @@ src/                          # Internal source (shipped via npm)
 │   ├── contention.js               # CPU contention check: per-sample CPU time / elapsed time
 │   ├── gc.js                       # --gc: findGc, a forced collection per runtime
 │   ├── isolate.js                  # --isolate: runChild, isolationPlan, fastestPerRound
+│   ├── load-runner.js              # --in-flight / --rate: closed and open loops in phases
 │   ├── params.js                   # factory files: one child per parameter value, the scaling table
 │   ├── settle.js                   # --settle: per-pair median-ratio CI against ±threshold
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
@@ -211,6 +212,7 @@ bin/nano-bench.js ──→ src/bench/runner.js ──→ src/stats.js
 bin/nano-bench-io.js ──→ src/bench/macro-runner.js
                      ──→ src/bench/isolate.js (--isolate, --repeat)
                      ──→ src/bench/settle.js (--settle), src/bench/gc.js (--gc)
+                     ──→ src/bench/load-runner.js, render/load-table.js (--in-flight, --rate)
                      ──→ src/bench/command-runner.js (the -c/--command adapter)
                      ──→ src/bench/outlier-notes.js ──→ src/stats/{quantile,mad}.js
                      ──→ src/stats.js (bootstrapSummary), src/stats/quantile.js

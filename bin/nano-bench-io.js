@@ -50,6 +50,9 @@ import selectFunctions from '../src/bench/select-functions.js';
 import smokeRun from '../src/bench/smoke.js';
 import {bodyHash, textHash} from '../src/utils/body-hash.js';
 import settlePairs from '../src/bench/settle.js';
+import collectLoad from '../src/bench/load-runner.js';
+import zPpf from '../src/stats/z-ppf.js';
+import {loadTable} from '../src/bench/render/load-table.js';
 import {captureEnvironment} from '../src/bench/results/environment.js';
 import {buildResultsObject} from '../src/bench/results/build.js';
 import {computeHistograms, binCount} from '../src/bench/histogram.js';
@@ -112,6 +115,34 @@ program
       .argParser(toFloat)
   )
   .option('--max-runs <runs>', 'hard cap on measured runs', toInt, 1000)
+  .addOption(
+    new Option('--in-flight <n>', 'closed loop: keep n calls in flight for each load phase')
+      .conflicts([
+        ...['runs', 'stable', 'settle', 'isolate', 'metrics', 'minRuns', 'maxRuns'],
+        'rate'
+      ])
+      .argParser(toInt)
+  )
+  .addOption(
+    new Option(
+      '--rate <r>',
+      "open loop: start r calls per second, latency counted from each call's intended start"
+    )
+      .conflicts(['runs', 'stable', 'settle', 'isolate', 'metrics', 'minRuns', 'maxRuns'])
+      .argParser(toFloat)
+  )
+  .option(
+    '--phase <ms>',
+    'load phase length in milliseconds (with --in-flight or --rate)',
+    toInt,
+    1000
+  )
+  .option(
+    '--max-in-flight <n>',
+    'with --rate: calls allowed in flight; a call due past it is dropped',
+    toInt,
+    1000
+  )
   .addOption(
     new Option(
       '--order <order>',
@@ -201,6 +232,29 @@ if (options.alpha <= 0 || options.alpha >= 1)
 if (options.bootstrap < 1) program.error('The number of bootstrap samples must be >= 1');
 if (options.repeat < 1) program.error('The number of processes per function must be >= 1');
 if (options.repeat > 1 && !options.isolate) program.error('--repeat needs --isolate');
+if (options.inFlight !== undefined && !(options.inFlight >= 1))
+  program.error('The number of calls in flight must be >= 1');
+if (options.rate !== undefined && !(options.rate > 0)) program.error('The rate must be > 0');
+if (!(options.phase >= 1)) program.error('The phase length must be >= 1 ms');
+if (!(options.maxInFlight >= 1)) program.error('The in-flight cap must be >= 1');
+if (program.getOptionValueSource('maxInFlight') !== 'default' && options.rate === undefined)
+  program.error('--max-in-flight needs --rate');
+if (
+  program.getOptionValueSource('phase') !== 'default' &&
+  options.rate === undefined &&
+  options.inFlight === undefined
+)
+  program.error('--phase needs --in-flight or --rate');
+
+const load =
+    /** @type {{mode: 'closed' | 'open', inFlight?: number, rate?: number, maxInFlight?: number} | null} */ (
+      options.inFlight !== undefined
+        ? {mode: 'closed', inFlight: options.inFlight}
+        : options.rate !== undefined
+          ? {mode: 'open', rate: options.rate, maxInFlight: options.maxInFlight}
+          : null
+    ),
+  loadPhases = load ? Math.max(1, Math.round(options.budget / options.phase)) : 0;
 
 const seed = (options.seed ?? Math.random() * 2 ** 32) >>> 0;
 
@@ -348,8 +402,11 @@ if (options.settle > 0 && names.length < 2)
 
 const interleaved = !options.isolate && options.order === 'interleaved' && names.length > 1;
 
-const policyLine =
-  options.runs > 0
+const policyLine = load
+  ? load.mode === 'closed'
+    ? c`Load: a closed loop, {{save.bright.yellow}}${formatInteger(load.inFlight)}{{restore}} calls in flight; ${formatInteger(loadPhases)} phases of ${formatTime(options.phase, prepareTimeFormat([options.phase], 1000))} per function (${options.order})`
+    : c`Load: an open loop at {{save.bright.yellow}}${formatNumber(load.rate, {decimals: 2})}{{restore}} calls/s (at most ${formatInteger(load.maxInFlight)} in flight); ${formatInteger(loadPhases)} phases of ${formatTime(options.phase, prepareTimeFormat([options.phase], 1000))} per function (${options.order}); latency counts from each call's intended start`
+  : options.runs > 0
     ? c`Measuring {{save.bright.yellow}}${formatInteger(options.runs)}{{restore}} runs per function (no batching, one call per run)`
     : options.settle > 0
       ? c`Measuring until every pair's difference is settled against {{save.bright.yellow}}±${formatNumber(options.settle, {decimals: 2})}%{{restore}} at two checks in a row (at least ${formatInteger(
@@ -379,7 +436,7 @@ await writer.write([
           options.repeat
         )}{{restore}} per function (${options.order}); the stop policy runs in each process`
       ]
-    : interleaved
+    : interleaved && !load
       ? ['Interleaved: one run of each function per round; the stop policy counts rounds']
       : []),
   ...(options.gc === 'none'
@@ -389,7 +446,9 @@ await writer.write([
           ? 'No garbage collector is available on this runtime: --gc is ignored'
           : options.gc === 'once'
             ? 'GC: one forced collection after warmup'
-            : 'GC: a forced collection before every run, outside the timed window'
+            : load
+              ? 'GC: a forced collection before every load phase'
+              : 'GC: a forced collection before every run, outside the timed window'
       ]),
   ''
 ]);
@@ -517,7 +576,78 @@ let lastSettle = null,
 // perProcess[fn][round]: the runs of one child process, detected warmup dropped
 let perProcess = null;
 
-if (options.isolate) {
+// perPhase[fn]: the load phases' results; loads[fn]: calls, throughput, and open-loop counts
+let perPhase = null,
+  loads = null;
+
+if (load) {
+  const startedAt = performance.now();
+  progress = {label: 'load', done: 0, total: 1};
+  await updater.update();
+  let collected;
+  try {
+    collected = await collectLoad(
+      names.map(name => fns[name]),
+      {
+        ...load,
+        phase: options.phase,
+        phases: loadPhases,
+        warmup: options.warmup,
+        order: options.order,
+        beforePhase: async () => {
+          await prepare?.();
+          await policy.beforeRun?.();
+        },
+        afterPhase: teardown,
+        afterWarmup: policy.afterWarmup
+      },
+      async (name, data) => {
+        if (name !== 'load-phase') return;
+        const elapsed = performance.now() - startedAt;
+        progress = {
+          label: `phase ${data.done} of ${data.total}: ${names[data.index]}${data.round < options.warmup ? ' (warmup)' : ''}`,
+          done: data.done,
+          total: data.total,
+          remainingMs: (elapsed / data.done) * (data.total - data.done)
+        };
+        await updater.update();
+      }
+    );
+  } catch (error) {
+    await finishUpdater();
+    program.error(String(error));
+  }
+  perPhase = collected.phases;
+  const medianOf = values =>
+    values.length ? quantileSorted(values.slice().sort(numericAsc), 0.5) : undefined;
+  loads = perPhase.map(phases => {
+    const calls = phases.reduce((sum, r) => sum + r.latencies.length, 0),
+      elapsed = phases.reduce((sum, r) => sum + r.elapsed, 0);
+    return {
+      calls,
+      throughput: elapsed > 0 ? (1000 * calls) / elapsed : 0,
+      ...(load.mode === 'open'
+        ? {
+            scheduled: phases.reduce((sum, r) => sum + r.scheduled, 0),
+            dropped: phases.reduce((sum, r) => sum + r.dropped, 0),
+            serviceMedian: medianOf(phases.flatMap(r => r.services)),
+            lagMedian: medianOf(phases.flatMap(r => r.lags))
+          }
+        : {})
+    };
+  });
+  for (let i = 0; i < names.length; ++i) {
+    if (!loads[i].calls) {
+      await finishUpdater();
+      program.error(`${names[i]}: no call finished in any phase; lengthen --phase`);
+    }
+    await summarize(
+      i,
+      perPhase[i].flatMap(r => r.latencies),
+      false
+    );
+  }
+} else if (options.isolate) {
   const script = fileURLToPath(import.meta.url),
     file = fileURLToPath(fileName),
     plan = isolationPlan(names.length, options.repeat, options.order),
@@ -723,6 +853,29 @@ if (options.isolate) {
 
 await finishUpdater();
 
+if (loads) {
+  await writer.write(['', c`{{save.bold}}Load:{{restore}} measured phases`, '']);
+  await writer.write(loadTable(names, loads, load.mode === 'open'));
+  // mwtest's normal approximation: n phases a side reach at most |z| = n·sqrt(3 / (2n + 1))
+  if (
+    names.length === 2 &&
+    loadPhases > 1 &&
+    loadPhases * Math.sqrt(3 / (2 * loadPhases + 1)) <= -zPpf(options.alpha / 2)
+  )
+    notes.push({
+      name: '',
+      note: `${loadPhases} phases per function: the per-phase test cannot reach α = ${options.alpha}; raise --budget or shorten --phase`
+    });
+  for (let i = 0; i < names.length; ++i) {
+    const l = loads[i];
+    if (load.mode === 'open' && l.dropped)
+      notes.push({
+        name: names[i],
+        note: `${formatInteger(l.dropped)} of ${formatInteger(l.scheduled)} calls dropped at the in-flight cap: the target fell behind ${formatNumber(load.rate, {decimals: 2})} calls/s`
+      });
+  }
+}
+
 if (options.metrics) {
   if (metricsOn) {
     const medians = names.map((_, i) => guardedMedians(runMetrics[i], metricSpecs[metricsKind]));
@@ -828,13 +981,27 @@ if (settleReport) {
 let significance = null;
 if (results.length > 1) {
   // several processes per function: the process is the unit, as in nano-bench --isolate
+  // calls in one load phase share the load: the phase is the unit
   const byProcess = perProcess && options.repeat > 1,
+    byPhase = perPhase && loadPhases > 1,
+    medianOfRuns = runs => quantileSorted(runs.slice().sort(numericAsc), 0.5),
     tested = byProcess
-      ? perProcess.map(list => list.map(runs => quantileSorted(runs.slice().sort(numericAsc), 0.5)))
-      : results,
+      ? perProcess.map(list => list.map(medianOfRuns))
+      : byPhase
+        ? perPhase.map(phases => phases.map(r => medianOfRuns(r.latencies)))
+        : results,
     testResult = computeSignificance(tested, options.alpha, options.correction),
     matrix = significanceMatrix(testResult);
-  significance = byProcess ? {...testResult, unit: 'process-medians'} : testResult;
+  significance = byProcess
+    ? {...testResult, unit: 'process-medians'}
+    : byPhase
+      ? {...testResult, unit: 'phase-medians'}
+      : testResult;
+  if (byPhase)
+    await writer.write([
+      '',
+      c`{{save.bold}}Phases:{{restore}} ${formatInteger(loadPhases)} per function; the test below compares per-phase medians`
+    ]);
   if (byProcess) {
     const wins = fastestPerRound(tested),
       tally = names
@@ -901,6 +1068,7 @@ if (options.json) {
         : {minRuns: options.minRuns, budget: options.budget}),
       ...(options.stable > 0 ? {stable: options.stable, stableChecks: 2} : {}),
       ...(options.settle > 0 ? {settle: options.settle, settleChecks: 2} : {}),
+      ...(load ? {load, phase: options.phase, phases: loadPhases} : {}),
       ...(metricsOn ? {metrics: metricsKind} : {}),
       maxRuns: options.maxRuns,
       warmup: options.warmup,
@@ -920,6 +1088,13 @@ if (options.json) {
       samples: results[i],
       ...(detectedWarmup[i] ? {warmupDetected: detectedWarmup[i]} : {}),
       ...(perProcess ? {processSizes: perProcess[i].map(runs => runs.length)} : {}),
+      ...(perPhase
+        ? {
+            phaseSizes: perPhase[i].map(r => r.latencies.length),
+            load: loads[i],
+            ...(load.mode === 'open' ? {serviceSamples: perPhase[i].flatMap(r => r.services)} : {})
+          }
+        : {}),
       ...(metricsOn ? {metrics: runMetrics[i]} : {}),
       summary: {
         median: stats[i].median,

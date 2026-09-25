@@ -158,7 +158,9 @@ makes it explicit and reports each mode apart.
 - **Coordinated omission** (Gil Tene): a closed-loop macro benchmark that waits
   for each run under-samples the tail during slow periods. For tens-of-runs whole
   processes this is less acute than for high-rate load testing, but a note in the
-  output (or an open-loop option) is worth it.
+  output (or an open-loop option) is worth it. **Resolved 2026-09-25:** `nano-bench-io
+--rate` is that open loop, counting latency from each call's intended start; `--in-flight`
+  is the closed loop, documented as subject to coordinated omission.
 - **Streaming quantiles for unbounded per-op I/O:** **t-digest** (mergeable,
   accurate at extreme quantiles, no fixed range) looks the better fit than
   HdrHistogram (fixed value range) for the per-operation tail case, but confirm

@@ -194,3 +194,23 @@ test('isolationWarning()', t => {
     'resultsWarnings() reports it'
   );
 });
+
+test('comparisonArrays(): per-phase medians', t => {
+  const {arrays, unit} = comparisonArrays([
+    {samples: [1, 2, 3, 10, 20], phaseSizes: [3, 2]},
+    {samples: [4, 5, 6, 7], phaseSizes: [1, 3]}
+  ]);
+  t.equal(unit, 'phase-medians');
+  t.deepEqual(arrays, [
+    [2, 15],
+    [4, 6]
+  ]);
+  t.equal(
+    comparisonArrays([
+      {samples: [1, 2], phaseSizes: [2]},
+      {samples: [3], phaseSizes: [1]}
+    ]).unit,
+    'samples',
+    'one phase each: the samples are the unit'
+  );
+});

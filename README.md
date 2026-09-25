@@ -359,6 +359,17 @@ tail percentiles:
 npx nano-bench-io -c 'node script.js' 'bun script.js'
 ```
 
+To measure under load, `--in-flight 8` keeps 8 calls running (a closed loop), and
+`--rate 200` starts 200 calls a second whether or not earlier ones have finished (an open
+loop). The open loop counts latency from each call's intended start, so a backlog shows in
+the tail instead of hiding in the arrivals, and calls past `--max-in-flight` are dropped and
+counted. Functions take turns in phases of `--phase` milliseconds, and a table reports the
+calls per second each one sustained:
+
+```bash
+npx nano-bench-io api-bench.js --rate 200
+```
+
 Add `-M` / `--metrics` for per-run system metrics: CPU, page faults, and context
 switches for module functions (any runtime); peak RSS, I/O bytes, and syscall
 counts for commands (Linux).
