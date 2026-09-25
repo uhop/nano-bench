@@ -6,7 +6,8 @@ export const buildResultsObject = ({
   environment,
   params,
   series,
-  significance
+  significance,
+  settle = null
 }) => ({
   schemaVersion: 1,
   tool: pkg.name,
@@ -17,7 +18,8 @@ export const buildResultsObject = ({
   environment,
   params,
   results: series,
-  ...(significance ? {significance} : {})
+  ...(significance ? {significance} : {}),
+  ...(settle ? {settle} : {})
 });
 
 export default buildResultsObject;

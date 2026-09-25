@@ -14,7 +14,9 @@ export const collectMacro = async (fn, options = {}, report) => {
     prepare,
     teardown,
     metricsBefore,
-    metricsAfter
+    metricsAfter,
+    afterWarmup,
+    beforeRun
   } = options;
 
   for (let i = 0; i < warmup; ++i) {
@@ -24,11 +26,13 @@ export const collectMacro = async (fn, options = {}, report) => {
     await report?.('macro-warmup', {n: i + 1, warmup});
   }
 
+  await afterWarmup?.();
   const samples = [],
     started = performance.now();
   let passed = 0;
   for (;;) {
     await prepare?.();
+    await beforeRun?.();
     const token = metricsBefore?.();
     const start = performance.now();
     await fn(1);
@@ -62,9 +66,10 @@ export const collectMacro = async (fn, options = {}, report) => {
 /**
  * One run of every function per round, rotating which goes first. The stop policy counts rounds:
  * `runs` and `minRuns`/`maxRuns` are rounds, `budget` is the whole loop's wall time, and with
- * `stable` a check passes when every function's width is within the target.
+ * `stable` a check passes when every function's width is within the target; with `settle` it
+ * passes when `settle(samples).settled` is true.
  * @param {Function[]} fns
- * @param {{warmup?: number, runs?: number, minRuns?: number, budget?: number, stable?: number, maxRuns?: number, checkEvery?: number, consecutive?: number, ciWidth?: (samples: number[], index: number) => number, prepare?: () => unknown, teardown?: () => unknown, metricsBefore?: (index: number) => any, metricsAfter?: (token: any, index: number) => unknown}} [options]
+ * @param {{warmup?: number, runs?: number, minRuns?: number, budget?: number, stable?: number, maxRuns?: number, checkEvery?: number, consecutive?: number, ciWidth?: (samples: number[], index: number) => number, prepare?: () => unknown, teardown?: () => unknown, metricsBefore?: (index: number) => any, metricsAfter?: (token: any, index: number) => unknown, afterWarmup?: () => unknown, beforeRun?: () => unknown, settle?: (samples: number[][]) => {settled: boolean}}} [options]
  * @param {(name: string, data: any) => unknown} [report]
  * @returns {Promise<number[][]>} samples per function, in time order
  */
@@ -82,7 +87,10 @@ export const collectMacroRounds = async (fns, options = {}, report) => {
     prepare,
     teardown,
     metricsBefore,
-    metricsAfter
+    metricsAfter,
+    afterWarmup,
+    beforeRun,
+    settle
   } = options;
   const k = fns.length;
 
@@ -95,6 +103,7 @@ export const collectMacroRounds = async (fns, options = {}, report) => {
     await report?.('macro-warmup', {n: round + 1, warmup});
   }
 
+  await afterWarmup?.();
   const samples = fns.map(() => /** @type {number[]} */ ([])),
     started = performance.now();
   let passed = 0;
@@ -102,6 +111,7 @@ export const collectMacroRounds = async (fns, options = {}, report) => {
     for (let j = 0; j < k; ++j) {
       const i = (warmup + round + j) % k;
       await prepare?.();
+      await beforeRun?.();
       const token = metricsBefore?.(i);
       const start = performance.now();
       await fns[i](1);
@@ -120,6 +130,15 @@ export const collectMacroRounds = async (fns, options = {}, report) => {
     }
     if (n >= maxRuns) break;
     if (n < minRuns) continue;
+    if (settle) {
+      if (n % checkEvery === 0) {
+        const verdict = settle(samples);
+        passed = verdict.settled ? passed + 1 : 0;
+        await report?.('macro-settle', {...verdict, n, passed});
+        if (passed >= consecutive) break;
+      }
+      continue;
+    }
     if (stable > 0) {
       if (n % checkEvery === 0 && ciWidth) {
         const widths = samples.map((s, i) => ciWidth(s, i)),

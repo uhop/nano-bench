@@ -102,6 +102,12 @@ export default {
     t.equal(data.significance.unit, 'process-medians', 'the test runs on per-process medians');
     t.ok(r.out.includes('Fastest median in each round'), 'the direction tally is printed');
 
+    r = await run([bench, 'a', 'b', '--gc', 'once', '-i', '100', '-s', '3', '--json', json]);
+    t.equal(r.code, 0, '--gc once');
+    data = JSON.parse(await readFile(json, 'utf8'));
+    t.equal(data.params.gc, 'once');
+    t.ok(r.out.includes('one forced collection before sampling'), 'the GC mode is announced');
+
     r = await run([bench, 'a', '--repeat', '2', '-i', '100']);
     t.notEqual(r.code, 0, '--repeat without --isolate is refused');
 
@@ -155,6 +161,29 @@ test('nano-bench-io --order and --isolate', async t => {
       'every run is kept: a macro run has no dropped first run'
     );
     t.equal(data.significance.unit, 'process-medians', 'the test runs on per-process medians');
+
+    r = await io([bench, '-r', '3', '--gc', 'each', '--isolate', '--json', json]);
+    t.equal(r.code, 0, '--gc passes through to isolated children');
+    data = JSON.parse(await readFile(json, 'utf8'));
+    t.equal(data.params.gc, 'each');
+    t.ok(r.out.includes('before every run'), 'the GC mode is announced');
+
+    r = await io([bench, '--settle', '20', '--max-runs', '60', '--json', json]);
+    t.equal(r.code, 0, '--settle');
+    data = JSON.parse(await readFile(json, 'utf8'));
+    t.equal(data.params.settle, 20);
+    t.equal(data.settle.pairs.length, 1, 'one pair');
+    t.ok(['settled', 'max-runs'].includes(data.settle.reason), 'the stop reason is recorded');
+    t.ok(r.out.includes('Settle:'), 'the verdicts are printed');
+
+    r = await io([bench, 'a', '--settle', '5']);
+    t.notEqual(r.code, 0, '--settle with one function is refused');
+
+    r = await io([bench, '--settle', '5', '--order', 'sequential']);
+    t.notEqual(r.code, 0, '--settle with --order sequential is refused');
+
+    r = await io(['-c', 'node -e 0', '--gc', 'once', '-r', '2']);
+    t.notEqual(r.code, 0, '--gc with --command is refused');
 
     r = await io([bench, '--repeat', '2', '-r', '2']);
     t.notEqual(r.code, 0, '--repeat without --isolate is refused');

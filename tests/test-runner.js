@@ -355,3 +355,27 @@ test('concurrent rounds', async t => {
     t.equal(Math.max(...a.seen, ...b.seen), 3, 'functions never overlap each other');
   });
 });
+
+test('beforeSample runs before every sample, outside the timing', async t => {
+  let calls = 0;
+  const hook = () => ++calls;
+  await benchmarkSeries(() => {}, 1, {nSeries: 3, timeout: 0, beforeSample: hook});
+  t.equal(calls, 3, 'benchmarkSeries: once per sample');
+
+  calls = 0;
+  await benchmarkRounds([() => {}, () => {}], [1, 1], {nSeries: 2, timeout: 0, beforeSample: hook});
+  t.equal(calls, 4, 'benchmarkRounds: once per sample of each function');
+
+  calls = 0;
+  await benchmarkSeriesPar(async () => {}, 1, {
+    nSeries: 3,
+    concurrency: 2,
+    timeout: 0,
+    beforeSample: hook
+  });
+  t.equal(calls, 3, 'benchmarkSeriesPar: once per round');
+
+  calls = 0;
+  await benchmarkSeriesPar(async () => {}, 1, {nSeries: 3, beforeSample: hook});
+  t.equal(calls, 1, 'benchmarkSeriesPar without concurrency: once before the burst');
+});

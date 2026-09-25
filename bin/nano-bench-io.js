@@ -20,6 +20,7 @@ import Updater from 'console-toolkit/output/updater.js';
 
 import {collectMacro, collectMacroRounds} from '../src/bench/macro-runner.js';
 import {runChild, isolationPlan, fastestPerRound} from '../src/bench/isolate.js';
+import findGc, {gcModes} from '../src/bench/gc.js';
 import detectWarmup from '../src/bench/warmup-detect.js';
 import runCommand, {commandFunctions} from '../src/bench/command-runner.js';
 import {rusageAvailable, rusageDelta} from '../src/bench/metrics.js';
@@ -47,6 +48,7 @@ import {smokeTable} from '../src/bench/render/smoke-table.js';
 import selectFunctions from '../src/bench/select-functions.js';
 import smokeRun from '../src/bench/smoke.js';
 import {bodyHash, textHash} from '../src/utils/body-hash.js';
+import settlePairs from '../src/bench/settle.js';
 import {captureEnvironment} from '../src/bench/results/environment.js';
 import {buildResultsObject} from '../src/bench/results/build.js';
 import {computeHistograms, binCount} from '../src/bench/histogram.js';
@@ -92,13 +94,21 @@ program
   .option('-t, --budget <ms>', 'time budget per function in milliseconds', toInt, 5000)
   .addOption(
     new Option('-r, --runs <runs>', 'exact number of runs (overrides the stop policy)')
-      .conflicts(['budget', 'minRuns', 'stable'])
+      .conflicts(['budget', 'minRuns', 'stable', 'settle'])
       .argParser(toInt)
   )
   .option(
     '--stable <pct>',
     'run until the median CI width is <= pct% of the median at two checks in a row (overrides --budget)',
     toFloat
+  )
+  .addOption(
+    new Option(
+      '--settle <pct>',
+      "run until every pair's median ratio CI shows a difference of at least pct% or rules one out, at two checks in a row (overrides --budget)"
+    )
+      .conflicts(['stable', 'isolate'])
+      .argParser(toFloat)
   )
   .option('--max-runs <runs>', 'hard cap on measured runs', toInt, 1000)
   .addOption(
@@ -113,6 +123,12 @@ program
     new Option('--isolate', 'measure each function in its own process').conflicts('command')
   )
   .option('--repeat <n>', 'with --isolate: processes per function', toInt, 1)
+  .addOption(
+    new Option('--gc <mode>', 'force a garbage collection: once after warmup, or before each run')
+      .choices(gcModes)
+      .default('none')
+      .conflicts('command')
+  )
   .addOption(new Option('--emit-runs', 'internal: child mode of --isolate').hideHelp())
   .option('-c, --command', 'treat the arguments as shell commands to benchmark, not a module file')
   .option('--prepare <cmd>', 'shell command run (untimed) before every run in command mode')
@@ -162,11 +178,15 @@ if (args[0] === 'self') showSelf();
 if (options.warmup < 0) program.error('The number of warmup runs must be >= 0');
 // measured 2026-09-24 (dev-docs/stable-stopping.md): a 10-run floor and a single passing check
 // stopped on lucky clusters and under-covered the median (82.5% for a 95% CI)
-options.minRuns ??= options.stable > 0 ? 30 : 10;
+options.minRuns ??= options.stable > 0 || options.settle > 0 ? 30 : 10;
 if (options.minRuns < 1) program.error('The minimum number of runs must be >= 1');
 if (options.budget < 1) program.error('The time budget must be >= 1 ms');
 if (options.runs !== undefined && options.runs < 1)
   program.error('The number of runs must be >= 1');
+if (options.settle !== undefined && !(options.settle > 0))
+  program.error('The settle threshold must be > 0');
+if (options.settle > 0 && options.order === 'sequential')
+  program.error('--settle compares functions round by round: it needs --order interleaved');
 if (options.stable !== undefined && options.stable <= 0)
   program.error('The CI width target must be > 0');
 if (options.maxRuns < 1) program.error('The maximum number of runs must be >= 1');
@@ -187,7 +207,11 @@ const ciWidth = samples => {
   return (100 * (s.ciHi - s.ciLo)) / s.median;
 };
 
+const gc = options.gc === 'none' ? null : await findGc();
+
 const policy = {
+  afterWarmup: options.gc === 'once' ? (gc ?? undefined) : undefined,
+  beforeRun: options.gc === 'each' ? (gc ?? undefined) : undefined,
   warmup: options.warmup,
   runs: options.runs || 0,
   minRuns: options.minRuns,
@@ -195,7 +219,17 @@ const policy = {
   stable: options.stable || 0,
   consecutive: 2,
   maxRuns: options.maxRuns,
-  ciWidth: options.stable > 0 ? ciWidth : undefined
+  ciWidth: options.stable > 0 ? ciWidth : undefined,
+  settle:
+    options.settle > 0
+      ? samples =>
+          settlePairs(samples, {
+            threshold: options.settle / 100,
+            alpha: options.alpha,
+            bootstrap: options.bootstrap,
+            random: mulberry32(seed)
+          })
+      : undefined
 };
 
 // open the file (or adapt the commands)
@@ -283,21 +317,28 @@ if (options.smoke) {
   process.exit(failed ? 1 : 0);
 }
 
+if (options.settle > 0 && names.length < 2)
+  program.error('--settle compares functions: it needs two or more');
+
 const interleaved = !options.isolate && options.order === 'interleaved' && names.length > 1;
 
 const policyLine =
   options.runs > 0
     ? c`Measuring {{save.bright.yellow}}${formatInteger(options.runs)}{{restore}} runs per function (no batching, one call per run)`
-    : options.stable > 0
-      ? c`Measuring until the median CI width is {{save.bright.yellow}}${formatNumber(options.stable, {decimals: 2})}%{{restore}} of the median at two checks in a row (at least ${formatInteger(
+    : options.settle > 0
+      ? c`Measuring until every pair's difference is settled against {{save.bright.yellow}}±${formatNumber(options.settle, {decimals: 2})}%{{restore}} at two checks in a row (at least ${formatInteger(
           options.minRuns
-        )} runs, at most ${formatInteger(options.maxRuns)})`
-      : c`Measuring for {{save.bright.yellow}}${formatTime(
-          options.budget,
-          prepareTimeFormat([options.budget], 1000)
-        )}{{restore}} per function (at least ${formatInteger(
-          options.minRuns
-        )} runs, at most ${formatInteger(options.maxRuns)})`;
+        )} rounds, at most ${formatInteger(options.maxRuns)})`
+      : options.stable > 0
+        ? c`Measuring until the median CI width is {{save.bright.yellow}}${formatNumber(options.stable, {decimals: 2})}%{{restore}} of the median at two checks in a row (at least ${formatInteger(
+            options.minRuns
+          )} runs, at most ${formatInteger(options.maxRuns)})`
+        : c`Measuring for {{save.bright.yellow}}${formatTime(
+            options.budget,
+            prepareTimeFormat([options.budget], 1000)
+          )}{{restore}} per function (at least ${formatInteger(
+            options.minRuns
+          )} runs, at most ${formatInteger(options.maxRuns)})`;
 
 await writer.write([
   c`{{bold.save.bright.cyan}}${program.name()}{{restore}} {{save.bright.yellow}}${program.version()}{{restore}}: ${program.description()}`,
@@ -315,6 +356,15 @@ await writer.write([
     : interleaved
       ? ['Interleaved: one run of each function per round; the stop policy counts rounds']
       : []),
+  ...(options.gc === 'none'
+    ? []
+    : [
+        !gc
+          ? 'No garbage collector is available on this runtime: --gc is ignored'
+          : options.gc === 'once'
+            ? 'GC: one forced collection after warmup'
+            : 'GC: a forced collection before every run, outside the timed window'
+      ]),
   ''
 ]);
 
@@ -435,6 +485,9 @@ const measureProgress = (prefix, n, elapsed, budget, width, unit = 'runs') => {
 
 const moduleMetrics = metricsOn && !options.command;
 
+let lastSettle = null,
+  settleReport = null;
+
 // perProcess[fn][round]: the runs of one child process, detected warmup dropped
 let perProcess = null;
 
@@ -464,6 +517,8 @@ if (options.isolate) {
       '--seed',
       String(seed),
       ...(metricsOn ? ['-M'] : []),
+      '--gc',
+      options.gc,
       '--emit-runs'
     ],
     processMetrics = names.map(() => []),
@@ -544,10 +599,25 @@ if (options.isolate) {
           await updater.update();
         } else if (name === 'macro-check') {
           lastWidth = data.width;
+        } else if (name === 'macro-settle') {
+          lastSettle = data;
         } else if (name === 'macro-round') {
           for (let i = 0; i < k; ++i) {
             stats[i] = {...exactSummary(data.samples[i], {alpha: options.alpha}), bootstrap: false};
             runCounts[i] = data.n;
+          }
+          if (options.settle > 0) {
+            const done = lastSettle
+                ? lastSettle.pairs.filter(pair => pair.state !== 'unsettled').length
+                : 0,
+              total = (k * (k - 1)) / 2;
+            progress = {
+              label: `measuring: ${data.n} rounds, ${done} of ${total} ${total > 1 ? 'pairs' : 'pair'} settled`,
+              done: lastSettle ? done : 0,
+              total
+            };
+            await updater.update();
+            return;
           }
           progress = measureProgress(
             'measuring',
@@ -565,6 +635,14 @@ if (options.isolate) {
     program.error(String(error));
   }
   for (let i = 0; i < k; ++i) await summarize(i, collected[i]);
+  if (options.settle > 0) {
+    settleReport = {
+      threshold: options.settle,
+      reason: lastSettle?.passed >= 2 ? 'settled' : 'max-runs',
+      rounds: collected[0].length,
+      ...policy.settle(results)
+    };
+  }
 } else {
   for (let i = 0; i < names.length; ++i) {
     const which = `${names[i]} (${i + 1} of ${names.length})`;
@@ -689,6 +767,37 @@ for (const {name, note} of notes) {
 // the significance block opens with its own blank line
 if (notes.length && results.length < 2) await writer.write('');
 
+if (settleReport) {
+  const pct = `${formatNumber(settleReport.threshold, {decimals: 2})}%`,
+    ratio = pair =>
+      `ratio ${formatNumber(pair.ratioLo, {decimals: 3})}–${formatNumber(pair.ratioHi, {decimals: 3})}`,
+    verdict = pair =>
+      pair.state === 'faster'
+        ? `${names[pair.i]} is faster by at least ${pct}`
+        : pair.state === 'slower'
+          ? `${names[pair.j]} is faster by at least ${pct}`
+          : pair.state === 'equivalent'
+            ? `within ${pct} of each other`
+            : 'unsettled';
+  await writer.write([
+    '',
+    c`{{save.bold}}Settle:{{restore}} each pair against ±${pct}, ${formatNumber(100 * (1 - options.alpha), {decimals: 2})}% CI of the median ratio, after ${formatInteger(settleReport.rounds)} rounds`,
+    ...settleReport.pairs.map(
+      pair => `  ${names[pair.i]} vs ${names[pair.j]}: ${verdict(pair)} (${ratio(pair)})`
+    )
+  ]);
+  if (settleReport.reason === 'max-runs') {
+    const open = settleReport.pairs.filter(pair => pair.state === 'unsettled').length;
+    await writer.write(
+      c`{{save.bright.yellow}}${warn}{{restore}} stopped at --max-runs: ${
+        open
+          ? `${open} ${open > 1 ? 'pairs' : 'pair'} still unsettled; the difference may sit near ±${pct}`
+          : 'the pairs settled only in the final rounds, after the last check'
+      }`
+    );
+  }
+}
+
 let significance = null;
 if (results.length > 1) {
   // several processes per function: the process is the unit, as in nano-bench --isolate
@@ -756,6 +865,7 @@ if (options.json) {
         ? {runs: options.runs}
         : {minRuns: options.minRuns, budget: options.budget}),
       ...(options.stable > 0 ? {stable: options.stable, stableChecks: 2} : {}),
+      ...(options.settle > 0 ? {settle: options.settle, settleChecks: 2} : {}),
       ...(metricsOn ? {metrics: metricsKind} : {}),
       maxRuns: options.maxRuns,
       warmup: options.warmup,
@@ -764,6 +874,7 @@ if (options.json) {
       alpha: options.alpha,
       correction: options.correction,
       order: options.order,
+      ...(gc ? {gc: options.gc} : {}),
       ...(options.isolate ? {isolate: true, repeat: options.repeat} : {})
     },
     series: names.map((name, i) => ({
@@ -788,7 +899,21 @@ if (options.json) {
         ci: 'bootstrap-percentile'
       }
     })),
-    significance
+    significance,
+    settle: settleReport
+      ? {
+          threshold: settleReport.threshold,
+          reason: settleReport.reason,
+          rounds: settleReport.rounds,
+          pairs: settleReport.pairs.map(pair => ({
+            a: names[pair.i],
+            b: names[pair.j],
+            state: pair.state,
+            ratioLo: pair.ratioLo,
+            ratioHi: pair.ratioHi
+          }))
+        }
+      : undefined
   });
   await writeFile(options.json, JSON.stringify(obj, null, 2) + '\n');
 }

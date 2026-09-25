@@ -4,6 +4,8 @@ import style, {c} from 'console-toolkit/style.js';
 import makeTable from 'console-toolkit/table';
 import lineTheme from 'console-toolkit/themes/lines/unicode-rounded.js';
 
+import {effectMagnitude} from '../../significance/cliff.js';
+
 const bold = s => style.bold.text(s),
   faster = s => style.bright.green.text(bold(s) + ' faster'),
   slower = s => style.bright.red.text(bold(s) + ' slower');
@@ -33,10 +35,8 @@ export const writeSignificance = (
   );
 
   if (isPair && typeof testResult.a12 == 'number') {
-    // magnitude labels: Romano et al. 2006
     const size = Math.abs(testResult.delta),
-      magnitude =
-        size < 0.147 ? 'negligible' : size < 0.33 ? 'small' : size < 0.474 ? 'medium' : 'large',
+      magnitude = effectMagnitude(size),
       wins = Math.max(testResult.a12, 1 - testResult.a12);
     writer.writeString(
       c`{{save.bold}}Effect size:{{restore}} Cliff's δ = {{save.bright.yellow}}${size.toFixed(2)}{{restore}} (${magnitude}) — the faster wins {{save.bright.yellow}}${Math.round(100 * wins)}%{{restore}} of random run pairs\n`
@@ -114,5 +114,27 @@ export const writeSignificance = (
     writer.write(table.toStrings());
   } else {
     writer.writeString('The difference is not statistically significant.\n');
+  }
+
+  if (!isPair && testResult.effects) {
+    const tableData = /** @type {any[]} */ ([[bold('#'), bold('name')]]);
+    for (let i = 0; i < names.length; ++i) {
+      tableData[0].push({value: bold(formatInteger(i + 1)), align: 'c'});
+      const row = /** @type {any[]} */ ([formatInteger(i + 1), bold(names[i])]);
+      for (let j = 0; j < names.length; ++j) {
+        const delta = testResult.effects[i][j];
+        row.push(
+          i === j
+            ? null
+            : {value: `${Math.abs(delta).toFixed(2)} ${effectMagnitude(delta)}`, align: 'c'}
+        );
+      }
+      tableData.push(row);
+    }
+    const table = makeTable(tableData, lineTheme);
+    writer.writeString(
+      c`\n{{save.bold}}Effect sizes:{{restore}} Cliff's δ for each pair, with its magnitude\n\n`
+    );
+    writer.write(table.toStrings());
   }
 };

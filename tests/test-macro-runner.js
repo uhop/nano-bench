@@ -212,3 +212,60 @@ test('collectMacroRounds()', t => {
     ]);
   });
 });
+
+test('GC hooks', async t => {
+  const log = [];
+  await collectMacro(() => log.push('run'), {
+    runs: 2,
+    warmup: 1,
+    prepare: () => log.push('prep'),
+    afterWarmup: () => log.push('once'),
+    beforeRun: () => log.push('each')
+  });
+  t.deepEqual(
+    log,
+    ['prep', 'run', 'once', 'prep', 'each', 'run', 'prep', 'each', 'run'],
+    'collectMacro: once after warmup; each after prepare, before the run'
+  );
+
+  log.length = 0;
+  await collectMacroRounds([() => log.push('a'), () => log.push('b')], {
+    runs: 1,
+    afterWarmup: () => log.push('once'),
+    beforeRun: () => log.push('each')
+  });
+  t.deepEqual(log, ['once', 'each', 'a', 'each', 'b'], 'collectMacroRounds: the same');
+});
+
+test('collectMacroRounds() settle', async t => {
+  const checks = [];
+  const samples = await collectMacroRounds(
+    [() => {}, () => {}],
+    {
+      minRuns: 10,
+      consecutive: 2,
+      maxRuns: 100,
+      budget: 0,
+      settle: s => ({settled: s[0].length >= 30})
+    },
+    (name, data) => name === 'macro-settle' && checks.push([data.n, data.settled, data.passed])
+  );
+  t.deepEqual(
+    samples.map(s => s.length),
+    [40, 40],
+    'settled at 30 and 40: two checks in a row'
+  );
+  t.deepEqual(checks, [
+    [10, false, 0],
+    [20, false, 0],
+    [30, true, 1],
+    [40, true, 2]
+  ]);
+
+  const capped = await collectMacroRounds([() => {}, () => {}], {
+    minRuns: 10,
+    maxRuns: 25,
+    settle: () => ({settled: false})
+  });
+  t.equal(capped[0].length, 25, 'never settled: --max-runs stops it');
+});

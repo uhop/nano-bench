@@ -35,6 +35,24 @@ test('computeSignificance()', t => {
   t.test('the mann-whitney pair path reports correction none (single comparison)', t => {
     t.equal(computeSignificance([a, c], 0.05, 'holm').correction, 'none');
   });
+  t.test('three or more series carry a pairwise Cliff delta matrix', t => {
+    const r = computeSignificance([a, b, c], 0.05),
+      e = r.effects;
+    t.equal(e.length, 3);
+    t.ok(
+      e.every((row, i) => row[i] === 0),
+      'zero on the diagonal'
+    );
+    t.ok(
+      e.every((row, i) => row.every((value, j) => Math.abs(value + e[j][i]) < 1e-12)),
+      'antisymmetric'
+    );
+    t.ok(
+      e.every(row => row.every(value => value >= -1 && value <= 1)),
+      'within [-1, 1]'
+    );
+    t.notOk(computeSignificance([a, b], 0.05).effects, 'a pair keeps its own delta');
+  });
   t.test('does not mutate inputs', t => {
     const x = [5, 3, 1, 4, 2],
       before = x.join(',');

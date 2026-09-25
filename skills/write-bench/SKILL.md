@@ -167,6 +167,7 @@ a **baseline** — its stats are reported with no significance test.
 | Stricter/looser significance | `-a, --alpha` (0.05)                            | 0.01 = 99% CI and a stricter test.                                      |
 | Sample order                 | `--order` (interleaved)                         | `sequential` measures each function in turn; interleaved is fairer.     |
 | Process isolation            | `--isolate`, `--repeat N`                       | Each function in its own processes; N > 1 tests per-process medians.    |
+| Garbage collection           | `--gc once` or `--gc each`                      | A forced collection before sampling or before every sample, untimed.    |
 | Async under concurrency      | `-p, --parallel`                                | Starts all samples at once; measures a different thing.                 |
 | Multiple-comparison control  | `--correction` (holm)                           | See below.                                                              |
 | See the test internals       | `-v, --verbose`                                 | Prints statistic, critical value, per-comparison α.                     |

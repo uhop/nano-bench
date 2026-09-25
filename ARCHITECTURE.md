@@ -37,7 +37,9 @@ src/                          # Internal source (shipped via npm)
 │   ├── outlier-notes.js            # Modified-z slow-side outliers: caching vs interference notes
 │   ├── warmup-detect.js            # Windowed MW screen: size the leading slow (warmup) segment
 │   ├── contention.js               # CPU contention check: per-sample CPU time / elapsed time
+│   ├── gc.js                       # --gc: findGc, a forced collection per runtime
 │   ├── isolate.js                  # --isolate: runChild, isolationPlan, fastestPerRound
+│   ├── settle.js                   # --settle: per-pair median-ratio CI against ±threshold
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
 │   ├── histogram.js                # Sample binning: computeHistograms, binCount, percentile
 │   ├── render/
@@ -69,6 +71,7 @@ src/                          # Internal source (shipped via npm)
 ├── stream-stats.js                 # StatCounter — online/streaming mean, variance, skewness, kurtosis
 ├── stream-median.js                # MedianCounter — approximate streaming median
 ├── significance/
+│   ├── cliff.js                    # Cliff's delta + magnitude labels (the pairwise effect-size matrix)
 │   ├── mwtest.js                   # Mann-Whitney U test (two-sample)
 │   ├── kwtest.js                   # Kruskal-Wallis H (k-sample) + Conover-Iman pairwise post-hoc
 │   ├── correction.js               # FWER control for the post-hoc pairs (none/Holm/Bonferroni)
@@ -195,6 +198,7 @@ bin/nano-bench.js ──→ src/bench/runner.js ──→ src/stats.js
                   ──→ src/stats.js              ↑
                   ──→ src/bench/significance.js ──→ src/significance/mwtest.js ──→ src/stats/rank.js
                                                 ──→ src/significance/kwtest.js ──→ src/stats/rank.js
+                                                ──→ src/significance/cliff.js
                                                                               ──→ src/stats/beta-ppf.js
                                                                               ──→ src/significance/correction.js ──→ src/stats/z-ppf.js
                   ──→ src/bench/histogram.js
@@ -204,6 +208,7 @@ bin/nano-bench.js ──→ src/bench/runner.js ──→ src/stats.js
 
 bin/nano-bench-io.js ──→ src/bench/macro-runner.js
                      ──→ src/bench/isolate.js (--isolate, --repeat)
+                     ──→ src/bench/settle.js (--settle), src/bench/gc.js (--gc)
                      ──→ src/bench/command-runner.js (the -c/--command adapter)
                      ──→ src/bench/outlier-notes.js ──→ src/stats/{quantile,mad}.js
                      ──→ src/stats.js (bootstrapSummary), src/stats/quantile.js

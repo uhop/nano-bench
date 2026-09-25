@@ -128,7 +128,10 @@ corrected for multiple comparisons by default. Choose the method with
 powerful than Bonferroni); `none` reproduces an uncorrected post-hoc. For two
 functions the effect size is reported next to the verdict (Cliff's &delta; with
 a magnitude label, and how often the faster wins a random pair of runs) &mdash;
-significance says a difference exists, the effect size says how much. Add `-v` /
+significance says a difference exists, the effect size says how much. For three or
+more, a matrix of Cliff's &delta; for every pair follows the significance table.
+`--gc once` or `--gc each` forces a garbage collection before sampling or before
+every sample, outside the timed window. Add `-v` /
 `--verbose` to see the test statistic, critical value, and per-comparison &alpha;.
 
 ### Distribution histograms
@@ -290,6 +293,14 @@ number of functions, and `--stable` waits until every function meets the target.
 `--order sequential` runs each function's runs in turn instead. `--isolate` runs
 each function's whole policy in its own process, and `--repeat N` runs N processes
 per function; as in `nano-bench`, the test then compares per-process medians.
+
+To answer a question instead of reaching a precision, `--settle 5` keeps running
+rounds until every pair of functions either differs by at least 5% or is shown to
+be within 5%, judged on the CI of the ratio of their medians:
+
+```bash
+npx nano-bench-io io-bench.js --settle 5     # is either one at least 5% faster?
+```
 
 The module format is the same. Optional `prepare()` / `teardown()` named exports
 run untimed around every run. Warmup is auto-detected and discarded with a note

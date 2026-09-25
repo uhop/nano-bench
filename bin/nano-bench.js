@@ -26,6 +26,7 @@ import {
 } from '../src/bench/runner.js';
 import {exactSummary, bootstrapSummary, mean, stdDev, getWeightedValue} from '../src/stats.js';
 import {runChild, isolationPlan, fastestPerRound} from '../src/bench/isolate.js';
+import findGc, {gcModes} from '../src/bench/gc.js';
 import {contentionSummary, contentionWarning, isContended} from '../src/bench/contention.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {corrections} from '../src/significance/correction.js';
@@ -108,6 +109,14 @@ program
     new Option('--isolate', 'measure each function in its own process').conflicts('parallel')
   )
   .option('--repeat <n>', 'with --isolate: processes per function', toInt, 1)
+  .addOption(
+    new Option(
+      '--gc <mode>',
+      'force a garbage collection: once before sampling, or before each sample'
+    )
+      .choices(gcModes)
+      .default('none')
+  )
   .addOption(new Option('--emit-samples', 'internal: child mode of --isolate').hideHelp())
   .option('-b, --bootstrap <bootstrap>', 'number of bootstrap samples', toInt, 1000)
   .option('--seed <seed>', 'bootstrap RNG seed (32-bit integer; default: random)', toInt)
@@ -176,13 +185,19 @@ try {
   program.error(error.message);
 }
 
+const gc = options.gc === 'none' ? null : await findGc(),
+  gcOnce = options.gc === 'once' ? gc : null,
+  gcEach = options.gc === 'each' ? gc : null;
+
 if (options.emitSamples) {
   if (!(options.iterations > 0) || names.length !== 1)
     program.error('--emit-samples is internal to --isolate: it needs -i and one function');
+  await gcOnce?.();
   // benchmarkRounds keeps time order, so the parent knows which sample came first
   const ratios = [[]],
     [samples] = await benchmarkRounds([fns[names[0]]], [options.iterations], {
       nSeries: options.samples,
+      beforeSample: gcEach ?? undefined,
       ratios
     });
   const out =
@@ -229,6 +244,16 @@ const benchSeries = options.parallel ? benchmarkSeriesPar : benchmarkSeries;
 
 const seed = (options.seed ?? Math.random() * 2 ** 32) >>> 0;
 
+function gcLines() {
+  if (options.gc === 'none') return [];
+  if (!gc) return ['No garbage collector is available on this runtime: --gc is ignored'];
+  return [
+    options.gc === 'once'
+      ? 'GC: one forced collection before sampling'
+      : 'GC: a forced collection before every sample, outside the timed window'
+  ];
+}
+
 let iterations = [];
 if (options.iterations > 0) {
   iterations = new Array(names.length).fill(Math.max(options.iterations, options.minIterations));
@@ -262,6 +287,7 @@ await writer.write([
         )}{{restore}} per function (${options.order}); the first sample of each process is dropped`
       ]
     : []),
+  ...gcLines(),
   ''
 ]);
 
@@ -387,6 +413,8 @@ if (options.isolate) {
         String(iterations[i]),
         '-s',
         String(options.samples + 1),
+        '--gc',
+        options.gc,
         '--emit-samples'
       ]);
     } catch (error) {
@@ -410,11 +438,13 @@ if (options.isolate) {
     sliceLabel = done =>
       `sampling: round ${Math.min(options.samples, Math.floor(done / names.length) + 1)} of ${options.samples}`;
   setProgress(sliceLabel(0), 0, slices, startedAt);
+  await gcOnce?.();
   const collected = await benchmarkRounds(
     names.map(name => fns[name]),
     iterations,
     {
       nSeries: options.samples,
+      beforeSample: gcEach ?? undefined,
       concurrency: options.parallel ?? 0,
       observe: options.observe ? 'all' : undefined,
       // concurrent calls share the CPU by design, so their ratios say nothing
@@ -449,8 +479,10 @@ if (options.isolate) {
   for (let i = 0; i < iterations.length; ++i) {
     sampling(i, 0);
     await updater.update();
+    await gcOnce?.();
     const samples = await benchSeries(fns[names[i]], iterations[i], {
       nSeries: options.samples,
+      beforeSample: gcEach ?? undefined,
       concurrency: options.parallel ?? 0,
       observe: options.observe ? names[i] : undefined,
       // concurrent calls share the CPU by design, so their ratios say nothing
@@ -576,6 +608,7 @@ if (options.json) {
       correction: options.correction,
       parallel: options.parallel ?? false,
       order: options.order,
+      ...(gc ? {gc: options.gc} : {}),
       ...(options.isolate ? {isolate: true, repeat: options.repeat} : {})
     },
     series: names.map((name, i) => ({

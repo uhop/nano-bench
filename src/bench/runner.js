@@ -114,10 +114,18 @@ export const benchmark = (fn, n, ratios) =>
   });
 
 /**
- * @param {{nSeries?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe, onSample?: (done: number) => unknown, ratios?: number[]}} [opts]
+ * @param {{nSeries?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe, onSample?: (done: number) => unknown, ratios?: number[], beforeSample?: () => unknown}} [opts]
  */
 export const benchmarkSeries = async (fn, n, opts = {}) => {
-  const {nSeries = 100, timeout = 5, DataArray = Array, observe, onSample, ratios} = opts;
+  const {
+    nSeries = 100,
+    timeout = 5,
+    DataArray = Array,
+    observe,
+    onSample,
+    ratios,
+    beforeSample
+  } = opts;
   const total = nSeries;
   const obs = makeObserver(observe, 'default');
   obs?.mark('series');
@@ -127,6 +135,7 @@ export const benchmarkSeries = async (fn, n, opts = {}) => {
     const bench = async (nSeries, resolve, reject) => {
       --nSeries;
       try {
+        if (beforeSample) await beforeSample();
         data[nSeries] = await benchmark(fn, n, ratios);
         if (onSample) await onSample(total - nSeries);
         if (nSeries) {
@@ -160,13 +169,21 @@ export const burst = (fn, n, concurrency) => {
 /**
  * @param {Function[]} fns
  * @param {number[]} ns batch size for each function
- * @param {{nSeries?: number, timeout?: number, concurrency?: number, observe?: Observe, onSample?: (done: number, total: number) => unknown, ratios?: number[][]}} [opts]
+ * @param {{nSeries?: number, timeout?: number, concurrency?: number, observe?: Observe, onSample?: (done: number, total: number) => unknown, ratios?: number[][], beforeSample?: () => unknown}} [opts]
  * @param {(round: number, data: number[][]) => unknown} [report] awaited after each round
  * @returns {Promise<number[][]>} samples per function, in time order; with `concurrency`, a
  *   burst of that many per function and round
  */
 export const benchmarkRounds = async (fns, ns, opts = {}, report) => {
-  const {nSeries = 100, timeout = 5, concurrency = 0, observe, onSample, ratios} = opts;
+  const {
+    nSeries = 100,
+    timeout = 5,
+    concurrency = 0,
+    observe,
+    onSample,
+    ratios,
+    beforeSample
+  } = opts;
   const obs = makeObserver(observe, 'default');
   obs?.mark('rounds');
   try {
@@ -177,6 +194,7 @@ export const benchmarkRounds = async (fns, ns, opts = {}, report) => {
       // rotate the start so no function always runs first in a round
       for (let j = 0; j < k; ++j) {
         const i = (round + j) % k;
+        if (beforeSample) await beforeSample();
         if (concurrency > 0) data[i].push(...(await burst(fns[i], ns[i], concurrency)));
         else data[i].push(await benchmark(fns[i], ns[i], ratios?.[i]));
         if (onSample) await onSample(round * k + j + 1, nSeries * k);
@@ -193,10 +211,18 @@ export const benchmarkRounds = async (fns, ns, opts = {}, report) => {
 /**
  * Without `concurrency`, one burst of `nSeries` calls. With it, `nSeries` rounds of `concurrency`
  * calls started together, `timeout` ms apart; the samples come round by round.
- * @param {{nSeries?: number, concurrency?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe, onSample?: (done: number, total: number) => unknown}} [opts]
+ * @param {{nSeries?: number, concurrency?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe, onSample?: (done: number, total: number) => unknown, beforeSample?: () => unknown}} [opts]
  */
 export const benchmarkSeriesPar = async (fn, n, opts = {}) => {
-  const {nSeries = 100, concurrency = 0, timeout = 5, DataArray = Array, observe, onSample} = opts;
+  const {
+    nSeries = 100,
+    concurrency = 0,
+    timeout = 5,
+    DataArray = Array,
+    observe,
+    onSample,
+    beforeSample
+  } = opts;
   const obs = makeObserver(observe, 'default');
   obs?.mark('series-par');
   try {
@@ -205,10 +231,12 @@ export const benchmarkSeriesPar = async (fn, n, opts = {}) => {
       results = [];
       for (let round = 0; round < nSeries; ++round) {
         if (round) await new Promise(resolve => setTimeout(resolve, timeout));
+        if (beforeSample) await beforeSample();
         results.push(...(await burst(fn, n, concurrency)));
         if (onSample) await onSample(round + 1, nSeries);
       }
     } else {
+      if (beforeSample) await beforeSample();
       results = await burst(fn, n, nSeries);
     }
     return DataArray === Array ? results : DataArray.from(results);

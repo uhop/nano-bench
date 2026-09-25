@@ -7,6 +7,7 @@ import {
 } from '../src/bench/results/series.js';
 import {planComparison} from '../src/bench/pair-series.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
+import {effectMagnitude} from '../src/significance/cliff.js';
 import {computeHistograms, binCount} from '../src/bench/histogram.js';
 import {distributionSvg, escapeXml as esc, logTicks} from '../src/bench/render/svg-distribution.js';
 import {numericAsc} from '../src/utils/numeric-asc.js';
@@ -136,10 +137,8 @@ const significanceBlock = (members, name, {alpha, correction}) => {
   );
 
   if (isPair && typeof test.a12 == 'number') {
-    // magnitude labels: Romano et al. 2006
     const size = Math.abs(test.delta),
-      magnitude =
-        size < 0.147 ? 'negligible' : size < 0.33 ? 'small' : size < 0.474 ? 'medium' : 'large',
+      magnitude = effectMagnitude(size),
       wins = Math.max(test.a12, 1 - test.a12);
     out.push(
       `<p>Effect size: Cliff’s δ = <strong>${size.toFixed(2)}</strong> (${magnitude}): the faster one wins ${Math.round(100 * wins)}% of random run pairs.</p>`
@@ -154,6 +153,7 @@ const significanceBlock = (members, name, {alpha, correction}) => {
     out.push(
       `<p class="verdict">The difference is not statistically significant. <span class="muted">${esc(statistic)}</span></p>`
     );
+    out.push(effectsTable(test, names));
     out.push('</div>');
     return out.join('');
   }
@@ -179,8 +179,26 @@ const significanceBlock = (members, name, {alpha, correction}) => {
   out.push(
     `<p class="note">Read a row against a column: the row is faster or slower than the column.</p>`
   );
+  out.push(effectsTable(test, names));
   out.push('</div>');
   return out.join('');
+};
+
+const effectsTable = (test, names) => {
+  if (!test.effects) return '';
+  const head = names.map((_, j) => `<th class="num">${j + 1}</th>`).join(''),
+    rows = names.map((n, i) => {
+      const cells = test.effects[i].map((delta, j) =>
+        i === j
+          ? '<td></td>'
+          : `<td class="num">${Math.abs(delta).toFixed(2)} ${effectMagnitude(delta)}</td>`
+      );
+      return `<tr><td class="num">${i + 1}</td><td class="name">${esc(n)}</td>${cells.join('')}</tr>`;
+    });
+  return (
+    `<p>Effect sizes: Cliff’s δ for each pair, with its magnitude.</p>` +
+    `<div class="scroll"><table class="matrix"><thead><tr><th class="num">#</th><th>Name</th>${head}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`
+  );
 };
 
 const significanceSection = (series, fileCount, options) => {
