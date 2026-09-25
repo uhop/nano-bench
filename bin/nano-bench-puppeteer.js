@@ -10,7 +10,10 @@ await main({
   installDriver: 'npm install --save-dev puppeteer',
   installBrowser: browser => `npx puppeteer browsers install ${browser}`,
   launch: async (puppeteer, browser, {headless}) => {
-    const instance = await puppeteer.launch({browser, headless});
+    // --no-sandbox: Chromium fails to launch on CI runners without it (as in tape-six-puppeteer)
+    const instance = await puppeteer.launch(
+      browser === 'chrome' ? {browser, headless, args: ['--no-sandbox']} : {browser, headless}
+    );
     return {
       page: await instance.newPage(),
       version: await instance.version(),

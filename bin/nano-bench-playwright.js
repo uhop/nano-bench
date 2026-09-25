@@ -10,7 +10,10 @@ await main({
   installDriver: 'npm install --save-dev playwright && npx playwright install',
   installBrowser: browser => `npx playwright install ${browser}`,
   launch: async (playwright, browser, {headless}) => {
-    const instance = await playwright[browser].launch({headless});
+    // --no-sandbox: Chromium fails to launch on CI runners without it (as in tape-six-playwright)
+    const instance = await playwright[browser].launch(
+      browser === 'chromium' ? {headless, args: ['--no-sandbox']} : {headless}
+    );
     return {
       page: await instance.newPage(),
       version: instance.version(),
