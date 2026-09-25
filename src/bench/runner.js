@@ -1,4 +1,5 @@
 import {numericAsc} from '../utils/numeric-asc.js';
+import {cpuTime} from './contention.js';
 
 /**
  * @typedef {boolean | string} Observe
@@ -83,20 +84,29 @@ export const findLevel = async (fn, opts = {}, report) => {
   }
 };
 
-export const benchmark = (fn, n) =>
+/**
+ * @param {Function} fn
+ * @param {number} n
+ * @param {number[]} [ratios] receives CPU time / elapsed time for a synchronous sample, NaN otherwise
+ * @returns {Promise<number>}
+ */
+export const benchmark = (fn, n, ratios) =>
   new Promise((resolve, reject) => {
     try {
-      const start = performance.now(),
+      const cpuStart = ratios ? cpuTime() : 0,
+        start = performance.now(),
         result = fn(n),
         finish = performance.now();
       if (result && typeof result.then == 'function') {
-        // thenable
+        // thenable: waiting is not running, so its CPU ratio says nothing
         result.then(() => {
           const finish = performance.now();
+          ratios?.push(NaN);
           resolve(finish - start);
         }, reject);
         return;
       }
+      ratios?.push((cpuTime() - cpuStart) / (finish - start));
       resolve(finish - start);
     } catch (error) {
       reject(error);
@@ -104,10 +114,10 @@ export const benchmark = (fn, n) =>
   });
 
 /**
- * @param {{nSeries?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe, onSample?: (done: number) => unknown}} [opts]
+ * @param {{nSeries?: number, timeout?: number, DataArray?: ArrayConstructor, observe?: Observe, onSample?: (done: number) => unknown, ratios?: number[]}} [opts]
  */
 export const benchmarkSeries = async (fn, n, opts = {}) => {
-  const {nSeries = 100, timeout = 5, DataArray = Array, observe, onSample} = opts;
+  const {nSeries = 100, timeout = 5, DataArray = Array, observe, onSample, ratios} = opts;
   const total = nSeries;
   const obs = makeObserver(observe, 'default');
   obs?.mark('series');
@@ -117,7 +127,7 @@ export const benchmarkSeries = async (fn, n, opts = {}) => {
     const bench = async (nSeries, resolve, reject) => {
       --nSeries;
       try {
-        data[nSeries] = await benchmark(fn, n);
+        data[nSeries] = await benchmark(fn, n, ratios);
         if (onSample) await onSample(total - nSeries);
         if (nSeries) {
           setTimeout(bench, timeout, nSeries, resolve, reject);
@@ -140,12 +150,12 @@ export const benchmarkSeries = async (fn, n, opts = {}) => {
 /**
  * @param {Function[]} fns
  * @param {number[]} ns batch size for each function
- * @param {{nSeries?: number, timeout?: number, observe?: Observe, onSample?: (done: number, total: number) => unknown}} [opts]
+ * @param {{nSeries?: number, timeout?: number, observe?: Observe, onSample?: (done: number, total: number) => unknown, ratios?: number[][]}} [opts]
  * @param {(round: number, data: number[][]) => unknown} [report] awaited after each round
  * @returns {Promise<number[][]>} samples per function, in time order
  */
 export const benchmarkRounds = async (fns, ns, opts = {}, report) => {
-  const {nSeries = 100, timeout = 5, observe, onSample} = opts;
+  const {nSeries = 100, timeout = 5, observe, onSample, ratios} = opts;
   const obs = makeObserver(observe, 'default');
   obs?.mark('rounds');
   try {
@@ -156,7 +166,7 @@ export const benchmarkRounds = async (fns, ns, opts = {}, report) => {
       // rotate the start so no function always runs first in a round
       for (let j = 0; j < k; ++j) {
         const i = (round + j) % k;
-        data[i].push(await benchmark(fns[i], ns[i]));
+        data[i].push(await benchmark(fns[i], ns[i], ratios?.[i]));
         if (onSample) await onSample(round * k + j + 1, nSeries * k);
         await pause();
       }

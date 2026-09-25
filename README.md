@@ -147,6 +147,13 @@ warning when its samples look multimodal. That usually means some batches paid a
 collection or a slow path and others didn't, so the median describes only the fast clump.
 Measure such code with `nano-bench-io`, which times one call per run and reports the tail.
 
+A second warning names a common cause: another program competing for the CPU. For each
+sample of a synchronous function, `nano-bench` compares the CPU time its thread used with the
+elapsed time; a sample that got less than 90% of it was preempted. When 10% or more of a
+function's samples were, the run says so, and the numbers read slow and noisy, often with a
+multimodal warning too. Rerun when the machine is quiet. It can't see slowdowns that don't
+take the CPU away, such as a busy sibling hyperthread.
+
 Functions measured in one run also share JIT and heap state. To confirm a small difference,
 benchmark each variant in its own process and compare the saved runs with
 `nano-bench-compare`.

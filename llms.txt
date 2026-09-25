@@ -23,7 +23,7 @@ npm install nano-benchmark
 
 ### nano-bench
 
-Benchmarks multiple functions, compares them with bootstrap confidence intervals and significance tests, outputs a styled table. Name one or more methods after the file to benchmark just those; a single name runs as a baseline (no significance test). A seeded dip test runs on every function, and a multimodal one gets a warning pointing at `nano-bench-io` (a batched median describes only the fast clump when some batches pay a GC or a slow path).
+Benchmarks multiple functions, compares them with bootstrap confidence intervals and significance tests, outputs a styled table. Name one or more methods after the file to benchmark just those; a single name runs as a baseline (no significance test). A seeded dip test runs on every function, and a multimodal one gets a warning pointing at `nano-bench-io` (a batched median describes only the fast clump when some batches pay a GC or a slow path). A contention check compares each synchronous sample's thread CPU time with its elapsed time and warns when 10% or more of a function's samples got under 90% of the CPU (another program competed); saved as `results[].contention`.
 
 ```bash
 npx nano-bench benchmark.js

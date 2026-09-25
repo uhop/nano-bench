@@ -3,6 +3,7 @@ import {numericAsc} from '../../utils/numeric-asc.js';
 import dipTest from '../../stats/dip.js';
 import {mulberry32} from '../../utils/prng.js';
 import {diffEnvironments} from './env-diff.js';
+import {contentionWarning, isContended} from '../contention.js';
 
 const baseName = file =>
   file
@@ -74,7 +75,16 @@ export const comparisonArrays = members =>
     : {arrays: members.map(s => s.samples), unit: 'samples'};
 
 export const resultsWarnings = files => {
-  const warnings = [];
+  const warnings = [],
+    many = files.length > 1;
+  for (const f of files) {
+    for (const s of f.results.results) {
+      if (isContended(s.contention))
+        warnings.push(
+          `${many ? fileTag(f) + '/' : ''}${s.name}: ${contentionWarning(s.contention)}`
+        );
+    }
+  }
   for (const {path, values} of diffEnvironments(files.map(f => f.results.environment))) {
     warnings.push(
       `environment differs — ${path}: ${values.map(v => JSON.stringify(v)).join(' vs ')}`

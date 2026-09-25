@@ -26,6 +26,7 @@ import {
 } from '../src/bench/runner.js';
 import {exactSummary, bootstrapSummary, mean, stdDev, getWeightedValue} from '../src/stats.js';
 import {runChild, isolationPlan, fastestPerRound} from '../src/bench/isolate.js';
+import {contentionSummary, contentionWarning, isContended} from '../src/bench/contention.js';
 import {computeSignificance, significanceMatrix} from '../src/bench/significance.js';
 import {corrections} from '../src/significance/correction.js';
 import {mulberry32} from '../src/utils/prng.js';
@@ -172,10 +173,14 @@ if (options.emitSamples) {
   if (!(options.iterations > 0) || names.length !== 1)
     program.error('--emit-samples is internal to --isolate: it needs -i and one function');
   // benchmarkRounds keeps time order, so the parent knows which sample came first
-  const [samples] = await benchmarkRounds([fns[names[0]]], [options.iterations], {
-    nSeries: options.samples
-  });
-  const out = JSON.stringify(samples.map(time => time / options.iterations)) + '\n';
+  const ratios = [[]],
+    [samples] = await benchmarkRounds([fns[names[0]]], [options.iterations], {
+      nSeries: options.samples,
+      ratios
+    });
+  const out =
+    JSON.stringify({samples: samples.map(time => time / options.iterations), ratios: ratios[0]}) +
+    '\n';
   await new Promise(resolve => process.stdout.write(out, () => resolve(undefined)));
   process.exit(0);
 }
@@ -339,6 +344,9 @@ const median = samples => getWeightedValue(samples.slice().sort(numericAsc), 0.5
 // perProcess[fn][round]: the samples of one child process, first sample dropped
 let perProcess = null;
 
+// per-sample CPU time / elapsed time, the contention signal
+const cpuRatios = names.map(() => /** @type {number[]} */ ([]));
+
 if (options.isolate) {
   const script = fileURLToPath(import.meta.url),
     file = fileURLToPath(fileName),
@@ -355,9 +363,9 @@ if (options.isolate) {
       startedAt
     );
     await updater.update();
-    let samples;
+    let child;
     try {
-      samples = await runChild(script, [
+      child = await runChild(script, [
         file,
         names[i],
         '-e',
@@ -373,7 +381,8 @@ if (options.isolate) {
       program.error(`${names[i]}: ${error.message}`);
     }
     // a fresh process's first sample pays for JIT warmup
-    perProcess[i][round] = samples.slice(1);
+    perProcess[i][round] = child.samples.slice(1);
+    cpuRatios[i].push(...child.ratios.slice(1));
     stats[i] = {
       ...exactSummary(perProcess[i].filter(Boolean).flat(), {alpha: options.alpha}),
       bootstrap: false
@@ -394,6 +403,7 @@ if (options.isolate) {
     {
       nSeries: options.samples,
       observe: options.observe ? 'all' : undefined,
+      ratios: cpuRatios,
       onSample: async done => {
         setProgress(sliceLabel(done), done, slices, startedAt);
         await updater.update();
@@ -428,6 +438,8 @@ if (options.isolate) {
     const samples = await benchSeries(fns[names[i]], iterations[i], {
       nSeries: options.samples,
       observe: options.observe ? names[i] : undefined,
+      // concurrent samples share the CPU by design, so their ratios say nothing
+      ratios: options.parallel ? undefined : cpuRatios[i],
       onSample: async done => {
         sampling(i, done);
         await updater.update();
@@ -444,8 +456,17 @@ if (options.isolate) {
 
 await finishUpdater();
 
+const contention = cpuRatios.map(contentionSummary);
+
 {
   const warn = options.emoji ? '⚠' : '!';
+  // contention first: it is a cause, and it often explains the multimodal warnings below it
+  for (let i = 0; i < results.length; ++i) {
+    if (!isContended(contention[i])) continue;
+    await writer.write(
+      c`{{save.bright.yellow}}${warn}{{restore}} ${names[i]}: ${contentionWarning(contention[i])}`
+    );
+  }
   for (let i = 0; i < results.length; ++i) {
     // same stream as nano-bench-compare, so a recompare flags the same series
     const p = multimodalityP(results[i].slice().sort(numericAsc), seed, i);
@@ -533,6 +554,7 @@ if (options.json) {
       reps: iterations[i],
       samples: results[i],
       ...(perProcess ? {processSizes: perProcess[i].map(list => list.length)} : {}),
+      ...(contention[i] ? {contention: contention[i]} : {}),
       summary: {
         median: stats[i].median,
         lo: stats[i].lo,

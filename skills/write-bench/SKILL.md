@@ -239,6 +239,11 @@ two or more clumps, usually because some batches paid a garbage collection or a 
 and others didn't. The median then describes the fast clump only. Measure such code with
 `nano-bench-io`, which times one call per run and reports p90 and p99.
 
+**A contention warning** (`⚠ name: N of M samples were preempted`) means another program
+took the CPU during the run: those samples got less than 90% of the CPU while they ran. The
+numbers are slow and noisy, and multimodal warnings often come with it. Don't read the
+result; rerun when the machine is quiet.
+
 ## Multiple-comparison correction (`--correction`)
 
 Comparing many functions runs many pairwise tests, which inflates the chance of a
