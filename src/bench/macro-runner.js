@@ -9,6 +9,7 @@ export const collectMacro = async (fn, options = {}, report) => {
     stable = 0,
     maxRuns = 1000,
     checkEvery = 10,
+    consecutive = 1,
     ciWidth,
     prepare,
     teardown,
@@ -25,6 +26,7 @@ export const collectMacro = async (fn, options = {}, report) => {
 
   const samples = [],
     started = performance.now();
+  let passed = 0;
   for (;;) {
     await prepare?.();
     const token = metricsBefore?.();
@@ -46,8 +48,9 @@ export const collectMacro = async (fn, options = {}, report) => {
     if (stable > 0) {
       if (n % checkEvery === 0 && ciWidth) {
         const width = ciWidth(samples);
-        await report?.('macro-check', {n, width});
-        if (width <= stable) break;
+        passed = width <= stable ? passed + 1 : 0;
+        await report?.('macro-check', {n, width, passed});
+        if (passed >= consecutive) break;
       }
       continue;
     }

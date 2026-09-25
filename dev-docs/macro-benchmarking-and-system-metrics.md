@@ -202,7 +202,9 @@ makes it explicit and reports each mode apart.
   `-r/--runs N` forces an exact count; `--stable <pct>` is the adaptive stop
   (run until the bootstrap CI on the median is ≤ pct% of the median, checked
   periodically after min-runs; `--max-runs` caps both adaptive and default
-  modes).
+  modes). Revised 2026-09-25: `--stable` needs two passing checks in a row and
+  defaults `--min-runs` to 30, after a simulation showed the first passing check
+  under-covering the median; see [`stable-stopping.md`](./stable-stopping.md).
 - **DM9 — new statistics live in-repo** under `src/stats/` (quantiles, MAD /
   modified z); kernel extraction happens when the tape-six `t.bench` work is
   scheduled.

@@ -41,6 +41,8 @@ Measurements:
 
 - [`parallel-processes.md`](./parallel-processes.md) &mdash; how much concurrent benchmark
   processes distort each other on a 2-core, 4-thread laptop CPU (2026-09-24).
+- [`stable-stopping.md`](./stable-stopping.md) &mdash; how often `--stable`'s CI covers the
+  median at the stop, and the floor-30, two-check rule it led to (2026-09-25).
 
 ## The one principle the whole design rests on
 

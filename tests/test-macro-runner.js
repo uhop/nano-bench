@@ -63,6 +63,18 @@ test('collectMacro()', t => {
     ]);
   });
 
+  t.test('consecutive: the width must pass at that many checks in a row', async t => {
+    const widths = {10: 1, 20: 50, 30: 1, 40: 1, 50: 1};
+    const samples = await collectMacro(() => {}, {
+      minRuns: 10,
+      stable: 5,
+      consecutive: 2,
+      maxRuns: 100,
+      ciWidth: s => widths[s.length]
+    });
+    t.equal(samples.length, 40, 'a pass at 10 is reset by the miss at 20; 30 and 40 pass');
+  });
+
   t.test('prepare/teardown wrap every run, warmup included', async t => {
     const log = [];
     await collectMacro(() => log.push('run'), {

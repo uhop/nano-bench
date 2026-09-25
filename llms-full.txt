@@ -122,9 +122,9 @@ nano-bench-io [options] <file> [methods...]
 
 ### Run policy
 
-- Default: keep running while runs < `--min-runs` (default: 10) *or* elapsed < `--budget <ms>` (default: 5000), per function; capped by `--max-runs` (default: 1000).
+- Default: keep running while runs < `--min-runs` (default: 10; 30 with `--stable`) *or* elapsed < `--budget <ms>` (default: 5000), per function; capped by `--max-runs` (default: 1000).
 - `-r, --runs <runs>` — exact run count (overrides the stop policy).
-- `--stable <pct>` — adaptive stop: run until the bootstrap CI on the median is <= pct% of the median (checked every 10 runs after `--min-runs`; capped by `--max-runs`).
+- `--stable <pct>` — adaptive stop: run until the bootstrap CI on the median is <= pct% of the median at **two checks in a row** (checked every 10 runs from `--min-runs`, which defaults to 30 under `--stable`; capped by `--max-runs`). Recorded as `params.stable` and `params.stableChecks: 2`. Before 2026-09-25 it stopped at the first passing check from 10 runs; a simulation over collected populations showed that under-covered the median (as low as 82.5% for a 95% CI), see `dev-docs/stable-stopping.md`.
 - `-w, --warmup <runs>` — discarded warmup runs per function (fills caches, JIT, connections). When omitted, warmup is auto-detected after collection (a windowed Mann-Whitney screen drops leading runs that read significantly slower than the rest, capped at 25% of the runs) and discarded with a note reporting the count; the per-series `warmupDetected` lands in the JSON. `--warmup N` pins the count, `--warmup 0` keeps everything — an explicit flag disables detection.
 
 ### Per-run hooks

@@ -83,7 +83,11 @@ program
     toInt,
     0
   )
-  .option('--min-runs <runs>', 'minimum measured runs per function', toInt, 10)
+  .option(
+    '--min-runs <runs>',
+    'minimum measured runs per function (default: 10, or 30 with --stable)',
+    toInt
+  )
   .option('-t, --budget <ms>', 'time budget per function in milliseconds', toInt, 5000)
   .addOption(
     new Option('-r, --runs <runs>', 'exact number of runs (overrides the stop policy)')
@@ -92,7 +96,7 @@ program
   )
   .option(
     '--stable <pct>',
-    'run until the median CI width is <= pct% of the median (overrides --budget)',
+    'run until the median CI width is <= pct% of the median at two checks in a row (overrides --budget)',
     toFloat
   )
   .option('--max-runs <runs>', 'hard cap on measured runs', toInt, 1000)
@@ -142,6 +146,9 @@ if (args[0] === 'self') showSelf();
 // validate the options
 
 if (options.warmup < 0) program.error('The number of warmup runs must be >= 0');
+// measured 2026-09-24 (dev-docs/stable-stopping.md): a 10-run floor and a single passing check
+// stopped on lucky clusters and under-covered the median (82.5% for a 95% CI)
+options.minRuns ??= options.stable > 0 ? 30 : 10;
 if (options.minRuns < 1) program.error('The minimum number of runs must be >= 1');
 if (options.budget < 1) program.error('The time budget must be >= 1 ms');
 if (options.runs !== undefined && options.runs < 1)
@@ -226,7 +233,7 @@ const policyLine =
   options.runs > 0
     ? c`Measuring {{save.bright.yellow}}${formatInteger(options.runs)}{{restore}} runs per function (no batching, one call per run)`
     : options.stable > 0
-      ? c`Measuring until the median CI width is {{save.bright.yellow}}${formatNumber(options.stable, {decimals: 2})}%{{restore}} of the median (at least ${formatInteger(
+      ? c`Measuring until the median CI width is {{save.bright.yellow}}${formatNumber(options.stable, {decimals: 2})}%{{restore}} of the median at two checks in a row (at least ${formatInteger(
           options.minRuns
         )} runs, at most ${formatInteger(options.maxRuns)})`
       : c`Measuring for {{save.bright.yellow}}${formatTime(
@@ -334,6 +341,7 @@ for (let i = 0; i < names.length; ++i) {
         minRuns: options.minRuns,
         budget: options.budget,
         stable: options.stable || 0,
+        consecutive: 2,
         maxRuns: options.maxRuns,
         ciWidth: options.stable > 0 ? ciWidth : undefined,
         prepare,
@@ -540,7 +548,7 @@ if (options.json) {
       ...(options.runs > 0
         ? {runs: options.runs}
         : {minRuns: options.minRuns, budget: options.budget}),
-      ...(options.stable > 0 ? {stable: options.stable} : {}),
+      ...(options.stable > 0 ? {stable: options.stable, stableChecks: 2} : {}),
       ...(metricsOn ? {metrics: metricsKind} : {}),
       maxRuns: options.maxRuns,
       warmup: options.warmup,
