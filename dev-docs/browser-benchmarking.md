@@ -109,13 +109,45 @@ Eugene's ruling (2026-09-24): isolate with an `<iframe>` per function, as in tap
 and avoid automatic page refreshes where possible, while staying open to other forms of
 measurement that iframes make possible.
 
-What an iframe isolates is to be verified by experiment before the runner relies on it.
-_Inference, unverified:_ a same-origin iframe gets its own global object and module instances,
-so each function has its own JIT feedback, but it shares the page's heap, garbage collector, and
-renderer process. A cross-site iframe (for example, `127.0.0.1` inside a `localhost` page) runs
-in its own process under Chromium's and Firefox's site isolation, which would match
-`--isolate`, though Safari may not isolate it. Site isolation keys on the site, so a different port
-alone is not enough.
+### What each container isolates (measured 2026-09-24)
+
+Two copies of a probe page ran side by side in each container, same-origin and cross-site
+(`localhost` against `127.0.0.1`, which are different sites), on a plain server and on one
+sending COOP and COEP. Three probes: copy A counted 1&nbsp;ms timer ticks while copy B spun for
+400&nbsp;ms (a largest gap near 400&nbsp;ms means one shared thread); B kept 64&nbsp;MB while A
+read `performance.memory` (Chromium only, launched with `--enable-precise-memory-info`); and each
+copy reported `crossOriginIsolated` and its smallest `performance.now()` step. Engines:
+Playwright's Chromium, Firefox, and WebKit builds, plus desktop Firefox 156 on the cross-site
+case.
+
+| Container                   | Same-origin                                                                                                                                               | Cross-site                                                                                                                                                  |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<iframe>`                  | shares the thread in every engine, and the heap in Chromium (+65.7&nbsp;MB)                                                                               | own process in Chromium with site isolation on (gap 6&ndash;9&nbsp;ms, heap +0) and in desktop Firefox 156 (gap 8&nbsp;ms), but shares the thread in WebKit |
+| `<frame>` in a `<frameset>` | same as `<iframe>`                                                                                                                                        | same as `<iframe>`                                                                                                                                          |
+| top-level page (a tab)      | own thread in every engine (gap 5&ndash;10&nbsp;ms, heap +0), except Firefox with COOP and COEP, where two same-origin tabs shared a thread (404&nbsp;ms) | own thread in every engine                                                                                                                                  |
+
+What this means:
+
+- A same-origin `<iframe>` isolates the **realm** only: fresh globals and module instances, so
+  each function gets its own JIT feedback (_inference_ from separate realms creating separate
+  function objects), but one thread, heap, and garbage collector for all. It sits between
+  today's in-process mode and `--isolate`, and the parent can interleave by messaging each
+  iframe in turn.
+- A cross-site `<iframe>` gives **process** isolation, the counterpart of `--isolate`, in
+  Chromium and Firefox with site isolation on, but not in WebKit. The server would answer on a
+  second site name (for example, `127.0.0.1` beside `localhost`). A different port on the same
+  host is the same site.
+- Classic frames still work in all three engines and add nothing over iframes.
+- **Automation caveats:** Playwright's default Chromium launch doesn't isolate sites. With
+  `--site-per-process` it does, which is what desktop Chrome does by default. Playwright's
+  Firefox kept cross-site frames on one thread, and with Fission forced on it didn't load them
+  at all, so the Firefox result above comes from desktop Firefox 156 driven by a self-running
+  page. Under COOP and COEP, a cross-site iframe in Chromium was not itself
+  `crossOriginIsolated` (it needs `allow="cross-origin-isolated"` on the `<iframe>`, per the
+  spec, not yet tested), and in Playwright's Firefox it didn't load.
+- Timer steps: 100&nbsp;&micro;s in Chromium and 1&nbsp;ms in Firefox and WebKit on the plain
+  server, and 5&nbsp;&micro;s in Chromium and 20&nbsp;&micro;s in Firefox and WebKit with COOP and
+  COEP.
 
 ## Cross-origin isolation
 
