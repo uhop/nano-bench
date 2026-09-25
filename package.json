@@ -30,7 +30,9 @@
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
     "js-check": "tsc --project tsconfig.check.json",
-    "view": "node bin/nano-bench-view.js"
+    "view": "node bin/nano-bench-view.js",
+    "playwright": "node bin/nano-bench-playwright.js",
+    "puppeteer": "node bin/nano-bench-puppeteer.js"
   },
   "repository": {
     "type": "git",

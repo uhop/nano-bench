@@ -68,6 +68,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - `npm run lint:fix` — fix formatting with Prettier
 - `npm run js-check` — type-check the JS sources with `tsc` (`checkJs`, no emit)
 - `npm run view` — serve the browser viewer over this repository (`npm run view -- FILE.json` opens a file; `npx nano-bench-view` inside this repository runs a cached copy of the package from npx's cache, not the working tree)
+- `npm run playwright -- FILE.js [options]`, `npm run puppeteer -- FILE.js [options]` — run a bench file through the driver bins from the working tree; `npx nano-bench-playwright` inside this repository fails with `not found` for the same reason as `npx nano-bench-view`
 
 ## File layout
 
