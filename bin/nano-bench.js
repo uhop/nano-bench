@@ -5,7 +5,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import path from 'node:path';
 import {readFile, writeFile} from 'node:fs/promises';
 
-import {Option, program} from 'commander';
+import {InvalidArgumentError, Option, program} from 'commander';
 
 import {CURSOR_NORMAL, CURSOR_INVISIBLE, CLEAR_EOL} from 'console-toolkit/ansi';
 import {
@@ -87,7 +87,15 @@ program
       .default('holm')
   )
   .option('-s, --samples <samples>', 'number of samples', toInt, 100)
-  .option('-p, --parallel', 'collect samples in parallel')
+  .option(
+    '-p, --parallel <n>',
+    'rounds of n concurrent calls, for asynchronous functions (-s counts rounds)',
+    value => {
+      const n = parseInt(value);
+      if (!(n >= 1)) throw new InvalidArgumentError('expected a whole number of 1 or more');
+      return n;
+    }
+  )
   .addOption(
     new Option(
       '--order <order>',
@@ -95,7 +103,6 @@ program
     )
       .choices(['interleaved', 'sequential'])
       .default('interleaved')
-      .conflicts('parallel')
   )
   .addOption(
     new Option('--isolate', 'measure each function in its own process').conflicts('parallel')
@@ -339,7 +346,13 @@ const summarize = async i => {
   await sleep(5);
 };
 
-const median = samples => getWeightedValue(samples.slice().sort(numericAsc), 0.5);
+const median = samples => getWeightedValue(samples.slice().sort(numericAsc), 0.5),
+  roundMedians = (samples, size) => {
+    const medians = [];
+    for (let start = 0; start < samples.length; start += size)
+      medians.push(median(samples.slice(start, start + size)));
+    return medians;
+  };
 
 // perProcess[fn][round]: the samples of one child process, first sample dropped
 let perProcess = null;
@@ -391,7 +404,7 @@ if (options.isolate) {
   }
   results.push(...perProcess.map(list => list.flat()));
   for (let i = 0; i < results.length; ++i) await summarize(i);
-} else if (!options.parallel && options.order === 'interleaved') {
+} else if (options.order === 'interleaved') {
   const startedAt = performance.now();
   const slices = names.length * options.samples,
     sliceLabel = done =>
@@ -402,8 +415,10 @@ if (options.isolate) {
     iterations,
     {
       nSeries: options.samples,
+      concurrency: options.parallel ?? 0,
       observe: options.observe ? 'all' : undefined,
-      ratios: cpuRatios,
+      // concurrent calls share the CPU by design, so their ratios say nothing
+      ratios: options.parallel ? undefined : cpuRatios,
       onSample: async done => {
         setProgress(sliceLabel(done), done, slices, startedAt);
         await updater.update();
@@ -425,9 +440,8 @@ if (options.isolate) {
     total = names.length * options.samples,
     sampling = (i, done) =>
       setProgress(
-        options.parallel
-          ? `sampling ${names[i]} in parallel (${i + 1} of ${names.length})`
-          : `sampling ${names[i]} (${i + 1} of ${names.length}): ${done} of ${options.samples}`,
+        `sampling ${names[i]} (${i + 1} of ${names.length}): ${done} of ${options.samples}` +
+          (options.parallel ? ` rounds, ${options.parallel} at a time` : ''),
         i * options.samples + done,
         total,
         startedAt
@@ -437,8 +451,9 @@ if (options.isolate) {
     await updater.update();
     const samples = await benchSeries(fns[names[i]], iterations[i], {
       nSeries: options.samples,
+      concurrency: options.parallel ?? 0,
       observe: options.observe ? names[i] : undefined,
-      // concurrent samples share the CPU by design, so their ratios say nothing
+      // concurrent calls share the CPU by design, so their ratios say nothing
       ratios: options.parallel ? undefined : cpuRatios[i],
       onSample: async done => {
         sampling(i, done);
@@ -481,11 +496,26 @@ let significance = null;
 if (results.length > 1) {
   // with several processes per function the process is the unit: pooling their samples
   // would treat a per-process offset as independent evidence
+  // concurrent calls in one round share the load, so the round is the unit, as the process is
   const byProcess = perProcess && options.repeat > 1,
-    tested = byProcess ? perProcess.map(list => list.map(median)) : results,
+    byRound = options.parallel > 1,
+    tested = byProcess
+      ? perProcess.map(list => list.map(median))
+      : byRound
+        ? results.map(samples => roundMedians(samples, options.parallel))
+        : results,
     testResult = computeSignificance(tested, options.alpha, options.correction),
     matrix = significanceMatrix(testResult);
-  significance = byProcess ? {...testResult, unit: 'process-medians'} : testResult;
+  significance = byProcess
+    ? {...testResult, unit: 'process-medians'}
+    : byRound
+      ? {...testResult, unit: 'round-medians'}
+      : testResult;
+  if (byRound)
+    await writer.write([
+      '',
+      c`{{save.bold}}Rounds:{{restore}} ${options.parallel} concurrent calls per round; the test below compares per-round medians`
+    ]);
   if (byProcess) {
     const wins = fastestPerRound(tested),
       tally = names
@@ -544,8 +574,8 @@ if (options.json) {
       seed,
       alpha: options.alpha,
       correction: options.correction,
-      parallel: Boolean(options.parallel),
-      order: options.parallel ? 'parallel' : options.order,
+      parallel: options.parallel ?? false,
+      order: options.order,
       ...(options.isolate ? {isolate: true, repeat: options.repeat} : {})
     },
     series: names.map((name, i) => ({

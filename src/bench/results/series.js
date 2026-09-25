@@ -43,6 +43,8 @@ export const buildSeries = (files, {alpha}) => {
         samples: s.samples,
         metrics: Array.isArray(s.metrics) ? s.metrics : null,
         processSizes: Array.isArray(s.processSizes) ? s.processSizes : null,
+        // `-p N` stores N; files before it store `true`, a single burst with no rounds
+        roundSize: typeof f.results.params.parallel == 'number' ? f.results.params.parallel : null,
         metricsKind: f.results.params.metrics,
         summary: bootstrapSummary(s.samples, {alpha, bootstrap, random})
       });
@@ -63,16 +65,27 @@ const splitProcesses = s => {
   return parts;
 };
 
+const splitRounds = s => {
+  const parts = [];
+  for (let start = 0; start < s.samples.length; start += s.roundSize)
+    parts.push(s.samples.slice(start, start + s.roundSize));
+  return parts;
+};
+
 /**
  * What a significance test compares: per-process medians when every series was measured in
- * more than one process (`nano-bench --isolate --repeat N`), the samples otherwise.
- * @param {{samples: number[], processSizes?: number[] | null}[]} members
- * @returns {{arrays: number[][], unit: 'samples' | 'process-medians'}}
+ * more than one process (`nano-bench --isolate --repeat N`), per-round medians when every series
+ * ran in rounds of concurrent calls (`nano-bench -p N`), the samples otherwise.
+ * @param {{samples: number[], processSizes?: number[] | null, roundSize?: number | null}[]} members
+ * @returns {{arrays: number[][], unit: 'samples' | 'process-medians' | 'round-medians'}}
  */
-export const comparisonArrays = members =>
-  members.every(s => s.processSizes && s.processSizes.length > 1)
-    ? {arrays: members.map(s => splitProcesses(s).map(median)), unit: 'process-medians'}
-    : {arrays: members.map(s => s.samples), unit: 'samples'};
+export const comparisonArrays = members => {
+  if (members.every(s => s.processSizes && s.processSizes.length > 1))
+    return {arrays: members.map(s => splitProcesses(s).map(median)), unit: 'process-medians'};
+  if (members.every(s => s.roundSize > 1))
+    return {arrays: members.map(s => splitRounds(s).map(median)), unit: 'round-medians'};
+  return {arrays: members.map(s => s.samples), unit: 'samples'};
+};
 
 /**
  * The warning for a browser run whose page was not cross-origin isolated, or null.

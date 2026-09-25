@@ -136,6 +136,40 @@ test('comparisonArrays()', t => {
     'a single-process series keeps the sample test'
   );
   t.equal(comparisonArrays([{samples: pooled}, {samples: pooled}]).unit, 'samples', 'older files');
+  t.deepEqual(
+    comparisonArrays([
+      {samples: pooled, roundSize: 3},
+      {samples: pooled, roundSize: 2}
+    ]),
+    {
+      arrays: [
+        [2, 11],
+        [1.5, 6.5, 11.5]
+      ],
+      unit: 'round-medians'
+    },
+    'rounds of concurrent calls: per-round medians'
+  );
+  t.equal(
+    comparisonArrays([
+      {samples: pooled, roundSize: 3},
+      {samples: pooled, roundSize: null}
+    ]).unit,
+    'samples',
+    'a series without rounds keeps the sample test'
+  );
+});
+
+test('buildSeries() roundSize', t => {
+  const [withRounds] = buildSeries(
+      [makeFile('a.json', {params: {parallel: 4}, series: [['f', 1]]})],
+      {alpha: 0.05}
+    ),
+    [oneBurst] = buildSeries([makeFile('b.json', {params: {parallel: true}, series: [['f', 1]]})], {
+      alpha: 0.05
+    });
+  t.equal(withRounds.roundSize, 4, '-p N stores N');
+  t.equal(oneBurst.roundSize, null, 'an older -p file was one burst: no rounds');
 });
 
 test('isolationWarning()', t => {

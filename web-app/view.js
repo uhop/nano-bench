@@ -123,6 +123,10 @@ const significanceBlock = (members, name, {alpha, correction}) => {
     out.push(
       `<p>Each function was measured in several processes, so the test compares per-process medians (${arrays.map(a => a.length).join(' vs ')}).</p>`
     );
+  else if (unit === 'round-medians')
+    out.push(
+      `<p>Each function ran in rounds of concurrent calls, so the test compares per-round medians (${arrays.map(a => a.length).join(' vs ')}).</p>`
+    );
   out.push(
     `<p>${isPair ? 'Mann–Whitney U test (two-sided, tie-corrected)' : 'Kruskal–Wallis H test'}, α = ${esc(alpha)}${
       isPair

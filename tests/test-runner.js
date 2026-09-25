@@ -300,3 +300,58 @@ test('observe option (User Timing API)', t => {
   performance.clearMarks();
   performance.clearMeasures();
 });
+
+// an async call that records how many calls were in flight when it started
+const inFlight = () => {
+  const seen = [];
+  let running = 0;
+  const fn = async () => {
+    seen.push(++running);
+    await new Promise(resolve => setTimeout(resolve, 1));
+    --running;
+  };
+  return {fn, seen};
+};
+
+test('concurrent rounds', async t => {
+  t.test('benchmarkSeriesPar with concurrency runs rounds of bursts', async t => {
+    const {fn, seen} = inFlight(),
+      progress = [];
+    const data = await benchmarkSeriesPar(fn, 1, {
+      nSeries: 3,
+      concurrency: 4,
+      timeout: 0,
+      onSample: (done, total) => progress.push(`${done}/${total}`)
+    });
+    t.equal(data.length, 12, 'nSeries rounds of concurrency samples');
+    t.deepEqual(
+      seen,
+      [1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4],
+      'each round starts from nothing in flight'
+    );
+    t.deepEqual(progress, ['1/3', '2/3', '3/3'], 'one report per round');
+  });
+
+  t.test('benchmarkSeriesPar without concurrency keeps one burst', async t => {
+    const {fn, seen} = inFlight();
+    const data = await benchmarkSeriesPar(fn, 1, {nSeries: 5});
+    t.equal(data.length, 5);
+    t.equal(Math.max(...seen), 5, 'all five in flight together');
+  });
+
+  t.test('benchmarkRounds with concurrency', async t => {
+    const a = inFlight(),
+      b = inFlight();
+    const data = await benchmarkRounds([a.fn, b.fn], [1, 1], {
+      nSeries: 2,
+      concurrency: 3,
+      timeout: 0
+    });
+    t.deepEqual(
+      data.map(series => series.length),
+      [6, 6],
+      'a burst per function and round'
+    );
+    t.equal(Math.max(...a.seen, ...b.seen), 3, 'functions never overlap each other');
+  });
+});
