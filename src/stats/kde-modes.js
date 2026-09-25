@@ -1,18 +1,25 @@
 import {stdDev} from '../stats.js';
 import quantileSorted from './quantile.js';
 
-// Gaussian KDE with Silverman's bandwidth; clusters split at the density minima
-// between local maxima — the mode count is a heuristic, not an assertion
-export const kdeClusters = (sorted, {grid = 256} = {}) => {
-  const n = sorted.length;
-  if (n < 2 || sorted[0] === sorted[n - 1]) return {clusters: [sorted], boundaries: [], modes: []};
-  const sd = stdDev(sorted),
+/**
+ * The Gaussian KDE of a sorted sample on an evenly spaced grid, Silverman's bandwidth.
+ * @param {number[]} sorted
+ * @param {{grid?: number, lo?: number, hi?: number}} [options] the grid's range, default ±3h past the data
+ * @returns {{lo: number, step: number, density: number[], h: number}} `density` unnormalized
+ */
+export const kdeDensity = (sorted, {grid = 256, lo: from, hi: to} = {}) => {
+  const n = sorted.length,
+    sd = stdDev(sorted),
     iqr = quantileSorted(sorted, 0.75) - quantileSorted(sorted, 0.25),
     spread = Math.min(sd || Infinity, iqr / 1.34 || Infinity),
     h =
-      0.9 * (isFinite(spread) && spread > 0 ? spread : (sorted[n - 1] - sorted[0]) / 4) * n ** -0.2;
-  const lo = sorted[0] - 3 * h,
-    hi = sorted[n - 1] + 3 * h,
+      0.9 *
+        (isFinite(spread) && spread > 0 ? spread : (sorted[n - 1] - sorted[0]) / 4) *
+        n ** -0.2 ||
+      Math.abs(sorted[0]) * 1e-3 ||
+      1e-9;
+  const lo = from ?? sorted[0] - 3 * h,
+    hi = to ?? sorted[n - 1] + 3 * h,
     step = (hi - lo) / (grid - 1),
     density = new Array(grid).fill(0);
   for (let g = 0; g < grid; ++g) {
@@ -24,6 +31,15 @@ export const kdeClusters = (sorted, {grid = 256} = {}) => {
     }
     density[g] = sum;
   }
+  return {lo, step, density, h};
+};
+
+// Gaussian KDE with Silverman's bandwidth; clusters split at the density minima
+// between local maxima — the mode count is a heuristic, not an assertion
+export const kdeClusters = (sorted, {grid = 256} = {}) => {
+  const n = sorted.length;
+  if (n < 2 || sorted[0] === sorted[n - 1]) return {clusters: [sorted], boundaries: [], modes: []};
+  const {lo, step, density} = kdeDensity(sorted, {grid});
   const maxima = [];
   for (let g = 0; g < grid; ++g) {
     const left = g > 0 ? density[g - 1] : -1,

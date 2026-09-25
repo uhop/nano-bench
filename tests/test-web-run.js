@@ -1,6 +1,6 @@
 import test from 'tape-six';
 
-import {detectBrowser, timerResolution} from '../web-app/run.js';
+import {crossSiteOrigin, detectBrowser, timerResolution} from '../web-app/run.js';
 
 test('detectBrowser()', t => {
   const chrome =
@@ -22,4 +22,17 @@ test('detectBrowser()', t => {
 test('timerResolution()', t => {
   const r = timerResolution();
   t.ok(r > 0 && r <= 1, `a positive step of 1 ms or less (${r} ms)`);
+});
+
+test('crossSiteOrigin()', t => {
+  t.equal(
+    crossSiteOrigin({hostname: 'localhost', protocol: 'http:', port: '3000'}),
+    'http://127.0.0.1:3000'
+  );
+  t.equal(
+    crossSiteOrigin({hostname: '127.0.0.1', protocol: 'https:', port: ''}),
+    'https://localhost',
+    'the default port stays implicit'
+  );
+  t.equal(crossSiteOrigin({hostname: 'bench.lan', protocol: 'http:', port: '80'}), null);
 });

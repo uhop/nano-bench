@@ -180,6 +180,11 @@ test('runner routes', async t => {
     t.equal(r.status, 200);
     t.equal(r.headers.get('cross-origin-opener-policy'), 'same-origin');
     t.equal(r.headers.get('cross-origin-embedder-policy'), 'require-corp');
+    t.equal(
+      r.headers.get('cross-origin-resource-policy'),
+      'cross-origin',
+      'a page on the other loopback name may embed it'
+    );
     t.equal(r.headers.get('cache-control'), 'no-store');
     const html = await r.text();
     t.ok(html.includes('"lib":"/lib/index.js"'), 'the project import map is inlined');

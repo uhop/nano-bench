@@ -130,6 +130,41 @@ td.name {
   fill: var(--series);
 }
 
+.dist .bar.cluster-1,
+.swatch.cluster-1 {
+  fill: var(--series-2);
+  background: var(--series-2);
+}
+
+.dist .bar.cluster-2,
+.swatch.cluster-2 {
+  fill: var(--series-3);
+  background: var(--series-3);
+}
+
+.dist .bar.cluster-more,
+.swatch.cluster-more {
+  fill: var(--muted);
+  background: var(--muted);
+}
+
+.swatch {
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 2px;
+  margin-right: 0.4em;
+  background: var(--series);
+  vertical-align: baseline;
+}
+
+.dist .violin-body {
+  fill: var(--series);
+  fill-opacity: 0.55;
+  stroke: var(--series);
+  stroke-width: 1;
+}
+
 .dist .hit {
   fill: transparent;
 }
@@ -275,7 +310,8 @@ button.compare:disabled {
 .axis-toggle[data-state='auto'] [data-axis='auto'],
 .axis-toggle[data-state='linear'] [data-axis='linear'],
 .axis-toggle[data-state='log'] [data-axis='log'],
-.axis-toggle[data-state='rows'] [data-axis='rows'] {
+.axis-toggle[data-state='rows'] [data-axis='rows'],
+.axis-toggle[data-state='violin'] [data-axis='violin'] {
   background: var(--active);
   color: var(--active-ink);
 }
@@ -366,4 +402,27 @@ button.stop {
   color: var(--ink);
   font: inherit;
   cursor: pointer;
+}
+
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.25em 1em;
+}
+
+.drop-zone.over {
+  border-color: var(--series);
+  background: var(--series-wash);
+}
+
+.paste textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5em;
 }

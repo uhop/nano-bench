@@ -41,6 +41,7 @@ src/                          # Internal source (shipped via npm)
 │   ├── gc.js                       # --gc: findGc, a forced collection per runtime
 │   ├── isolate.js                  # --isolate: runChild, isolationPlan, fastestPerRound
 │   ├── load-runner.js              # --in-flight / --rate: closed and open loops in phases
+│   ├── metrics-specs.js            # metric specs and medians, shared by the terminal and the viewer
 │   ├── params.js                   # factory files: one child per parameter value, the scaling table
 │   ├── settle.js                   # --settle: per-pair median-ratio CI against ±threshold
 │   ├── pair-series.js              # planComparison — paired-by-name blocks vs one pooled omnibus
@@ -54,7 +55,8 @@ src/                          # Internal source (shipped via npm)
 │   │   ├── significance-table.js   # Significance header + N×N matrix (shared by bench & compare)
 │   │   ├── histogram-chart.js      # Terminal distribution charts (columns ridgeline / rotated bars)
 │   │   ├── progress.js             # Progress bar + line shown under the live tables while measuring
-│   │   └── svg-distribution.js     # Viewer chart: small-multiple histograms as an SVG string
+│   │   ├── svg-distribution.js     # Viewer chart: small-multiple histograms as an SVG string
+│   │   └── svg-violin.js           # Viewer chart: one KDE violin per series
 │   └── results/
 │       ├── build.js                # buildResultsObject — schema v1
 │       ├── parse.js                # Validate results JSON text (browser-safe)
@@ -171,7 +173,7 @@ Steps 2 and 4 live in `src/bench/results/series.js`, so the browser viewer compu
 ### nano-bench-view
 
 1. **Serve** — `createTestServer` from `tape-six/test-server.js` (lazy import) over `--root`, with `webAppPath` set to `/--nano-bench/web-app/` so `/` redirects to the viewer, remote plugin registration off, and two plugins. `nano-bench-plugin.js` serves `web-app/`, `src/`, and the `console-toolkit` sources from wherever they are installed (resolved with `import.meta.resolve`), so the viewer works when the package is outside the served root. It also answers `/--nano-bench/results`: every JSON file under the root whose first 512 bytes carry `schemaVersion: 1` and `tool: "nano-benchmark"`, skipping dot-folders and `node_modules`. `autoindex.js` lists folders without `index.html`; the root lists only with `/?list`.
-2. **View** — `web-app/app.js` loads `?view=` paths from the server (or local files through a file input), `parseResults` validates them, and `view.js` runs the compare pipeline's `buildSeries` / `resultsWarnings` / `planComparison` / `computeSignificance` in the browser. The chart is `computeHistograms` rendered by `svg-distribution.js`: a shared linear axis, a shared log axis (chosen automatically when the pooled 1st–99th percentile range exceeds 20×), or one axis per row.
+2. **View** — `web-app/app.js` loads `?view=` paths from the server (or local files through a file input), `parseResults` validates them, and `view.js` runs the compare pipeline's `buildSeries` / `resultsWarnings` / `planComparison` / `computeSignificance` in the browser. The chart is `computeHistograms` rendered by `svg-distribution.js`: a shared linear axis, a shared log axis (chosen automatically when the pooled 1st–99th percentile range exceeds 20×), or one axis per row; the Violin mode draws `svg-violin.js` instead. Sections for scaling, load, settle, `-M` metrics, and dip-test clusters (`kdeClusters`, colored on the histogram through its `binClass` hook) come from the same files.
 3. **Run** — `?run=<path>` (or a local file through a blob URL) hands the bench file to `web-app/run.js`. A lister iframe returns the function names, then one same-origin iframe per function loads `/--nano-bench/frame`, which inlines the root's import map and runs `web-app/frame.js`. The parent calibrates each function (`findLevel`) and samples them in interleaved rounds (`benchmark`) over `postMessage`, waiting while the tab is hidden. It then builds a schema-v1 object with `bootstrapSummary` and `computeSignificance`, `POST`s it to `/--nano-bench/save` (written under `nano-bench-results/`, never overwriting), and opens it in the viewer. The plugin sends COOP and COEP with every page, so `performance.now()` steps 5–20 µs.
 
 ### Browser drivers

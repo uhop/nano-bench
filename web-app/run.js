@@ -45,15 +45,35 @@ export const detectBrowser = ua => {
 const engineOf = name =>
   ({firefox: 'spidermonkey', chromium: 'v8', edge: 'v8', webkit: 'javascriptcore'})[name] ?? null;
 
+/**
+ * The other loopback name, whose frames are cross-site to this page: localhost and 127.0.0.1
+ * are different sites to a browser, and the server answers on both. Null elsewhere.
+ */
+export const crossSiteOrigin = (where = location) => {
+  const other = {localhost: '127.0.0.1', '127.0.0.1': 'localhost'}[where.hostname];
+  return other ? `${where.protocol}//${other}${where.port ? ':' + where.port : ''}` : null;
+};
+
 class Frames {
-  constructor(host) {
+  /**
+   * @param {HTMLElement} host
+   * @param {{origin?: string | null, source?: string | null}} [options] `origin` for cross-site
+   *   frames; `source` is sent to frames loading `:message`
+   */
+  constructor(host, {origin = null, source = null} = {}) {
     this.host = host;
+    this.origin = origin ?? location.origin;
+    this.source = source;
     this.pending = new Map();
     this.waiters = new Map();
     this.nextId = 0;
     this.onMessage = event => {
-      if (event.origin !== location.origin) return;
+      if (event.origin !== this.origin) return;
       const data = event.data || {};
+      if (data.type === 'need-source') {
+        event.source?.postMessage({type: 'source', text: this.source ?? ''}, this.origin);
+        return;
+      }
       if (data.type === 'result') {
         const settle = this.pending.get(data.id);
         this.pending.delete(data.id);
@@ -69,11 +89,18 @@ class Frames {
     const frame = document.createElement('iframe');
     frame.className = 'bench-frame';
     frame.title = 'benchmark';
+    if (this.origin !== location.origin) frame.allow = 'cross-origin-isolated';
     this.host.append(frame);
     // the WindowProxy keeps its identity across the navigation below, and the frame may answer
     // before its load event, so the waiter goes in first
     const ready = new Promise(resolve => this.waiters.set(frame.contentWindow, resolve));
-    frame.src = FRAME + '?' + new URLSearchParams(query);
+    frame.src =
+      (this.origin === location.origin ? '' : this.origin) +
+      FRAME +
+      '?' +
+      new URLSearchParams(
+        this.origin === location.origin ? query : {...query, parent: location.origin}
+      );
     return {frame, ready};
   }
   ask(frame, request) {
@@ -82,7 +109,7 @@ class Frames {
       this.pending.set(id, data =>
         data.error ? reject(new Error(data.error)) : resolve(data.value)
       );
-      frame.contentWindow.postMessage({...request, id}, location.origin);
+      frame.contentWindow.postMessage({...request, id}, this.origin);
     });
   }
   close() {
@@ -92,15 +119,19 @@ class Frames {
 }
 
 /**
- * Runs a bench module in the browser: one same-origin iframe per function, interleaved rounds.
+ * Runs a bench module in the browser: one iframe per function, interleaved rounds. With
+ * `crossSite`, the frames come from the other loopback name, so browsers that isolate sites
+ * give each one its own process; a local `source` then reaches the frames by message.
  * @param {HTMLElement} main
- * @param {{file: string, url: string, exportName?: string, ms?: number, samples?: number,
+ * @param {{file: string, url: string, source?: string | null, crossSite?: boolean, exportName?: string, ms?: number, samples?: number,
  *   bootstrap?: number, alpha?: number, correction?: string, onDone: (results: any, file: string) => unknown}} options
  */
 export const runBench = async (main, options) => {
   const {
     file,
     url,
+    source = null,
+    crossSite = false,
     exportName = 'default',
     ms = 50,
     samples = 100,
@@ -112,7 +143,7 @@ export const runBench = async (main, options) => {
 
   main.innerHTML = `<section class="run">
 <h2>Running <code>${esc(file)}</code></h2>
-<p class="meta run-params">${esc(ms)} ms per sample, ${esc(samples)} samples per function, one iframe per function, interleaved rounds</p>
+<p class="meta run-params">${esc(ms)} ms per sample, ${esc(samples)} samples per function, one ${crossSite ? 'cross-site ' : ''}iframe per function, interleaved rounds</p>
 <div class="run-progress"><nano-bench-progress aria-label="benchmark progress"></nano-bench-progress><span class="label">starting…</span></div>
 <section class="warnings" hidden><ul><li></li></ul></section>
 <p class="run-notes muted"></p>
@@ -126,7 +157,13 @@ export const runBench = async (main, options) => {
     notes = /** @type {HTMLElement} */ (main.querySelector('.run-notes')),
     body = /** @type {HTMLElement} */ (main.querySelector('.run-table tbody')),
     stop = /** @type {HTMLButtonElement} */ (main.querySelector('.stop')),
-    frames = new Frames(/** @type {HTMLElement} */ (main.querySelector('.frames')));
+    frameOrigin = crossSite ? crossSiteOrigin() : null,
+    frames = new Frames(/** @type {HTMLElement} */ (main.querySelector('.frames')), {
+      origin: frameOrigin,
+      source
+    }),
+    // a blob URL belongs to this page's origin: a cross-site frame gets the source by message
+    fileParam = frameOrigin && source !== null ? ':message' : url;
 
   let stopped = false,
     pauses = 0;
@@ -184,17 +221,29 @@ export const runBench = async (main, options) => {
     }
 
     progress('loading the module');
-    const lister = frames.open({file: url, export: exportName}),
+    if (crossSite && !frameOrigin)
+      throw new Error('cross-site frames need the page on localhost or 127.0.0.1');
+    const lister = frames.open({file: fileParam, export: exportName}),
       listed = await lister.ready;
     if (listed.type === 'error') throw new Error(listed.message);
     const names = listed.names;
     lister.frame.remove();
     if (!names.length) throw new Error(`no functions in the "${exportName}" export`);
 
-    const opened = names.map(name => frames.open({file: url, export: exportName, fn: name})),
+    const opened = names.map(name => frames.open({file: fileParam, export: exportName, fn: name})),
       ready = await Promise.all(opened.map(o => o.ready));
     const failed = ready.find(r => r.type === 'error');
     if (failed) throw new Error(`${failed.name}: ${failed.message}`);
+    // a cross-site frame is isolated only when the browser grants it through the allow attribute
+    const framesIsolated = ready.every(r => r.crossOriginIsolated);
+    if (!framesIsolated && self.crossOriginIsolated) {
+      const message =
+          'the benchmark frames were not cross-origin isolated, so their timers are coarse: this browser does not extend isolation to cross-site frames',
+        box = /** @type {HTMLElement} */ (main.querySelector('.warnings'));
+      /** @type {HTMLElement} */ (box.querySelector('li')).textContent = message;
+      box.hidden = false;
+      report({type: 'warning', message});
+    }
 
     const k = names.length,
       data = names.map(() => /** @type {number[]} */ ([])),
@@ -273,8 +322,11 @@ export const runBench = async (main, options) => {
         browser: {
           userAgent: navigator.userAgent,
           crossOriginIsolated: self.crossOriginIsolated,
+          framesIsolated,
           timerResolutionMs: resolution,
-          isolation: 'same-origin iframe per function',
+          isolation: crossSite
+            ? 'cross-site iframe per function'
+            : 'same-origin iframe per function',
           hiddenPauses: pauses,
           stoppedEarly: stopped
         }

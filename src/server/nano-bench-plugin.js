@@ -105,6 +105,8 @@ const framePage = importmap =>
 const isolate = response => {
   response.headers.set('cross-origin-opener-policy', 'same-origin');
   response.headers.set('cross-origin-embedder-policy', 'require-corp');
+  // lets the page on localhost embed frames from 127.0.0.1, and the other way round
+  response.headers.set('cross-origin-resource-policy', 'cross-origin');
   return response;
 };
 

@@ -7,52 +7,12 @@ import style from 'console-toolkit/style.js';
 import makeTable from 'console-toolkit/table';
 import lineTheme from 'console-toolkit/themes/lines/unicode-rounded.js';
 
-import quantileSorted from '../../stats/quantile.js';
-import numericAsc from '../../utils/numeric-asc.js';
-
 const bold = s => style.bold.text(s),
   num = s => style.bright.yellow.text(s);
 
-export const metricSpecs = {
-  rusage: [
-    {key: 'cpuUser', label: 'cpu user', kind: 'us'},
-    {key: 'cpuSystem', label: 'cpu sys', kind: 'us'},
-    {key: 'minorPageFault', label: 'minor pf', kind: 'count'},
-    {key: 'majorPageFault', label: 'major pf', kind: 'count'},
-    {key: 'voluntaryContextSwitches', label: 'vcsw', kind: 'count'},
-    {key: 'involuntaryContextSwitches', label: 'icsw', kind: 'count'}
-  ],
-  proc: [
-    {key: 'peakRSS', label: 'peak rss', kind: 'bytes'},
-    {key: 'logicalRead', label: 'read', kind: 'bytes'},
-    {key: 'logicalWrite', label: 'write', kind: 'bytes'},
-    {key: 'physicalRead', label: 'phys read', kind: 'bytes'},
-    {key: 'physicalWrite', label: 'phys write', kind: 'bytes'},
-    {key: 'syscallRead', label: 'syscr', kind: 'count'},
-    {key: 'syscallWrite', label: 'syscw', kind: 'count'}
-  ]
-};
+import {metricSpecs} from '../metrics-specs.js';
 
-export const metricLegends = {
-  rusage: 'pf = page fault, icsw/vcsw = (in)voluntary context switches',
-  proc: 'phys = block-layer bytes, syscr/syscw = read/write syscalls'
-};
-
-export const metricMedians = (perRun, spec) => {
-  const medians = {};
-  for (const {key} of spec) {
-    const sorted = perRun
-      .filter(Boolean)
-      .map(reading => reading[key])
-      .sort(numericAsc);
-    medians[key] = sorted.length ? quantileSorted(sorted, 0.5) : null;
-  }
-  return medians;
-};
-
-// a median over a minority of runs isn't a median — render blank instead
-export const guardedMedians = (perRun, spec) =>
-  metricMedians(perRun.filter(Boolean).length * 2 >= perRun.length ? perRun : [], spec);
+export {metricSpecs, metricLegends, metricMedians, guardedMedians} from '../metrics-specs.js';
 
 const formatValue = (value, kind) => {
   if (value == null) return '';

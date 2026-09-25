@@ -1,7 +1,7 @@
 import {parseResults} from '../src/bench/results/parse.js';
 import {escapeXml as esc} from '../src/bench/render/svg-distribution.js';
 import {renderView} from './view.js';
-import {report, runBench} from './run.js';
+import {crossSiteOrigin, report, runBench} from './run.js';
 import './components/nano-bench-progress.js';
 
 const main = /** @type {HTMLElement} */ (document.querySelector('main'));
@@ -61,10 +61,12 @@ const saveAndShow = async (results, name) => {
   }
 };
 
-const run = (file, url) =>
+const run = (file, url, {source = null, crossSite = query.get('frames') === 'cross'} = {}) =>
   runBench(main, {
     file,
     url,
+    source,
+    crossSite,
     exportName: query.get('export') || 'default',
     ms: numberParam('ms', 50),
     samples: numberParam('samples', 100),
@@ -77,9 +79,14 @@ const renderPicker = async () => {
   document.title = 'Results · nano-bench';
   main.innerHTML = `<section>
 <h2>Run a benchmark</h2>
+<p><label><input type="checkbox" class="cross-site"> Run each function in a cross-site frame</label> <span class="muted cross-site-note"></span></p>
 <div class="bench-list"><p class="muted">Searching…</p></div>
-<p><label class="file-input">Open a bench file… <input type="file" class="bench-input" accept=".js,.mjs,text/javascript"></label></p>
-<p class="note">Each function runs in its own iframe, in interleaved rounds. A local file must be self-contained: its own imports can't be resolved. Results are saved under <code>nano-bench-results/</code> on the server.</p>
+<div class="drop-zone"><p><label class="file-input">Open a bench file… <input type="file" class="bench-input" accept=".js,.mjs,text/javascript"></label> or drop one here.</p></div>
+<details class="paste"><summary>Paste bench code</summary>
+<p><textarea class="paste-code" rows="10" spellcheck="false" placeholder="export default {&#10;  a: n => { for (let i = 0; i < n; ++i) { /* … */ } },&#10;  b: n => { for (let i = 0; i < n; ++i) { /* … */ } }&#10;};"></textarea></p>
+<p><button type="button" class="paste-run">Run the pasted code</button></p>
+</details>
+<p class="note">Each function runs in its own iframe, in interleaved rounds. A cross-site frame is served from the other loopback name (<code>localhost</code> or <code>127.0.0.1</code>), so browsers that isolate sites (Chromium with site isolation, desktop Firefox) give each function its own process; WebKit does not. A local or pasted file must be self-contained: its own imports can't be resolved. Results are saved under <code>nano-bench-results/</code> on the server.</p>
 </section>
 <section>
 <h2>Results on the server</h2>
@@ -99,9 +106,51 @@ const renderPicker = async () => {
     benchList = /** @type {HTMLElement} */ (main.querySelector('.bench-list')),
     benchInput = /** @type {HTMLInputElement} */ (main.querySelector('.bench-input'));
 
-  benchInput.addEventListener('change', () => {
+  const crossBox = /** @type {HTMLInputElement} */ (main.querySelector('.cross-site')),
+    crossNote = /** @type {HTMLElement} */ (main.querySelector('.cross-site-note')),
+    dropZone = /** @type {HTMLElement} */ (main.querySelector('.drop-zone')),
+    pasteCode = /** @type {HTMLTextAreaElement} */ (main.querySelector('.paste-code')),
+    pasteRun = /** @type {HTMLButtonElement} */ (main.querySelector('.paste-run'));
+  if (!crossSiteOrigin()) {
+    crossBox.disabled = true;
+    crossNote.textContent = '(needs the page on localhost or 127.0.0.1)';
+  }
+  crossBox.checked = !crossBox.disabled && query.get('frames') === 'cross';
+
+  const runLocal = async (name, text) => {
+    const url = URL.createObjectURL(new Blob([text], {type: 'text/javascript'}));
+    await run(name, url, {source: text, crossSite: crossBox.checked});
+  };
+
+  benchInput.addEventListener('change', async () => {
     const file = benchInput.files?.[0];
-    if (file) run(file.name, URL.createObjectURL(file));
+    if (file) await runLocal(file.name, await file.text());
+  });
+
+  dropZone.addEventListener('dragover', event => {
+    if (!event.dataTransfer?.types.includes('Files')) return;
+    event.preventDefault();
+    dropZone.classList.add('over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+  dropZone.addEventListener('drop', async event => {
+    event.preventDefault();
+    dropZone.classList.remove('over');
+    const file = event.dataTransfer?.files?.[0];
+    if (file) await runLocal(file.name, await file.text());
+  });
+
+  pasteRun.addEventListener('click', async () => {
+    if (pasteCode.value.trim()) await runLocal('snippet.js', pasteCode.value);
+  });
+
+  const benchHref = path =>
+    `?run=${encodeURIComponent(path).replaceAll('%2F', '/')}${crossBox.checked ? '&frames=cross' : ''}`;
+  crossBox.addEventListener('change', () => {
+    for (const link of /** @type {NodeListOf<HTMLAnchorElement>} */ (
+      benchList.querySelectorAll('a[data-path]')
+    ))
+      link.href = benchHref(/** @type {string} */ (link.dataset.path));
   });
 
   fetch('/--nano-bench/benches')
@@ -111,7 +160,7 @@ const renderPicker = async () => {
         ? `<ul class="benches">${benches
             .map(
               b =>
-                `<li><a href="?run=${encodeURIComponent(b.path).replaceAll('%2F', '/')}">${esc(b.path)}</a></li>`
+                `<li><a data-path="${esc(b.path)}" href="${esc(benchHref(b.path))}">${esc(b.path)}</a></li>`
             )
             .join('')}</ul>`
         : '<p class="muted">No bench files (<code>bench-*.js</code> or <code>*.bench.js</code>) were found under the server’s root folder.</p>';

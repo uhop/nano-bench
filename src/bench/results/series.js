@@ -44,6 +44,8 @@ export const buildSeries = (files, {alpha}) => {
         metrics: Array.isArray(s.metrics) ? s.metrics : null,
         processSizes: Array.isArray(s.processSizes) ? s.processSizes : null,
         phaseSizes: Array.isArray(s.phaseSizes) ? s.phaseSizes : null,
+        load: s.load ?? null,
+        param: f.results.params.param,
         // `-p N` stores N; files before it store `true`, a single burst with no rounds
         roundSize: typeof f.results.params.parallel == 'number' ? f.results.params.parallel : null,
         metricsKind: f.results.params.metrics,

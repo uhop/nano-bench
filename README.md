@@ -283,11 +283,20 @@ another machine: run the command there, forward its port over SSH (for example,
 without an `index.html` file show a directory listing with links into the viewer. The page
 follows the system's light or dark theme, and a switch overrides it.
 
+Beside the summary and the distribution chart, the viewer shows what a file recorded: the load
+table of `nano-bench-io --in-flight` or `--rate`, the `--settle` verdicts, `-M` metrics, and a
+scaling table when the files are runs of one parameterized file. A multimodal distribution is
+split into clusters, each with its weight, median, and range, and colored to match on the chart.
+The chart also draws violins, and the chosen view is kept in the page URL.
+
 ### Running benchmarks in a browser
 
 The same server runs bench files in the browser. The start page lists the bench files under the
-root (`bench/bench-*.js` and `*.bench.js`), and **Open a bench file…** runs a local one. Each
-function runs in its own iframe, one sample of each function per round, as in `nano-bench`. The
+root (`bench/bench-*.js` and `*.bench.js`). **Open a bench file…** runs a local one, and so
+does dropping a file on the page or pasting code into its text box. Each function runs in its
+own iframe, one sample of each function per round, as in `nano-bench`. With **Run each function
+in a cross-site frame**, the frames come from the other loopback name (`127.0.0.1` for a page on
+`localhost`), so browsers that isolate sites give each function its own process. The
 results are saved to `nano-bench-results/<bench>-<browser>.json` under the root and open in the
 viewer, so `nano-bench-compare` can read them too. The page is cross-origin isolated, which
 gives `performance.now()` a 5&ndash;20&nbsp;µs step instead of 0.1&ndash;1&nbsp;ms. Browsers grant

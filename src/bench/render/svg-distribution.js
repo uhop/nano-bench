@@ -60,6 +60,7 @@ const truncate = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
  * @param {(series: number) => string} [options.describeRow]
  * @param {number[]} [options.ticks] tick positions in the histogram's units
  * @param {number} [options.width]
+ * @param {(series: number, bin: number) => string} [options.binClass] an extra class for a bar
  */
 export const distributionSvg = ({
   names,
@@ -69,7 +70,8 @@ export const distributionSvg = ({
   describeBin,
   describeRow = i => names[i],
   ticks: givenTicks,
-  width = 720
+  width = 720,
+  binClass
 }) => {
   // narrow: labels ride above their rows instead of a left gutter
   const compact = width < 560,
@@ -93,6 +95,10 @@ export const distributionSvg = ({
     ticks = givenTicks ?? niceTicks(lo, hi, Math.max(2, Math.round(plotWidth / 110))),
     tickLabels = formatTicks(ticks),
     plotBottom = padTop + rows * rowStep - rowGap,
+    extraClass = (i, j) => {
+      const name = binClass?.(i, j);
+      return name ? ' ' + name : '';
+    },
     out = [];
 
   out.push(
@@ -131,7 +137,7 @@ export const distributionSvg = ({
       );
       if (count)
         out.push(
-          `<path class="bar" d="${barPath(sx + (slot - barWidth) / 2, base - h, barWidth, h)}"/>`
+          `<path class="bar${extraClass(i, j)}" d="${barPath(sx + (slot - barWidth) / 2, base - h, barWidth, h)}"/>`
         );
       out.push(`<title>${escapeXml(describeBin(i, j))}</title></g>`);
     }
