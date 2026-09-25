@@ -178,6 +178,11 @@ Built 2026-09-24 (`web-app/run.js`, `web-app/frame.js`, and the plugin's `benche
   page it serves. The first runs read `crossOriginIsolated: true` in Chromium, Firefox, and
   Playwright WebKit, with a measured step of 5&nbsp;&micro;s in Chromium and 20&nbsp;&micro;s in
   the other two.
+- **Without isolation:** a page opened over plain HTTP from another machine isn't a secure
+  context, so browsers ignore COOP and COEP and hide `crypto.subtle`. The runner then uses a
+  bundled SHA-256 for the body hash and warns with the measured step. Epiphany 60.5 reported
+  `crossOriginIsolated: false` and a 1&nbsp;ms step on 2026-09-24; whether it was a secure
+  context is still open.
 - **Stale files:** tape-six's static handler sends no caching headers, and an edited bench file
   was picked up on reload in all three engines (measured 2026-09-24). No cache-busting was
   added.

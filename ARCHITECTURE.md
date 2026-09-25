@@ -86,6 +86,7 @@ src/                          # Internal source (shipped via npm)
     ├── numeric-asc.js              # Numeric ascending comparator
     ├── prng.js                     # mulberry32 — seeded PRNG for the reproducible bootstrap
     ├── body-hash.js                # sha256(fn.toString()) — per-function comparability hash
+    ├── sha256.js                   # FIPS 180-4 SHA-256 — the browser runner's hash without crypto.subtle
     └── rk.js                       # Runge-Kutta ODE solver
 bench/                        # Example benchmark + sample results files
 ├── bench-string-concat.js          # Example: compare string concatenation methods

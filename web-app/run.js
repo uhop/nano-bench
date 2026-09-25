@@ -1,6 +1,7 @@
 import {bootstrapSummary, mean, stdDev} from '../src/stats.js';
 import {computeSignificance} from '../src/bench/significance.js';
 import {mulberry32} from '../src/utils/prng.js';
+import {isolationWarning} from '../src/bench/results/series.js';
 import {escapeXml as esc} from '../src/bench/render/svg-distribution.js';
 
 const FRAME = '/--nano-bench/frame';
@@ -106,6 +107,7 @@ export const runBench = async (main, options) => {
 <h2>Running <code>${esc(file)}</code></h2>
 <p class="meta run-params">${esc(ms)} ms per sample, ${esc(samples)} samples per function, one iframe per function, interleaved rounds</p>
 <div class="run-progress"><div class="bar"><div class="fill"></div></div><span class="label">starting…</span></div>
+<section class="warnings" hidden><ul><li></li></ul></section>
 <p class="run-notes muted"></p>
 <div class="scroll"><table class="summary run-table"><thead><tr><th>Name</th><th class="num">Median so far</th><th class="num">Samples</th><th class="num">Batch</th></tr></thead><tbody></tbody></table></div>
 <p><button type="button" class="stop">Stop</button></p>
@@ -127,10 +129,16 @@ export const runBench = async (main, options) => {
     stop.textContent = 'Stopping…';
   });
 
-  const progress = (text, fraction) => {
-    fill.style.width = `${Math.round(100 * Math.min(1, Math.max(0, fraction)))}%`;
-    label.textContent = text;
-  };
+  // ?trace logs each update with the width the page computed, for engines we can't run
+  const trace = new URLSearchParams(location.search).has('trace'),
+    progress = (text, fraction) => {
+      fill.style.width = `${Math.round(100 * Math.min(1, Math.max(0, fraction)))}%`;
+      label.textContent = text;
+      if (trace)
+        console.log(
+          `nano-bench ${performance.now().toFixed(1)} ms: ${fill.style.width} set, ${getComputedStyle(fill).width} computed: ${text}`
+        );
+    };
 
   // a hidden tab clamps timers to 1 s or more and changes the GC window: wait for the tab
   const visible = async () => {
@@ -152,6 +160,16 @@ export const runBench = async (main, options) => {
       fetch('/--nano-bench/meta').then(r => r.json()),
       Promise.resolve(timerResolution())
     ]);
+
+    const isolation = isolationWarning(
+      {crossOriginIsolated: self.crossOriginIsolated, timerResolutionMs: resolution},
+      ms
+    );
+    if (isolation) {
+      const box = /** @type {HTMLElement} */ (main.querySelector('.warnings'));
+      /** @type {HTMLElement} */ (box.querySelector('li')).textContent = isolation;
+      box.hidden = false;
+    }
 
     progress('loading the module', 0);
     const lister = frames.open({file: url, export: exportName}),
@@ -176,8 +194,10 @@ export const runBench = async (main, options) => {
         return tr.children;
       });
 
+    // one step per calibration, then one per sample, so the bar never moves backwards
+    const steps = k + k * samples;
     for (let i = 0; i < k && !stopped; ++i) {
-      progress(`calibrating ${names[i]} (${i + 1} of ${k})`, i / k);
+      progress(`calibrating ${names[i]} (${i + 1} of ${k})`, i / steps);
       await visible();
       iterations[i] = await frames.ask(opened[i].frame, {
         op: 'calibrate',
@@ -201,7 +221,7 @@ export const runBench = async (main, options) => {
         progress(
           `sampling: round ${round + 1} of ${samples}` +
             (done > k ? ` · about ${Math.max(1, Math.round(left / 1000))} s left` : ''),
-          done / total
+          (k + done) / steps
         );
         // the GC window between samples, as in the CLI
         await sleep(5);

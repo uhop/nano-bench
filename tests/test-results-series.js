@@ -4,6 +4,7 @@ import {
   buildSeries,
   comparisonArrays,
   fileTag,
+  isolationWarning,
   multimodalityP,
   resultsWarnings
 } from 'nano-benchmark/bench/results/series.js';
@@ -135,4 +136,27 @@ test('comparisonArrays()', t => {
     'a single-process series keeps the sample test'
   );
   t.equal(comparisonArrays([{samples: pooled}, {samples: pooled}]).unit, 'samples', 'older files');
+});
+
+test('isolationWarning()', t => {
+  t.equal(isolationWarning(undefined, 50), null, 'not a browser run');
+  t.equal(isolationWarning({crossOriginIsolated: true, timerResolutionMs: 0.005}, 50), null);
+  const text = isolationWarning(
+    {crossOriginIsolated: false, timerResolutionMs: 0.09999999403953552},
+    50
+  );
+  t.ok(text.includes('stepped 0.1 ms (up to 0.2% of a 50 ms sample)'), text);
+
+  const file = {
+    file: 'a.json',
+    results: {
+      environment: {browser: {crossOriginIsolated: false, timerResolutionMs: 1}},
+      params: {ms: 50},
+      results: []
+    }
+  };
+  t.ok(
+    resultsWarnings([file]).some(w => w.startsWith('the page was not cross-origin isolated')),
+    'resultsWarnings() reports it'
+  );
 });

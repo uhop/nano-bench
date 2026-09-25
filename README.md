@@ -234,7 +234,9 @@ root (`bench/bench-*.js` and `*.bench.js`), and **Open a bench file…** runs a 
 function runs in its own iframe, one sample of each function per round, as in `nano-bench`. The
 results are saved to `nano-bench-results/<bench>-<browser>.json` under the root and open in the
 viewer, so `nano-bench-compare` can read them too. The page is cross-origin isolated, which
-gives `performance.now()` a 5&ndash;20&nbsp;µs step instead of 0.1&ndash;1&nbsp;ms.
+gives `performance.now()` a 5&ndash;20&nbsp;µs step instead of 0.1&ndash;1&nbsp;ms. Browsers grant
+isolation only over HTTPS or `localhost`, so open a remote server through an SSH tunnel; otherwise
+the run still works, and the results carry a warning with the timer step.
 
 Add `ms` and `samples` to the run URL to change the sample length and count, for example
 `/--nano-bench/web-app/?run=bench/bench-sort.js&samples=50`. Keep the tab visible: the runner

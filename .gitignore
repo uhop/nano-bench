@@ -2,3 +2,4 @@ node_modules/*
 report/*
 coverage/*
 .AppleDouble
+nano-bench-results/*

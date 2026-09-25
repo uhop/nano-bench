@@ -74,6 +74,19 @@ export const comparisonArrays = members =>
     ? {arrays: members.map(s => splitProcesses(s).map(median)), unit: 'process-medians'}
     : {arrays: members.map(s => s.samples), unit: 'samples'};
 
+/**
+ * The warning for a browser run whose page was not cross-origin isolated, or null.
+ * @param {{crossOriginIsolated?: boolean, timerResolutionMs?: number} | undefined} browser
+ * @param {number} ms the sample length
+ */
+export const isolationWarning = (browser, ms) => {
+  if (!browser || browser.crossOriginIsolated !== false) return null;
+  const step = +(browser.timerResolutionMs ?? NaN).toPrecision(3),
+    share =
+      step > 0 && ms > 0 ? ` (up to ${+((100 * step) / ms).toFixed(1)}% of a ${ms} ms sample)` : '';
+  return `the page was not cross-origin isolated, so the timer stepped ${step} ms${share}: isolation needs HTTPS or localhost (an SSH tunnel works) and a browser that grants it`;
+};
+
 export const resultsWarnings = files => {
   const warnings = [],
     many = files.length > 1;
@@ -84,6 +97,8 @@ export const resultsWarnings = files => {
           `${many ? fileTag(f) + '/' : ''}${s.name}: ${contentionWarning(s.contention)}`
         );
     }
+    const isolation = isolationWarning(f.results.environment?.browser, f.results.params?.ms);
+    if (isolation) warnings.push(many ? `${fileTag(f)}: ${isolation}` : isolation);
   }
   for (const {path, values} of diffEnvironments(files.map(f => f.results.environment))) {
     warnings.push(

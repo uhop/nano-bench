@@ -1,11 +1,15 @@
 import {benchmark, findLevel} from '../src/bench/runner.js';
+import {sha256Hex} from '../src/utils/sha256.js';
 
 // one benchmark function per iframe; without `fn` it only lists the module's functions
 const params = new URLSearchParams(location.search),
   reply = message => parent.postMessage(message, location.origin);
 
+// crypto.subtle exists only in secure contexts: HTTPS or localhost
 const hash = async text => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  const bytes = new TextEncoder().encode(text);
+  if (!crypto.subtle) return 'sha256:' + sha256Hex(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
   return 'sha256:' + [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 };
 

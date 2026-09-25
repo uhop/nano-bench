@@ -79,7 +79,7 @@ npx nano-bench-view --host 0.0.0.0   # listen on every interface
 
 Options: `-r, --root` (folder to serve and search; default the current folder), `--host` (default `localhost`), `-p, --port` (default 3000), `--show-dot-files`, `--trace`.
 
-The same page runs bench files in the browser: `?run=<path>` (listed on the start page: `bench/bench-*.js` and `*.bench.js` under the root) or a local file through a file input. One same-origin iframe per function, interleaved rounds, cross-origin isolated for 5–20 µs timers. Query parameters `ms` (default 50), `samples` (default 100), `export` (default `default`). Results are saved as schema-v1 JSON to `nano-bench-results/<bench>-<browser>.json` under the root and opened in the viewer; `nano-bench-compare` reads them.
+The same page runs bench files in the browser: `?run=<path>` (listed on the start page: `bench/bench-*.js` and `*.bench.js` under the root) or a local file through a file input. One same-origin iframe per function, interleaved rounds, cross-origin isolated for 5–20 µs timers. Query parameters `ms` (default 50), `samples` (default 100), `export` (default `default`). Browsers grant isolation only over HTTPS or `localhost` (use an SSH tunnel for a remote server); without it the run works and the results carry a warning. Results are saved as schema-v1 JSON to `nano-bench-results/<bench>-<browser>.json` under the root and opened in the viewer; `nano-bench-compare` reads them.
 
 The server is strictly a development tool: not hardened, not for general web serving. The user is responsible for its security; outside `localhost` they are on their own (prefer an SSH tunnel to `--host`). A non-loopback `--host` prints a warning.
 

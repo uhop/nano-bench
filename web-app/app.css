@@ -306,7 +306,6 @@ button.compare:disabled {
   width: 0;
   height: 100%;
   background: var(--series);
-  transition: width 0.2s;
 }
 
 .run-progress .label {
