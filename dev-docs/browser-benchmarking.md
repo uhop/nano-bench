@@ -17,11 +17,11 @@ Sources were read on 2026-09-24. Facts below cite them, and statements marked _i
 | Tool                                                                         | Where it runs                                                                                 | How it measures                                                                             | Statistics                                                                                                          | Status                                                    |
 | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | [Tachometer](https://github.com/google/tachometer)                           | real browsers through WebDriver (Chrome, Firefox, Safari, Edge), Selenium for remote machines | a fresh tab for every sample; round-robin across benchmarks; one throw-away warmup run each | mean, Student-t 95% interval; difference of means with df = min(n) &minus; 1 and a delta-method relative difference | archived 2026-09-04                                       |
-| [Benchmark.js](https://github.com/bestiejs/benchmark.js)                     | in-page loop                                                                                  | calibrated cycles of a snippet                                                              | mean with relative margin of error                                                                                  | archived 2024-04-14; last release about six years earlier |
+| [Benchmark.js](https://github.com/bestiejs/benchmark.js)                     | in-page loop                                                                                  | calibrated cycles of a snippet                                                              | mean with relative margin of error                                                                                  | archived 2024-04-14, last release about six years earlier |
 | [perf.link](https://github.com/lukejacksonn/perflink)                        | a Web Worker in the page                                                                      | counts runs in a fixed time window, reports operations per second                           | none beyond the count                                                                                               | static site, state in the URL hash                        |
 | [jsbench.me](https://github.com/psiho/jsbench-me)                            | the page                                                                                      | Benchmark.js underneath                                                                     | Benchmark.js's                                                                                                      | a UI over Benchmark.js with an AWS backend                |
-| [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) | Chrome through Puppeteer or Playwright                                                        | Chrome trace events (script, main-thread work, paint); warmup runs per benchmark type       | weighted geometric mean across benchmarks                                                                           | not checked                                               |
-| [mitata](https://github.com/evanwashere/mitata)                              | Node.js, Bun, Deno, engine shells; browsers not documented                                    | batched samples with warmup                                                                 | average, min and max, p75 and p99; no significance test                                                             | used by Bun and Deno                                      |
+| [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) | Chrome through Puppeteer or Playwright                                                        | Chrome trace events (script, main-thread work, paint), warmup runs per benchmark type       | weighted geometric mean across benchmarks                                                                           | not checked                                               |
+| [mitata](https://github.com/evanwashere/mitata)                              | Node.js, Bun, Deno, engine shells (browsers not documented)                                   | batched samples with warmup                                                                 | average, min and max, p75 and p99, no significance test                                                             | used by Bun and Deno                                      |
 
 Not surveyed, by design: browser profilers (DevTools, Firefox Profiler), which drill into one
 run instead of comparing variants, and hosted services (CodSpeed and the like), which the
@@ -67,9 +67,10 @@ launching and serving, Playwright and Puppeteer as optional peers for automation
 
 ## Good ideas to absorb
 
-- **Fresh context per sample or per function** (Tachometer's new tab per sample). In a browser,
-  the counterpart of `--isolate` is a fresh page or `BrowserContext` per function, which
-  tape-six's driver already creates per task.
+- **A fresh context per function** (Tachometer opens a new tab per sample). Eugene's own
+  practice in tape6 and perf.js is an `<iframe>` per unit, which isolates without page reloads
+  and lets the parent keep interleaving: it can ask each function's iframe for one sample in
+  turn. See &sect; Isolation with iframes.
 - **Round-robin across variants** (Tachometer), which nano-bench already does in-process.
 - **Stop on the question, not on precision** (Tachometer's auto-sample conditions): keep
   sampling until the difference between two variants is clearly on one side of a threshold,
@@ -82,7 +83,7 @@ launching and serving, Playwright and Puppeteer as optional peers for automation
 - **Trace events for drill-down** (Tachometer's Chromium traces, js-framework-benchmark's script
   and paint durations), as an opt-in for the Playwright driver.
 - **Parameterized benchmarks and explicit GC control** (mitata's `.args()`/`.range()` and its
-  `gc('inner')` mode). Not browser-specific; filed as queue items.
+  `gc('inner')` mode). Not browser-specific, so they are filed as queue items.
 
 ## What this means for the browser runner
 
@@ -99,14 +100,44 @@ A sketch, to be confirmed:
    the results say so.
 5. Results are shown by the viewer's renderer and saved through a results plugin on the
    server, as a schema-v1 file that `nano-bench-compare` reads.
-6. The Playwright and Puppeteer drivers open that page per browser, per function when
-   isolated, and collect the saved results.
+6. The Playwright and Puppeteer drivers open that page per browser and collect the saved
+   results. Isolation happens inside the page, with iframes.
 
-## Open questions
+## Isolation with iframes
 
-- Should the run route accept a bench file from the server's root only, or also a pasted
-  snippet (the perf.link case)?
-- Should isolation in the browser mean a fresh page per function (like `--isolate`) or a fresh
-  page per sample (like Tachometer)? The second costs a page load per sample.
-- Is Firefox's 1&nbsp;ms default timer acceptable without isolation, given 50&nbsp;ms batches,
-  or should the runner refuse to run un-isolated?
+Eugene's ruling (2026-09-24): isolate with an `<iframe>` per function, as in tape6 and perf.js,
+and avoid automatic page refreshes where possible, while staying open to other forms of
+measurement that iframes make possible.
+
+What an iframe isolates is to be verified by experiment before the runner relies on it.
+_Inference, unverified:_ a same-origin iframe gets its own global object and module instances,
+so each function has its own JIT feedback, but it shares the page's heap, garbage collector, and
+renderer process. A cross-site iframe (for example, `127.0.0.1` inside a `localhost` page) runs
+in its own process under Chromium's and Firefox's site isolation, which would match
+`--isolate`, though Safari may not isolate it. Site isolation keys on the site, so a different port
+alone is not enough.
+
+## Cross-origin isolation
+
+To be decided after the details below. A page is cross-origin isolated when it is served with
+`Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` (or
+`credentialless`), and every iframe it embeds is served with COEP too. `crossOriginIsolated`
+then reads `true`. Isolation unlocks precise timers (Chrome 100&nbsp;&micro;s &rarr;
+5&nbsp;&micro;s, Firefox 1&nbsp;ms &rarr; 20&nbsp;&micro;s), `SharedArrayBuffer` with
+`Atomics.wait`, and `performance.measureUserAgentSpecificMemory()`. The cost here is small:
+everything the runner loads comes from our own server, whose plugin can add both headers. A
+bench file that fetches from another origin needs CORS or `Cross-Origin-Resource-Policy`, which
+`credentialless` mostly waives. Proposed: isolate by default, record `crossOriginIsolated` and
+the measured timer resolution with the results, and warn instead of refusing when isolation is
+missing. For scale, 1&nbsp;ms of resolution on a 50&nbsp;ms sample is up to &plusmn;2% per sample.
+
+## Answered questions
+
+Eugene, 2026-09-24:
+
+- **Where bench files come from:** the server's files and local files (a file input, or even
+  drag and drop). Pasted snippets can be allowed too, though he expects few people to use them.
+- **Isolation:** an `<iframe>` per function, without automatic refreshes if possible. Other
+  forms of measurement are open to discussion. See &sect; Isolation with iframes.
+- **Cross-origin isolation:** asked for the technical details before deciding. See &sect;
+  Cross-origin isolation.
