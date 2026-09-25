@@ -1,6 +1,6 @@
 import test from 'tape-six';
 
-import collectMacro from 'nano-benchmark/bench/macro-runner.js';
+import collectMacro, {collectMacroRounds} from 'nano-benchmark/bench/macro-runner.js';
 
 test('collectMacro()', t => {
   t.test('fixed run count', async t => {
@@ -104,5 +104,111 @@ test('collectMacro()', t => {
     });
     t.equal(samples.length, 3);
     t.ok(samples.every(time => time >= 3));
+  });
+});
+
+test('collectMacroRounds()', t => {
+  const tracer = log => ['A', 'B', 'C'].map(name => () => log.push(name));
+
+  t.test('one run of each function per round, rotating the start', async t => {
+    const log = [];
+    const samples = await collectMacroRounds(tracer(log), {runs: 3});
+    t.deepEqual(log.join(''), 'ABCBCACAB');
+    t.deepEqual(
+      samples.map(s => s.length),
+      [3, 3, 3]
+    );
+  });
+
+  t.test('warmup counts rounds and is discarded', async t => {
+    const log = [];
+    const samples = await collectMacroRounds(tracer(log), {runs: 2, warmup: 1});
+    t.equal(log.length, 9);
+    t.deepEqual(
+      samples.map(s => s.length),
+      [2, 2, 2]
+    );
+  });
+
+  t.test('minRuns counts rounds with a zero budget', async t => {
+    const samples = await collectMacroRounds([() => {}, () => {}], {minRuns: 12, budget: 0});
+    t.deepEqual(
+      samples.map(s => s.length),
+      [12, 12]
+    );
+  });
+
+  t.test('maxRuns caps rounds', async t => {
+    const samples = await collectMacroRounds([() => {}, () => {}], {
+      minRuns: 1,
+      budget: 60000,
+      maxRuns: 20
+    });
+    t.deepEqual(
+      samples.map(s => s.length),
+      [20, 20]
+    );
+  });
+
+  t.test('the budget is the whole loop, not each function', async t => {
+    const slow = () => new Promise(resolve => setTimeout(resolve, 20)),
+      samples = await collectMacroRounds([slow, slow], {minRuns: 1, budget: 100});
+    t.ok(samples[0].length <= 4, `about 100 ms of 40 ms rounds: ${samples[0].length} rounds`);
+  });
+
+  t.test('stable: a check passes only when every function is within the target', async t => {
+    const consulted = [];
+    const samples = await collectMacroRounds([() => {}, () => {}], {
+      minRuns: 5,
+      stable: 5,
+      consecutive: 2,
+      maxRuns: 100,
+      ciWidth: (s, i) => {
+        consulted.push(`${i}@${s.length}`);
+        return i === 1 && s.length < 30 ? 50 : 1;
+      }
+    });
+    t.deepEqual(
+      samples.map(s => s.length),
+      [40, 40],
+      'function 1 passes from 30; 30 and 40 pass in a row'
+    );
+    t.deepEqual(consulted.slice(0, 4), ['0@10', '1@10', '0@20', '1@20']);
+  });
+
+  t.test('checks report the widest function', async t => {
+    const checks = [];
+    await collectMacroRounds(
+      [() => {}, () => {}],
+      {
+        minRuns: 10,
+        stable: 5,
+        maxRuns: 100,
+        ciWidth: (s, i) => (s.length >= 20 ? 4 : 10 * (i + 1))
+      },
+      (name, data) => name === 'macro-check' && checks.push([data.n, data.width, data.widths])
+    );
+    t.deepEqual(checks, [
+      [10, 20, [10, 20]],
+      [20, 4, [4, 4]]
+    ]);
+  });
+
+  t.test('prepare/teardown wrap every run; metrics hooks get the function index', async t => {
+    const log = [],
+      indexes = [];
+    await collectMacroRounds([() => log.push('a'), () => log.push('b')], {
+      runs: 1,
+      warmup: 1,
+      prepare: () => log.push('<'),
+      teardown: () => log.push('>'),
+      metricsBefore: i => i,
+      metricsAfter: (token, i) => indexes.push([token, i])
+    });
+    t.equal(log.join(''), '<a><b><b><a>');
+    t.deepEqual(indexes, [
+      [1, 1],
+      [0, 0]
+    ]);
   });
 });

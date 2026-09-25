@@ -30,7 +30,7 @@ src/                          # Internal source (shipped via npm)
 │   ├── significance.js             # computeSignificance (MW vs KW) + significanceMatrix
 │   ├── select-functions.js         # Resolve the [methods…] positional against the export
 │   ├── smoke.js                    # smokeRun — each function once (the --smoke pre-flight)
-│   ├── macro-runner.js             # collectMacro — one call per run; warmup, prepare/teardown, stop policies
+│   ├── macro-runner.js             # collectMacro, collectMacroRounds — one call per run; warmup, prepare/teardown, stop policies
 │   ├── command-runner.js           # runCommand (shell spawn, fails on code or signal) + command adapter
 │   ├── metrics.js                  # rusageDelta over process.resourceUsage() — portable per-run metrics
 │   ├── proc-metrics.js             # Linux /proc/[pid]/{io,status} readings for spawned children
@@ -147,7 +147,7 @@ This design amortizes function-call overhead over `n` iterations, which is criti
 
 ### nano-bench-io pipeline
 
-1. **Collect** (`collectMacro`) — one awaited call per run (`n = 1`, no batching); optional warmup runs discarded, optional module-level `prepare()`/`teardown()` awaited untimed around every run. Stop policy: fixed `--runs`, or the default min-runs + time-budget pair, or `--stable` (bootstrap-median-CI width target, checked every 10 runs) — all capped by `--max-runs`. Unless `--warmup` is explicit, a windowed Mann–Whitney screen then sizes and discards the leading slow (warmup) segment, noted with the count. With `-c`/`--command` the "functions" are adapted shell commands (`command-runner.js`): spawned via the system shell, output discarded, a run failing on non-zero exit or a fatal signal; `--prepare <cmd>` becomes the untimed per-run hook.
+1. **Collect** (`collectMacroRounds` by default with two or more functions: one run of each function per round, rotating the start, the stop policy counting rounds with a budget of `--budget` × the number of functions; `collectMacro` per function with `--order sequential`; with `--isolate`, `collectMacro` in a child process per function, `--emit-runs`, spawned through `isolate.js`) — one awaited call per run (`n = 1`, no batching); optional warmup runs discarded, optional module-level `prepare()`/`teardown()` awaited untimed around every run. Stop policy: fixed `--runs`, or the default min-runs + time-budget pair, or `--stable` (bootstrap-median-CI width target, checked every 10 runs) — all capped by `--max-runs`. Unless `--warmup` is explicit, a windowed Mann–Whitney screen then sizes and discards the leading slow (warmup) segment, noted with the count. With `-c`/`--command` the "functions" are adapted shell commands (`command-runner.js`): spawned via the system shell, output discarded, a run failing on non-zero exit or a fatal signal; `--prepare <cmd>` becomes the untimed per-run hook.
 2. **Summarize** — the same `bootstrapSummary`, plus p90/p99 (`quantileSorted`, R-7). With `-M`/`--metrics`: per-run rusage deltas taken outside the timed window (module mode) or Linux `/proc/[pid]` polling with last-poll-wins semantics (command mode), rendered as a medians table and persisted into the JSON.
 3. **Notes** — modified-z slow-side outliers (`outlier-notes.js`): all in the first runs → caching (suggest `--warmup`); scattered → interference. A coarse-tail note fires below 100 runs. A dip-test gate (`dip.js`, seeded bootstrap p-value) flags multimodal distributions; `--clusters` splits them at KDE density minima (`kde-modes.js`) and reports per-cluster weight/median/CI/range — the mode count is a labeled heuristic.
 4. **Significance / output** — same tests, histograms, and JSON as `nano-bench` (`params.mode: "macro"`, `reps: 1`), then the explicit exit.
@@ -203,6 +203,7 @@ bin/nano-bench.js ──→ src/bench/runner.js ──→ src/stats.js
                   ──→ src/utils/{prng,body-hash}.js
 
 bin/nano-bench-io.js ──→ src/bench/macro-runner.js
+                     ──→ src/bench/isolate.js (--isolate, --repeat)
                      ──→ src/bench/command-runner.js (the -c/--command adapter)
                      ──→ src/bench/outlier-notes.js ──→ src/stats/{quantile,mad}.js
                      ──→ src/stats.js (bootstrapSummary), src/stats/quantile.js

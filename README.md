@@ -283,6 +283,14 @@ npx nano-bench-io io-bench.js -r 50          # exactly 50 runs
 npx nano-bench-io io-bench.js --stable 5     # run until the median CI is within 5%
 ```
 
+With two or more functions, runs are interleaved: each round runs every function
+once, rotating which goes first, so drift over a long run lands on every function
+alike. The stop policy then counts rounds. The budget becomes `--budget` times the
+number of functions, and `--stable` waits until every function meets the target.
+`--order sequential` runs each function's runs in turn instead. `--isolate` runs
+each function's whole policy in its own process, and `--repeat N` runs N processes
+per function; as in `nano-bench`, the test then compares per-process medians.
+
 The module format is the same. Optional `prepare()` / `teardown()` named exports
 run untimed around every run. Warmup is auto-detected and discarded with a note
 (`--warmup N` pins it, `--warmup 0` keeps everything). Slow outliers are

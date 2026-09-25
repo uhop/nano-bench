@@ -18,7 +18,8 @@ import {c} from 'console-toolkit/style.js';
 import Writer from 'console-toolkit/output/writer.js';
 import Updater from 'console-toolkit/output/updater.js';
 
-import {collectMacro} from '../src/bench/macro-runner.js';
+import {collectMacro, collectMacroRounds} from '../src/bench/macro-runner.js';
+import {runChild, isolationPlan, fastestPerRound} from '../src/bench/isolate.js';
 import detectWarmup from '../src/bench/warmup-detect.js';
 import runCommand, {commandFunctions} from '../src/bench/command-runner.js';
 import {rusageAvailable, rusageDelta} from '../src/bench/metrics.js';
@@ -100,6 +101,19 @@ program
     toFloat
   )
   .option('--max-runs <runs>', 'hard cap on measured runs', toInt, 1000)
+  .addOption(
+    new Option(
+      '--order <order>',
+      'run order: one run of each function per round, or each function in turn'
+    )
+      .choices(['interleaved', 'sequential'])
+      .default('interleaved')
+  )
+  .addOption(
+    new Option('--isolate', 'measure each function in its own process').conflicts('command')
+  )
+  .option('--repeat <n>', 'with --isolate: processes per function', toInt, 1)
+  .addOption(new Option('--emit-runs', 'internal: child mode of --isolate').hideHelp())
   .option('-c, --command', 'treat the arguments as shell commands to benchmark, not a module file')
   .option('--prepare <cmd>', 'shell command run (untimed) before every run in command mode')
   .option('-M, --metrics', 'collect per-run system metrics (rusage; Linux /proc for commands)')
@@ -159,6 +173,30 @@ if (options.maxRuns < 1) program.error('The maximum number of runs must be >= 1'
 if (options.alpha <= 0 || options.alpha >= 1)
   program.error('The significance level must be > 0 and < 1');
 if (options.bootstrap < 1) program.error('The number of bootstrap samples must be >= 1');
+if (options.repeat < 1) program.error('The number of processes per function must be >= 1');
+if (options.repeat > 1 && !options.isolate) program.error('--repeat needs --isolate');
+
+const seed = (options.seed ?? Math.random() * 2 ** 32) >>> 0;
+
+const ciWidth = samples => {
+  const s = bootstrapSummary(samples, {
+    alpha: options.alpha,
+    bootstrap: options.bootstrap,
+    random: mulberry32(seed)
+  });
+  return (100 * (s.ciHi - s.ciLo)) / s.median;
+};
+
+const policy = {
+  warmup: options.warmup,
+  runs: options.runs || 0,
+  minRuns: options.minRuns,
+  budget: options.budget,
+  stable: options.stable || 0,
+  consecutive: 2,
+  maxRuns: options.maxRuns,
+  ciWidth: options.stable > 0 ? ciWidth : undefined
+};
 
 // open the file (or adapt the commands)
 
@@ -166,7 +204,7 @@ const metricsKind = options.command ? 'proc' : 'rusage',
   metricsOn = options.metrics && (options.command ? procAvailable() : rusageAvailable()),
   metricsByName = new Map();
 
-let fns, names, prepare, teardown;
+let fns, names, prepare, teardown, fileName;
 if (options.command) {
   if (new Set(args).size !== args.length) program.error('Duplicate commands');
   names = args;
@@ -182,7 +220,7 @@ if (options.command) {
     prepare = () => runCommand(prepareCommand);
   }
 } else {
-  const fileName = pathToFileURL(path.resolve(process.cwd(), args[0]));
+  fileName = pathToFileURL(path.resolve(process.cwd(), args[0]));
   try {
     const file = await import(fileName.href);
     fns = file[options.export];
@@ -199,6 +237,24 @@ if (options.command) {
   } catch (error) {
     program.error(error.message);
   }
+}
+
+if (options.emitRuns) {
+  if (options.command || names.length !== 1)
+    program.error('--emit-runs is internal to --isolate: it needs a module and one function');
+  const metrics = [];
+  const samples = await collectMacro(fns[names[0]], {
+    ...policy,
+    prepare,
+    teardown,
+    metricsBefore: metricsOn ? () => process.resourceUsage() : undefined,
+    metricsAfter: metricsOn
+      ? token => metrics.push(rusageDelta(token, process.resourceUsage()))
+      : undefined
+  });
+  const out = JSON.stringify({samples, ...(metricsOn ? {metrics} : {})}) + '\n';
+  await new Promise(resolve => process.stdout.write(out, () => resolve(undefined)));
+  process.exit(0);
 }
 
 // set up the writer and the updater
@@ -227,7 +283,7 @@ if (options.smoke) {
   process.exit(failed ? 1 : 0);
 }
 
-const seed = (options.seed ?? Math.random() * 2 ** 32) >>> 0;
+const interleaved = !options.isolate && options.order === 'interleaved' && names.length > 1;
 
 const policyLine =
   options.runs > 0
@@ -250,6 +306,15 @@ await writer.write([
     options.bootstrap
   )}{{restore}} resamples)`,
   policyLine,
+  ...(options.isolate
+    ? [
+        c`Isolated: each function in its own process, {{save.bright.yellow}}${formatInteger(
+          options.repeat
+        )}{{restore}} per function (${options.order}); the stop policy runs in each process`
+      ]
+    : interleaved
+      ? ['Interleaved: one run of each function per round; the stop policy counts rounds']
+      : []),
   ''
 ]);
 
@@ -287,96 +352,13 @@ updater = new Updater(
   writer
 );
 
-const ciWidth = samples => {
-  const s = bootstrapSummary(samples, {
-    alpha: options.alpha,
-    bootstrap: options.bootstrap,
-    random: mulberry32(seed)
-  });
-  return (100 * (s.ciHi - s.ciLo)) / s.median;
-};
-
-for (let i = 0; i < names.length; ++i) {
+// warmup detection, the bootstrap summary, and the per-function notes
+const summarize = async (i, samples, detect = !warmupExplicit) => {
   const which = `${names[i]} (${i + 1} of ${names.length})`;
-  let samples,
-    started = performance.now(),
-    lastWidth = Infinity;
-  const measuring = n => {
-    const elapsed = performance.now() - started;
-    if (options.runs > 0) {
-      progress = {
-        label: `measuring ${which}: ${n} of ${options.runs} runs`,
-        done: n,
-        total: options.runs,
-        remainingMs: n > 0 ? (elapsed / n) * (options.runs - n) : undefined
-      };
-    } else if (options.stable > 0) {
-      const width = Number.isFinite(lastWidth) ? `${formatNumber(lastWidth, {decimals: 1})}%` : '…';
-      progress = {
-        label: `measuring ${which}: ${n} runs, CI width ${width} of ${options.stable}% target`,
-        done: Number.isFinite(lastWidth) ? Math.min(1, options.stable / lastWidth) : 0,
-        total: 1
-      };
-    } else {
-      const fraction = Math.min(1, n / options.minRuns, elapsed / options.budget);
-      progress = {
-        label: `measuring ${which}: ${n} runs`,
-        done: fraction,
-        total: 1,
-        remainingMs: Math.max(
-          options.budget - elapsed,
-          n > 0 ? (elapsed / n) * (options.minRuns - n) : 0
-        )
-      };
-    }
-  };
-  progress = {label: `measuring ${which}`, done: 0, total: 1};
-  await updater.update();
-  try {
-    samples = await collectMacro(
-      fns[names[i]],
-      {
-        warmup: options.warmup,
-        runs: options.runs || 0,
-        minRuns: options.minRuns,
-        budget: options.budget,
-        stable: options.stable || 0,
-        consecutive: 2,
-        maxRuns: options.maxRuns,
-        ciWidth: options.stable > 0 ? ciWidth : undefined,
-        prepare,
-        teardown,
-        metricsBefore: metricsOn && !options.command ? () => process.resourceUsage() : undefined,
-        metricsAfter:
-          metricsOn && !options.command
-            ? token => runMetrics[i].push(rusageDelta(token, process.resourceUsage()))
-            : undefined
-      },
-      async (name, data) => {
-        if (name === 'macro-warmup') {
-          progress = {
-            label: `warming up ${which}: ${data.n} of ${data.warmup}`,
-            done: data.n,
-            total: data.warmup
-          };
-          started = performance.now();
-          await updater.update();
-        } else if (name === 'macro-check') {
-          lastWidth = data.width;
-        } else if (name === 'macro-run') {
-          runCounts[i] = data.n;
-          measuring(data.n);
-          await updater.update();
-        }
-      }
-    );
-  } catch (error) {
-    program.error(String(error));
-  }
   if (metricsOn && options.command) {
     runMetrics[i] = metricsByName.get(names[i]).slice(options.warmup);
   }
-  if (!warmupExplicit) {
+  if (detect) {
     const drop = detectWarmup(samples);
     if (drop) {
       detectedWarmup[i] = drop;
@@ -388,12 +370,12 @@ for (let i = 0; i < names.length; ++i) {
       });
     }
   }
-  results.push(samples);
+  results[i] = samples;
   runCounts[i] = samples.length;
 
   const sorted = samples.slice().sort(numericAsc),
     percentiles = {p90: quantileSorted(sorted, 0.9), p99: quantileSorted(sorted, 0.99)};
-  stats.push({...exactSummary(samples, {alpha: options.alpha}), ...percentiles, bootstrap: false});
+  stats[i] = {...exactSummary(samples, {alpha: options.alpha}), ...percentiles, bootstrap: false};
   progress = {label: `bootstrapping ${which}`, done: 1, total: 1};
   await updater.update();
   await sleep(5);
@@ -424,6 +406,213 @@ for (let i = 0; i < names.length; ++i) {
     }
   } else if (options.clusters) {
     notes.push({name: names[i], note: `no multimodality detected (dip test ${pText(p)})`});
+  }
+};
+
+const measureProgress = (prefix, n, elapsed, budget, width, unit = 'runs') => {
+  if (options.runs > 0)
+    return {
+      label: `${prefix}: ${n} of ${options.runs} ${unit}`,
+      done: n,
+      total: options.runs,
+      remainingMs: n > 0 ? (elapsed / n) * (options.runs - n) : undefined
+    };
+  if (options.stable > 0) {
+    const shown = Number.isFinite(width) ? `${formatNumber(width, {decimals: 1})}%` : '…';
+    return {
+      label: `${prefix}: ${n} ${unit}, ${unit === 'rounds' ? 'widest CI' : 'CI width'} ${shown} of ${options.stable}% target`,
+      done: Number.isFinite(width) ? Math.min(1, options.stable / width) : 0,
+      total: 1
+    };
+  }
+  return {
+    label: `${prefix}: ${n} ${unit}`,
+    done: Math.min(1, n / options.minRuns, elapsed / budget),
+    total: 1,
+    remainingMs: Math.max(budget - elapsed, n > 0 ? (elapsed / n) * (options.minRuns - n) : 0)
+  };
+};
+
+const moduleMetrics = metricsOn && !options.command;
+
+// perProcess[fn][round]: the runs of one child process, detected warmup dropped
+let perProcess = null;
+
+if (options.isolate) {
+  const script = fileURLToPath(import.meta.url),
+    file = fileURLToPath(fileName),
+    plan = isolationPlan(names.length, options.repeat, options.order),
+    childArgs = [
+      '-e',
+      options.export,
+      ...(options.runs > 0
+        ? ['-r', String(options.runs)]
+        : [
+            '--min-runs',
+            String(options.minRuns),
+            '-t',
+            String(options.budget),
+            '--max-runs',
+            String(options.maxRuns),
+            ...(options.stable > 0 ? ['--stable', String(options.stable)] : [])
+          ]),
+      ...(warmupExplicit ? ['-w', String(options.warmup)] : []),
+      '-a',
+      String(options.alpha),
+      '-b',
+      String(options.bootstrap),
+      '--seed',
+      String(seed),
+      ...(metricsOn ? ['-M'] : []),
+      '--emit-runs'
+    ],
+    processMetrics = names.map(() => []),
+    processWarmup = names.map(() => /** @type {number[]} */ ([])),
+    startedAt = performance.now();
+  perProcess = names.map(() => []);
+  for (let p = 0; p < plan.length; ++p) {
+    const {fn: i, round} = plan[p],
+      elapsed = performance.now() - startedAt;
+    progress = {
+      label:
+        `process ${p + 1} of ${plan.length}: ${names[i]}` +
+        (options.repeat > 1 ? ` (round ${round + 1} of ${options.repeat})` : ''),
+      done: p,
+      total: plan.length,
+      remainingMs: p > 0 ? (elapsed / p) * (plan.length - p) : undefined
+    };
+    await updater.update();
+    let child;
+    try {
+      child = await runChild(script, [file, names[i], ...childArgs]);
+    } catch (error) {
+      await finishUpdater();
+      program.error(`${names[i]}: ${error.message}`);
+    }
+    // a macro run's first call is a real measurement: detection decides, per process
+    const drop = warmupExplicit ? 0 : detectWarmup(child.samples);
+    processWarmup[i][round] = drop;
+    perProcess[i][round] = child.samples.slice(drop);
+    processMetrics[i][round] = (child.metrics ?? []).slice(drop);
+    const pooled = perProcess[i].filter(Boolean).flat();
+    stats[i] = {...exactSummary(pooled, {alpha: options.alpha}), bootstrap: false};
+    runCounts[i] = pooled.length;
+    await updater.update();
+  }
+  for (let i = 0; i < names.length; ++i) {
+    const drops = processWarmup[i],
+      dropped = drops.filter(drop => drop > 0).length;
+    if (dropped) {
+      detectedWarmup[i] = drops;
+      notes.push({
+        name: names[i],
+        note: `warmup detected in ${dropped} of ${drops.length} ${drops.length > 1 ? 'processes' : 'process'}: up to ${Math.max(...drops)} runs discarded per process (pin with --warmup N, keep with --warmup 0)`
+      });
+    }
+    if (metricsOn) runMetrics[i] = processMetrics[i].flat();
+    await summarize(i, perProcess[i].flat(), false);
+  }
+} else if (interleaved) {
+  const k = names.length,
+    budget = options.budget * k;
+  let started = performance.now(),
+    lastWidth = Infinity;
+  progress = {label: 'measuring', done: 0, total: 1};
+  await updater.update();
+  let collected;
+  try {
+    collected = await collectMacroRounds(
+      names.map(name => fns[name]),
+      {
+        ...policy,
+        budget,
+        prepare,
+        teardown,
+        metricsBefore: moduleMetrics ? () => process.resourceUsage() : undefined,
+        metricsAfter: moduleMetrics
+          ? (token, i) => runMetrics[i].push(rusageDelta(token, process.resourceUsage()))
+          : undefined
+      },
+      async (name, data) => {
+        if (name === 'macro-warmup') {
+          progress = {
+            label: `warming up: round ${data.n} of ${data.warmup}`,
+            done: data.n,
+            total: data.warmup
+          };
+          started = performance.now();
+          await updater.update();
+        } else if (name === 'macro-check') {
+          lastWidth = data.width;
+        } else if (name === 'macro-round') {
+          for (let i = 0; i < k; ++i) {
+            stats[i] = {...exactSummary(data.samples[i], {alpha: options.alpha}), bootstrap: false};
+            runCounts[i] = data.n;
+          }
+          progress = measureProgress(
+            'measuring',
+            data.n,
+            performance.now() - started,
+            budget,
+            lastWidth,
+            'rounds'
+          );
+          await updater.update();
+        }
+      }
+    );
+  } catch (error) {
+    program.error(String(error));
+  }
+  for (let i = 0; i < k; ++i) await summarize(i, collected[i]);
+} else {
+  for (let i = 0; i < names.length; ++i) {
+    const which = `${names[i]} (${i + 1} of ${names.length})`;
+    let samples,
+      started = performance.now(),
+      lastWidth = Infinity;
+    progress = {label: `measuring ${which}`, done: 0, total: 1};
+    await updater.update();
+    try {
+      samples = await collectMacro(
+        fns[names[i]],
+        {
+          ...policy,
+          prepare,
+          teardown,
+          metricsBefore: moduleMetrics ? () => process.resourceUsage() : undefined,
+          metricsAfter: moduleMetrics
+            ? token => runMetrics[i].push(rusageDelta(token, process.resourceUsage()))
+            : undefined
+        },
+        async (name, data) => {
+          if (name === 'macro-warmup') {
+            progress = {
+              label: `warming up ${which}: ${data.n} of ${data.warmup}`,
+              done: data.n,
+              total: data.warmup
+            };
+            started = performance.now();
+            await updater.update();
+          } else if (name === 'macro-check') {
+            lastWidth = data.width;
+          } else if (name === 'macro-run') {
+            runCounts[i] = data.n;
+            progress = measureProgress(
+              `measuring ${which}`,
+              data.n,
+              performance.now() - started,
+              options.budget,
+              lastWidth
+            );
+            await updater.update();
+          }
+        }
+      );
+    } catch (error) {
+      program.error(String(error));
+    }
+    await summarize(i, samples);
   }
 }
 
@@ -502,15 +691,33 @@ if (notes.length && results.length < 2) await writer.write('');
 
 let significance = null;
 if (results.length > 1) {
-  const testResult = computeSignificance(results, options.alpha, options.correction),
+  // several processes per function: the process is the unit, as in nano-bench --isolate
+  const byProcess = perProcess && options.repeat > 1,
+    tested = byProcess
+      ? perProcess.map(list => list.map(runs => quantileSorted(runs.slice().sort(numericAsc), 0.5)))
+      : results,
+    testResult = computeSignificance(tested, options.alpha, options.correction),
     matrix = significanceMatrix(testResult);
-  significance = testResult;
+  significance = byProcess ? {...testResult, unit: 'process-medians'} : testResult;
+  if (byProcess) {
+    const wins = fastestPerRound(tested),
+      tally = names
+        .map((name, i) => [name, wins[i]])
+        .filter(([, count]) => count > 0)
+        .map(([name, count]) => `${name} ${count} of ${options.repeat}`)
+        .join(', ');
+    await writer.write([
+      '',
+      c`{{save.bold}}Processes:{{restore}} ${options.repeat} per function; the test below compares per-process medians`,
+      c`Fastest median in each round of processes: ${tally}`
+    ]);
+  }
   writeSignificance(writer, {
     testResult,
     matrix,
     stats,
     names,
-    results,
+    results: tested,
     alpha: options.alpha,
     correction: options.correction,
     verbose: options.verbose,
@@ -555,7 +762,9 @@ if (options.json) {
       bootstrap: options.bootstrap,
       seed,
       alpha: options.alpha,
-      correction: options.correction
+      correction: options.correction,
+      order: options.order,
+      ...(options.isolate ? {isolate: true, repeat: options.repeat} : {})
     },
     series: names.map((name, i) => ({
       name,
@@ -563,6 +772,7 @@ if (options.json) {
       reps: 1,
       samples: results[i],
       ...(detectedWarmup[i] ? {warmupDetected: detectedWarmup[i]} : {}),
+      ...(perProcess ? {processSizes: perProcess[i].map(runs => runs.length)} : {}),
       ...(metricsOn ? {metrics: runMetrics[i]} : {}),
       summary: {
         median: stats[i].median,

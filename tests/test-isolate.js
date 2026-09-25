@@ -35,9 +35,9 @@ test('fastestPerRound()', t => {
   t.deepEqual(fastestPerRound([[1, 1], [2, 2], [3]]), [1, 0, 0], 'only complete rounds count');
 });
 
-const run = args =>
+const run = (args, name = 'nano-bench') =>
   new Promise((resolve, reject) => {
-    const bin = fileURLToPath(new URL('../bin/nano-bench.js', import.meta.url)),
+    const bin = fileURLToPath(new URL(`../bin/${name}.js`, import.meta.url)),
       child = spawn('node', [bin, ...args], {stdio: ['ignore', 'pipe', 'pipe']});
     let out = '';
     child.stdout.on('data', chunk => (out += chunk));
@@ -107,6 +107,60 @@ export default {
 
     r = await run([bench, 'a', '--isolate', '-p', '-i', '100']);
     t.notEqual(r.code, 0, '--isolate with --parallel is refused');
+  } finally {
+    await rm(dir, {recursive: true, force: true});
+  }
+});
+
+test('nano-bench-io --order and --isolate', async t => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'nano-bench-io-isolate-')),
+    bench = path.join(dir, 'bench.js'),
+    json = path.join(dir, 'out.json'),
+    io = args => run(args, 'nano-bench-io');
+  await writeFile(
+    bench,
+    `export default {
+  a: () => new Promise(resolve => setTimeout(resolve, 1)),
+  b: () => new Promise(resolve => setTimeout(resolve, 2))
+};
+`
+  );
+  try {
+    let r = await io([bench, '-r', '5', '--json', json]);
+    t.equal(r.code, 0, 'interleaved by default');
+    let data = JSON.parse(await readFile(json, 'utf8'));
+    t.equal(data.params.order, 'interleaved');
+    t.deepEqual(
+      data.results.map(s => s.samples.length),
+      [5, 5]
+    );
+    t.ok(r.out.includes('the stop policy counts rounds'), 'the order is announced');
+
+    r = await io([bench, '-r', '5', '--order', 'sequential', '--json', json]);
+    t.equal(r.code, 0, 'sequential on request');
+    data = JSON.parse(await readFile(json, 'utf8'));
+    t.equal(data.params.order, 'sequential');
+
+    r = await io([bench, '-r', '4', '--isolate', '--repeat', '2', '--json', json]);
+    t.equal(r.code, 0, 'two processes per function');
+    data = JSON.parse(await readFile(json, 'utf8'));
+    t.equal(data.params.isolate, true);
+    t.equal(data.params.repeat, 2);
+    t.deepEqual(
+      data.results.map(s => s.processSizes),
+      [
+        [4, 4],
+        [4, 4]
+      ],
+      'every run is kept: a macro run has no dropped first run'
+    );
+    t.equal(data.significance.unit, 'process-medians', 'the test runs on per-process medians');
+
+    r = await io([bench, '--repeat', '2', '-r', '2']);
+    t.notEqual(r.code, 0, '--repeat without --isolate is refused');
+
+    r = await io(['-c', 'node -e 0', '--isolate', '-r', '2']);
+    t.notEqual(r.code, 0, '--isolate with --command is refused');
   } finally {
     await rm(dir, {recursive: true, force: true});
   }
