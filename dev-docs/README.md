@@ -30,6 +30,13 @@ the same sample data model:
   (D6), same goal by a lighter, terminal-first means. Bins the raw samples into
   buckets before charting.
 
+Browser work, designed separately:
+
+- [`browser-viewer.md`](./browser-viewer.md) &mdash; the results viewer served by
+  `nano-bench-view` (shipped 2026-09-24).
+- [`browser-benchmarking.md`](./browser-benchmarking.md) &mdash; the survey of browser
+  benchmarking tools and the plan for the browser runner (2026-09-24).
+
 ## The one principle the whole design rests on
 
 nano-bench's significance tests are **nonparametric and rank-based**:
