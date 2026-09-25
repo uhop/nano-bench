@@ -4,7 +4,7 @@
 
 ## Overview
 
-nano-benchmark provides five CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U for two functions; Kruskal-Wallis H with Conover-Iman pairwise post-hoc for three or more, with Holm/Bonferroni multiple-comparison correction) to produce statistically rigorous results. Saved runs can be re-rendered and compared with significance recomputed from the raw samples, in the terminal or in a browser viewer. Designed for micro-benchmarks where function-call overhead matters.
+nano-benchmark provides seven CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U for two functions; Kruskal-Wallis H with Conover-Iman pairwise post-hoc for three or more, with Holm/Bonferroni multiple-comparison correction) to produce statistically rigorous results. Saved runs can be re-rendered and compared with significance recomputed from the raw samples, in the terminal or in a browser viewer. Designed for micro-benchmarks where function-call overhead matters.
 
 - NPM: https://npmjs.org/package/nano-benchmark
 - GitHub: https://github.com/uhop/nano-bench
@@ -82,6 +82,17 @@ Options: `-r, --root` (folder to serve and search; default the current folder), 
 The same page runs bench files in the browser: `?run=<path>` (listed on the start page: `bench/bench-*.js` and `*.bench.js` under the root) or a local file through a file input. One same-origin iframe per function, interleaved rounds, cross-origin isolated for 5–20 µs timers. Query parameters `ms` (default 50), `samples` (default 100), `export` (default `default`). Browsers grant isolation only over HTTPS or `localhost` (use an SSH tunnel for a remote server); without it the run works and the results carry a warning. Results are saved as schema-v1 JSON to `nano-bench-results/<bench>-<browser>.json` under the root and opened in the viewer; `nano-bench-compare` reads them.
 
 The server is strictly a development tool: not hardened, not for general web serving. The user is responsible for its security; outside `localhost` they are on their own (prefer an SSH tunnel to `--host`). A non-loopback `--host` prints a warning.
+
+### nano-bench-playwright, nano-bench-puppeteer
+
+Run a bench file in browsers from the command line: start the server on `localhost`, run the page in each browser in turn, print each browser's tables as `nano-bench-compare` does, and exit non-zero if a browser fails. Results are saved to `nano-bench-results/<bench>-<browser>.json` under the root. Need the optional peers `tape-six` and `playwright` or `puppeteer`, plus the browsers.
+
+```bash
+npx nano-bench-playwright bench/bench-sort.js -b chromium,firefox,webkit
+npx nano-bench-puppeteer bench/bench-sort.js -b chrome,firefox
+```
+
+Options: `-b, --browser` (comma-separated; Playwright `chromium`, `firefox`, `webkit`, default `chromium`; Puppeteer `chrome`, `firefox`, default `chrome`), `-m, --ms` (default 50), `-s, --samples` (default 100), `-e, --export`, `-r, --root` (default the current folder; the file must be inside it), `--headed`, `--timeout <seconds>`, `-v, --verbose`, `--histogram`, `--no-emoji`.
 
 ### nano-watch
 

@@ -6,8 +6,7 @@ import {readFile, stat} from 'node:fs/promises';
 
 import {program} from 'commander';
 
-import {nanoBenchPlugin, PREFIX} from '../src/server/nano-bench-plugin.js';
-import {autoindexPlugin} from '../src/server/autoindex.js';
+import {serverInstallHint, startServer} from '../src/server/start.js';
 import {encodeQueryPath, isInside, toPosix} from '../src/server/files.js';
 
 const pkgUrl = new URL('../package.json', import.meta.url),
@@ -49,34 +48,23 @@ const viewPaths = program.args.map(file => {
   return toPosix(path.relative(rootFolder, fileName));
 });
 
-let createTestServer;
-try {
-  ({createTestServer} = await import('tape-six/test-server.js'));
-} catch (error) {
-  if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error;
-  console.error(
-    'nano-bench-view serves the viewer with tape-six, which is not installed.\n' +
-      'Install it next to nano-benchmark:\n\n  npm install --save-dev tape-six\n'
-  );
-  process.exit(1);
-}
-
 let server;
 try {
-  server = await createTestServer({
+  server = await startServer({
     rootFolder,
     host: options.host,
     port: options.port,
-    protocol: 'h1',
-    webAppPath: PREFIX + 'web-app/',
-    remotePlugins: false,
     trace: options.trace,
-    plugins: [nanoBenchPlugin, api => autoindexPlugin(api, {showDotFiles: options.showDotFiles})]
+    showDotFiles: options.showDotFiles
   });
 } catch (error) {
   if (error?.code === 'EADDRINUSE')
     program.error(`port ${options.port} is in use — pass --port to pick another`);
   throw error;
+}
+if (!server) {
+  console.error(serverInstallHint('nano-bench-view'));
+  process.exit(1);
 }
 
 // the root redirects to the viewer and keeps the query

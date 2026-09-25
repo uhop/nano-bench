@@ -2,7 +2,7 @@
 
 ## Project identity
 
-nano-benchmark is an ESM JavaScript package providing command-line utilities (`nano-bench`, `nano-bench-io`, `nano-watch`, `nano-bench-compare`, `nano-bench-view`) for benchmarking code — ns-scale hot loops and ms-scale per-run operations — with proper nonparametric statistics and significance testing. Runs on Node.js, Bun, and Deno. Per the fleet runtime policy it supports every non-EOL Node release (active LTS plus current) with no `engines` floor pinned — don't add one without a feature that requires it, and don't name specific versions in docs. CI runs the suite across the non-EOL Node versions. The `src/` modules (stats, significance tests, streaming counters) are internal — the user-facing surface is the five CLI tools in `bin/`, plus the browser viewer in `web-app/` that `nano-bench-view` serves.
+nano-benchmark is an ESM JavaScript package providing command-line utilities (`nano-bench`, `nano-bench-io`, `nano-watch`, `nano-bench-compare`, `nano-bench-view`, `nano-bench-playwright`, `nano-bench-puppeteer`) for benchmarking code — ns-scale hot loops and ms-scale per-run operations — with proper nonparametric statistics and significance testing. Runs on Node.js, Bun, and Deno. Per the fleet runtime policy it supports every non-EOL Node release (active LTS plus current) with no `engines` floor pinned — don't add one without a feature that requires it, and don't name specific versions in docs. CI runs the suite across the non-EOL Node versions. The `src/` modules (stats, significance tests, streaming counters) are internal — the user-facing surface is the five CLI tools in `bin/`, plus the browser viewer in `web-app/` that `nano-bench-view` serves.
 
 ## Critical rules
 
@@ -10,7 +10,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - **No build step.** Source JS in `src/`, CLI scripts in `bin/`, and the viewer in `web-app/` are shipped directly. Do not create build scripts or compiled output.
 - **No TypeScript.** No `.ts` files, no `.d.ts` files. This is a pure JS project.
 - **Do not modify or delete test expectations** without understanding why they changed.
-- **CLI-first project.** The five binaries (`bin/nano-bench.js`, `bin/nano-bench-io.js`, `bin/nano-watch.js`, `bin/nano-bench-compare.js`, `bin/nano-bench-view.js`) are the user-facing interface. The `src/` modules are internal implementation details.
+- **CLI-first project.** The seven binaries (`bin/nano-bench.js`, `bin/nano-bench-io.js`, `bin/nano-watch.js`, `bin/nano-bench-compare.js`, `bin/nano-bench-view.js`, `bin/nano-bench-playwright.js`, `bin/nano-bench-puppeteer.js`) are the user-facing interface. The `src/` modules are internal implementation details.
 - **The viewer imports `src/` directly in the browser.** Modules it loads (`src/bench/results/{parse,env-diff,series}.js`, `pair-series.js`, `significance.js`, `histogram.js`, `render/svg-distribution.js`, and what they import) must stay free of `node:` imports and bare specifiers other than `console-toolkit/`, which the page's import map resolves. Node-only code lives in sibling modules (`load.js`, `environment.js`).
 
 ## Code style
@@ -26,6 +26,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - **`bin/nano-bench-io.js`** — benchmarks slow (ms-scale) functions one call per run, no batching: p90/p99 tail percentiles, modified-z outlier notes (caching vs interference), stop policies (`--min-runs`+`--budget` default, `-r` fixed, `--stable` CI-width adaptive), auto-detected warmup discard (windowed MW screen; explicit `--warmup` disables), optional module-level `prepare()`/`teardown()` named exports run untimed around every run. `-c`/`--command` benchmarks shell commands instead (whole processes; `--prepare <cmd>` untimed before each run; a run fails on non-zero exit _or_ a fatal signal). `-M`/`--metrics` collects per-run system metrics (module mode: rusage deltas, cross-runtime; command mode: Linux `/proc` polling of the command's process tree, wrapper shell excluded; degrades with a note). A dip-test gate flags multimodal distributions; `--clusters` splits them at KDE density minima and reports per-cluster weight/median/CI/range (mode count is a labeled heuristic). Shares the module format, significance tests, histograms, `--json`, and `--smoke` with `nano-bench`.
 - **`bin/nano-watch.js`** — continuously benchmarks a single function in streaming mode, showing live stats and memory usage.
 - **`bin/nano-bench-view.js`** — a development-only server (not hardened; the docs say so, and a non-loopback `--host` prints a warning) that serves the browser viewer with tape-six's `createTestServer` (an optional peer, imported lazily; prints an install hint when missing). Registers two plugins: `src/server/nano-bench-plugin.js` (serves `web-app/`, `src/`, and `console-toolkit` under `/--nano-bench/` from their installed locations, plus `/--nano-bench/results`, a list of results files that skips dot-folders and `node_modules`; `/benches`, the bench files; `/save`, a `POST` that writes a results file to `nano-bench-results/` without overwriting; `/frame`, the benchmark iframe page with the root's import map inlined; `/meta`; every page it serves carries COOP and COEP, so the runner is cross-origin isolated) and `src/server/autoindex.js` (HTML listings for folders without `index.html`; the root lists only with `/?list`, because `/` redirects to the viewer).
+- **`bin/nano-bench-playwright.js`**, **`bin/nano-bench-puppeteer.js`** — thin driver bins over `src/driver/browser-cli.js`: start the server on a free `localhost` port, open `?run=<file>` in each browser in turn (never in parallel), follow the run through `page.exposeFunction('nanoBenchDriver', …)` (the page pushes `progress`, `warning`, `error`, and `saved` events; polling with `evaluate` would queue tasks on the thread the benchmark iframes share), draw the CLI progress line, and print each saved file through `nano-bench-compare` as a child process.
 - **`web-app/`** — the viewer and the browser runner: `app.js` (picker and routing, `?view=<path>` repeatable, `?run=<path>`), `view.js` (summary, distribution chart, significance), `run.js` (the runner: one same-origin iframe per function, interleaved rounds, a schema-v1 results object) and `frame.js` (the iframe side: loads one function, answers `calibrate` and `sample` messages), `components/` (custom elements, one per file, light DOM styled by tag in `app.css` so page classes can't collide: `<nano-bench-progress>`), theme files (Auto / Light / Dark, saved in `localStorage`). No build step; plain ES modules.
 - **`bin/nano-bench-compare.js`** — reads results JSON, recomputes significance from the saved samples, and renders view/compare tables with an environment-diff banner; no benchmarking. Pairs same-named series across files (default) or pools all series with `--pooled`. Renders persisted per-run system metrics side by side when files carry them.
 - **`src/bench/runner.js`** — core benchmark engine: `findLevel`, `benchmark`, `benchmarkSeries`, `benchmarkRounds` (interleaved: one sample of each function per round, the CLI default), `measure`, `Stats`. The orchestrating functions (`findLevel`, `benchmarkSeries`, `benchmarkSeriesPar`, `benchmarkRounds`, `measure`, `measurePar`) accept an `observe: boolean | string` option that emits User Timing marks at phase boundaries (`nano-bench/<label>/<phase>`).
@@ -50,10 +51,11 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 
 ## Dependencies
 
-- **`commander`** — CLI argument parsing for all five binaries.
+- **`commander`** — CLI argument parsing for all seven binaries.
 - **`console-toolkit`** — styled terminal output, tables, charts, ANSI sequences.
 - **`emoji-regex`** + **`get-east-asian-width`** — let `console-toolkit` measure wide-glyph widths faithfully (emoji markers 🐇/🐢, CJK/fullwidth names) so table cells align; without them every wide glyph would measure as 1 column.
-- **`tape-six`** — optional peer dependency: `nano-bench-view` serves the viewer with its test server. Also a devDependency for testing.
+- **`tape-six`** — optional peer dependency: `nano-bench-view` and the driver bins serve the web app with its test server (`src/server/start.js`). Also a devDependency for testing.
+- **`playwright`**, **`puppeteer`** — optional peer dependencies of `nano-bench-playwright` and `nano-bench-puppeteer`, imported lazily; a missing one prints its install command. Also devDependencies: `tests/test-browser-drivers.js` runs each driver end to end under Node and skips when its browser isn't installed.
 - **Dev only:** `tape-six-proc` for testing; `prettier` for formatting; `typescript` + `@types/node` for the `js-check` step.
 
 ## Verification commands
@@ -69,7 +71,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 
 ## File layout
 
-- CLI binaries: `bin/nano-bench.js`, `bin/nano-bench-io.js`, `bin/nano-watch.js`, `bin/nano-bench-compare.js`, `bin/nano-bench-view.js`
+- CLI binaries: `bin/nano-bench.js`, `bin/nano-bench-io.js`, `bin/nano-watch.js`, `bin/nano-bench-compare.js`, `bin/nano-bench-view.js`, `bin/nano-bench-playwright.js`, `bin/nano-bench-puppeteer.js`
 - Browser viewer: `web-app/` (served by `nano-bench-view`; server plugins in `src/server/`)
 - Internal source: `src/` (stats, significance, bench runner, streaming counters, utils)
 - Tests: `tests/test-*.js`

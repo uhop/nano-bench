@@ -1,7 +1,7 @@
 import {parseResults} from '../src/bench/results/parse.js';
 import {escapeXml as esc} from '../src/bench/render/svg-distribution.js';
 import {renderView} from './view.js';
-import {runBench} from './run.js';
+import {report, runBench} from './run.js';
 import './components/nano-bench-progress.js';
 
 const main = /** @type {HTMLElement} */ (document.querySelector('main'));
@@ -48,8 +48,10 @@ const saveAndShow = async (results, name) => {
     });
     if (!response.ok) throw new Error(await response.text());
     const {path} = await response.json();
+    await report({type: 'saved', path});
     location.search = viewHref([path]);
   } catch (error) {
+    report({type: 'error', message: `not saved on the server: ${error.message}`});
     show([{file: name + '.json', results}]);
     const blob = new Blob([JSON.stringify(results, null, 2) + '\n'], {type: 'application/json'}),
       note = document.createElement('p');

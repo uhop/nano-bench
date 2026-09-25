@@ -10,7 +10,9 @@ bin/                          # CLI entry points (shipped via npm)
 ├── nano-bench-io.js                # Benchmark slow (ms-scale) functions per run — tails, no batching
 ├── nano-watch.js                   # Continuously benchmark a single function with live streaming stats
 ├── nano-bench-compare.js           # View/compare saved results JSON — recomputes significance, no measuring
-└── nano-bench-view.js              # Serve the browser viewer (tape-six test server + two plugins)
+├── nano-bench-view.js              # Serve the browser viewer (tape-six test server + two plugins)
+├── nano-bench-playwright.js        # Run a bench file in Playwright browsers (src/driver/browser-cli.js)
+└── nano-bench-puppeteer.js         # Run a bench file in Puppeteer browsers (src/driver/browser-cli.js)
 web-app/                      # Browser viewer (shipped via npm; plain ES modules, no build)
 ├── index.html                      # Shell + import map (console-toolkit/ → /--nano-bench/console-toolkit/)
 ├── app.js                          # Routing (?view=<path>, repeatable; ?run=<path>) + the picker
@@ -55,9 +57,12 @@ src/                          # Internal source (shipped via npm)
 │       ├── env-diff.js             # diffEnvironments — comparability banner (browser-safe)
 │       ├── environment.js          # captureEnvironment (Node)
 │       └── series.js               # buildSeries / resultsWarnings / multimodalityP — shared by compare + viewer
+├── driver/
+│   └── browser-cli.js              # The driver bins' shared CLI: server, browsers in turn, push events, compare
 ├── server/                         # nano-bench-view plugins (Node)
 │   ├── nano-bench-plugin.js        # /--nano-bench/{web-app,src,console-toolkit}/ + results, benches, save, frame, meta
 │   ├── autoindex.js                # HTML folder listings (algorithm from the static-server.mjs gist)
+│   ├── start.js                    # startServer: tape-six's test server with both plugins (lazy import)
 │   └── files.js                    # MIME table, containment check, escaping
 ├── stats.js                        # Batch stats: mean, variance, stdDev, skewness, kurtosis, bootstrap, *Summary
 ├── median.js                       # Fast approximate median (median-of-medians variant)
@@ -162,6 +167,12 @@ Steps 2 and 4 live in `src/bench/results/series.js`, so the browser viewer compu
 2. **View** — `web-app/app.js` loads `?view=` paths from the server (or local files through a file input), `parseResults` validates them, and `view.js` runs the compare pipeline's `buildSeries` / `resultsWarnings` / `planComparison` / `computeSignificance` in the browser. The chart is `computeHistograms` rendered by `svg-distribution.js`: a shared linear axis, a shared log axis (chosen automatically when the pooled 1st–99th percentile range exceeds 20×), or one axis per row.
 3. **Run** — `?run=<path>` (or a local file through a blob URL) hands the bench file to `web-app/run.js`. A lister iframe returns the function names, then one same-origin iframe per function loads `/--nano-bench/frame`, which inlines the root's import map and runs `web-app/frame.js`. The parent calibrates each function (`findLevel`) and samples them in interleaved rounds (`benchmark`) over `postMessage`, waiting while the tab is hidden. It then builds a schema-v1 object with `bootstrapSummary` and `computeSignificance`, `POST`s it to `/--nano-bench/save` (written under `nano-bench-results/`, never overwriting), and opens it in the viewer. The plugin sends COOP and COEP with every page, so `performance.now()` steps 5–20 µs.
 
+### Browser drivers
+
+1. **Serve** — `startServer` on a free `localhost` port, so the page is cross-origin isolated.
+2. **Drive** — for each requested browser in turn: launch it, `exposeFunction('nanoBenchDriver')`, and open `?run=<file>`. The page pushes `progress`, `warning`, `error`, and `saved` events; the CLI draws the progress line from them.
+3. **Report** — each saved file is printed by `nano-bench-compare` in a child process; the exit status is non-zero when any browser failed.
+
 ### nano-watch pipeline
 
 1. **Find level** — same as above.
@@ -201,8 +212,13 @@ bin/nano-bench-compare.js ──→ src/bench/results/{load,series}.js
                           ──→ src/bench/significance.js (same tests, recomputed from saved samples)
                           ──→ src/bench/render/* (shared renderers)
 
-bin/nano-bench-view.js ──→ tape-six/test-server.js (optional peer, lazy)
-                       ──→ src/server/{nano-bench-plugin,autoindex}.js
+bin/nano-bench-view.js ──→ src/server/start.js ──→ tape-six/test-server.js (optional peer, lazy)
+                                            ──→ src/server/{nano-bench-plugin,autoindex}.js
+
+bin/nano-bench-{playwright,puppeteer}.js ──→ src/driver/browser-cli.js
+    ──→ playwright | puppeteer (optional peers, lazy)
+    ──→ src/server/start.js, src/bench/render/progress.js
+    ──→ bin/nano-bench-compare.js (child process, one per saved file)
 
 web-app/view.js ──→ src/bench/results/series.js, src/bench/pair-series.js, src/bench/significance.js
                 ──→ src/bench/histogram.js, src/bench/render/svg-distribution.js

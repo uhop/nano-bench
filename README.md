@@ -17,7 +17,10 @@ Five utilities are available:
 - `nano-bench-compare` &mdash; views and compares saved results (JSON), recomputing
   significance from the raw samples &mdash; for before/after comparisons across runs.
 - `nano-bench-view` &mdash; serves a browser viewer for saved results: distribution plots,
-  summary, and significance, with folder listings for browsing a remote machine's files.
+  summary, and significance, with folder listings for browsing a remote machine's files. The
+  same page runs bench files in a browser.
+- `nano-bench-playwright` and `nano-bench-puppeteer` &mdash; run a bench file in browsers from
+  the command line and print the results as `nano-bench` does.
 
 Designed for performance tuning of small, fast code snippets used in tight loops.
 
@@ -242,6 +245,23 @@ Add `ms` and `samples` to the run URL to change the sample length and count, for
 `/--nano-bench/web-app/?run=bench/bench-sort.js&samples=50`. Keep the tab visible: the runner
 pauses while the tab is hidden and records the pauses. A local file can't import other local
 files, so bench it from the server when it has relative imports.
+
+To run the same page from the command line, use `nano-bench-playwright` or
+`nano-bench-puppeteer`. Each starts the server on `localhost`, runs the file in one browser after
+another, prints each browser's tables, and exits with a non-zero status if a browser fails. The
+driver is an optional peer dependency, so install it and its browsers first:
+
+```bash
+npm install --save-dev tape-six playwright
+npx playwright install chromium firefox webkit
+
+npx nano-bench-playwright bench/bench-sort.js                   # Chromium
+npx nano-bench-playwright bench/bench-sort.js -b firefox,webkit # one after another
+npx nano-bench-puppeteer bench/bench-sort.js -b chrome,firefox  # with Puppeteer
+```
+
+Playwright's WebKit is a build of its own, separate from Safari and Epiphany. To measure those
+engines, open the page in them.
 
 ### Benchmarking slow functions
 

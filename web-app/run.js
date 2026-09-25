@@ -6,6 +6,13 @@ import {escapeXml as esc} from '../src/bench/render/svg-distribution.js';
 
 const FRAME = '/--nano-bench/frame';
 
+// the driver bins (nano-bench-playwright, nano-bench-puppeteer) expose nanoBenchDriver to follow a
+// run by push: polling with evaluate would queue tasks on the thread the benchmarks share
+export const report = async event => {
+  const driver = /** @type {any} */ (globalThis).nanoBenchDriver;
+  if (typeof driver == 'function') await driver(event);
+};
+
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // the smallest step performance.now() takes: 5 µs to 1 ms depending on engine and isolation
@@ -135,6 +142,7 @@ export const runBench = async (main, options) => {
       bar.max = max;
       bar.value = value;
       label.textContent = text;
+      report({type: 'progress', label: text, value, max});
       if (!trace) return;
       const box = bar.firstElementChild.getBoundingClientRect(),
         where = value === null ? 'indeterminate' : `${value} of ${max}`;
@@ -172,6 +180,7 @@ export const runBench = async (main, options) => {
       const box = /** @type {HTMLElement} */ (main.querySelector('.warnings'));
       /** @type {HTMLElement} */ (box.querySelector('li')).textContent = isolation;
       box.hidden = false;
+      report({type: 'warning', message: isolation});
     }
 
     progress('loading the module');
@@ -300,6 +309,7 @@ export const runBench = async (main, options) => {
     await onDone(results, `${file.replace(/^.*\//, '').replace(/\.m?js$/, '')}-${browser.name}`);
   } catch (error) {
     frames.close();
+    report({type: 'error', message: String(error?.message || error)});
     main.innerHTML = `<section class="error"><p>${esc(error?.message || error)}</p><p><a href="./">Back to the start page</a></p></section>`;
   }
 };

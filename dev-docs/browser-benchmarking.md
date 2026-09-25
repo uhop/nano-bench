@@ -87,7 +87,7 @@ launching and serving, Playwright and Puppeteer as optional peers for automation
 
 ## What this means for the browser runner
 
-The runner was built on 2026-09-24 along steps 1&ndash;5; step 6, the drivers, is still open.
+The runner was built on 2026-09-24 along steps 1&ndash;5, and the drivers of step 6 the same day.
 The plan as sketched:
 
 1. A run route in the web app (`?run=<bench file>`), served by `nano-bench-view`'s server with
@@ -189,7 +189,14 @@ Built 2026-09-24 (`web-app/run.js`, `web-app/frame.js`, and the plugin's `benche
 - **Results:** saved to `nano-bench-results/<bench>-<browser>.json` under the root and opened
   in the viewer.
 
-Not built yet: the Playwright and Puppeteer drivers, cross-site iframes, drag and drop, and
+The drivers, `nano-bench-playwright` and `nano-bench-puppeteer`, share `src/driver/browser-cli.js`.
+They start the server on `localhost`, open the page in each browser in turn, and follow the run
+through `page.exposeFunction`: the page pushes its progress, warnings, errors, and the saved path,
+so the driver adds no polling tasks to the thread the benchmarks share. tape-six's driver kit
+(`TestWorker`, `EventServer`) wasn't used: its value is test events, many parallel tasks, and a
+control plane, and one sequential page per browser needs none of them.
+
+Not built yet: cross-site iframes, drag and drop, and
 pasted snippets. A local file runs from a blob URL, so it can't import relative files.
 
 ## Answered questions

@@ -295,6 +295,46 @@ npx nano-bench-view runs/base.json
 
 ---
 
+## CLI tools: nano-bench-playwright and nano-bench-puppeteer
+
+Run a bench file in browsers from the command line, over the browser runner's page. Each bin starts tape-six's server with nano-bench's plugins on a free `localhost` port (so the page is cross-origin isolated), opens `/--nano-bench/web-app/?run=<file>` in each requested browser **one after another** (one at a time: parallel runs share cores and the turbo budget and bias each other), and prints each saved file through `nano-bench-compare`. The drivers are optional peer dependencies imported lazily; a missing driver prints its install command and exits 1, and a browser that fails to launch prints the command that installs it.
+
+### Usage
+
+```
+nano-bench-playwright [options] <file>
+nano-bench-puppeteer [options] <file>
+```
+
+### Options
+
+- `-b, --browser <names>` — comma-separated browsers. Playwright: `chromium` (default), `firefox`, `webkit`. Puppeteer: `chrome` (default), `firefox`.
+- `-m, --ms <ms>` — measurement time per sample (default: 50).
+- `-s, --samples <samples>` — samples per function (default: 100).
+- `-e, --export <name>` — the export holding the functions (default: `default`).
+- `-r, --root <folder>` — the folder to serve (default: the current folder). The bench file must be inside it; bare imports resolve through the root's tape6 import map.
+- `--headed` — show the browser windows.
+- `--timeout <seconds>` — give up on a browser after this long (default: never).
+- `-v, --verbose`, `--histogram`, `--no-emoji` — passed to `nano-bench-compare`.
+
+### Behavior
+
+- **Following a run:** the driver exposes `nanoBenchDriver` to the page (`page.exposeFunction`); the page calls it with `{type: 'progress', label, value, max}`, `{type: 'warning', message}`, `{type: 'error', message}`, and `{type: 'saved', path}`. Push instead of polling keeps the driver from queuing tasks on the thread the benchmark iframes share. On a terminal, progress is drawn as the CLI progress line.
+- **Output:** results are saved by the page to `nano-bench-results/<bench>-<browser>.json` under the root (`-2`, `-3`, … on collision). After each browser, its file is printed by `nano-bench-compare`; at the end, the saved paths are listed.
+- **Exit status:** 0 when every browser saved its results; 1 when a browser failed to launch, the run reported an error, or `--timeout` expired. Ctrl-C closes the browser and the server.
+- **Engines:** Playwright's `webkit` is a WebKit build of Playwright's own, separate from Safari and Epiphany (WebKitGTK); to measure those engines, open the page in them.
+- **Runtime:** the drivers run on Node.js.
+
+### Example
+
+```bash
+npm install --save-dev tape-six playwright
+npx playwright install chromium firefox
+npx nano-bench-playwright bench/bench-sort.js -b chromium,firefox -s 50
+```
+
+---
+
 ## Results JSON schema (v1)
 
 `nano-bench --json out.json` writes this shape. The **raw per-sample arrays are the source of truth** — significance and CIs are always recomputed from them; the stored summaries are FYI only.

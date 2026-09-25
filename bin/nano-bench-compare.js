@@ -188,7 +188,7 @@ if (unpaired.length) {
   writer.writeString(
     c`\n{{save.dim}}Not compared (one series each): ${unpaired.join(', ')}{{restore}}\n`
   );
-} else if (degraded && series.length > 1) {
+} else if (degraded && files.length > 1) {
   writer.writeString(
     c`\n{{save.dim}}No shared names; compared all series together — pass --pooled to silence.{{restore}}\n`
   );
