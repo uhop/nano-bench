@@ -1,10 +1,10 @@
 # nano-benchmark
 
-> Command-line utilities for micro-benchmarking JavaScript code with nonparametric statistics and significance testing.
+> Command-line utilities for benchmarking JavaScript code — ns-scale hot loops, ms-scale operations, whole commands, and code in browsers — with nonparametric statistics and significance testing.
 
 ## Overview
 
-nano-benchmark provides seven CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U for two functions; Kruskal-Wallis H with Conover-Iman pairwise post-hoc for three or more, with Holm/Bonferroni multiple-comparison correction) to produce statistically rigorous results. Saved runs can be re-rendered and compared with significance recomputed from the raw samples, in the terminal or in a browser viewer. Designed for micro-benchmarks where function-call overhead matters.
+nano-benchmark provides eight CLI tools for benchmarking code. It uses nonparametric statistics (bootstrap resampling, quantile-based confidence intervals) and rank-based significance tests (Mann-Whitney U for two functions; Kruskal-Wallis H with Conover-Iman pairwise post-hoc for three or more, with Holm/Bonferroni multiple-comparison correction) to produce statistically rigorous results. Saved runs can be re-rendered and compared with significance recomputed from the raw samples, in the terminal or in a browser viewer. Designed for micro-benchmarks where function-call overhead matters, and for slow operations, commands, and load measured one run at a time.
 
 - NPM: https://npmjs.org/package/nano-benchmark
 - GitHub: https://github.com/uhop/nano-bench

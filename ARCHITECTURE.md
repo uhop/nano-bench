@@ -1,6 +1,6 @@
 # Architecture
 
-`nano-benchmark` is a pure JavaScript (ESM) CLI package for micro-benchmarking code with nonparametric statistics and significance testing. It runs on Node.js (every non-EOL release), Bun, and Deno; no `engines` floor is declared. Runtime dependencies: `commander` (CLI parsing), `console-toolkit` (styled terminal output, tables, charts), and `emoji-regex` + `get-east-asian-width` (so `console-toolkit` measures wide-glyph widths — emoji markers, CJK names — correctly). `tape-six` is an optional peer: `nano-bench-view` serves the browser viewer with its test server and prints an install hint when it is absent.
+`nano-benchmark` is a pure JavaScript (ESM) CLI package for benchmarking code (hot loops, ms-scale operations, whole commands, and code in browsers) with nonparametric statistics and significance testing. It runs on Node.js (every non-EOL release), Bun, and Deno; no `engines` floor is declared. Runtime dependencies: `commander` (CLI parsing), `console-toolkit` (styled terminal output, tables, charts), and `emoji-regex` + `get-east-asian-width` (so `console-toolkit` measures wide-glyph widths — emoji markers, CJK names — correctly). `tape-six` is an optional peer: `nano-bench-view` serves the browser viewer with its test server and prints an install hint when it is absent.
 
 ## Project layout
 

@@ -3,17 +3,18 @@
 [npm-img]: https://img.shields.io/npm/v/nano-benchmark.svg
 [npm-url]: https://npmjs.org/package/nano-benchmark
 
-`nano-benchmark` provides command-line utilities for micro-benchmarking code
-with nonparametric statistics and significance testing.
+`nano-benchmark` provides command-line utilities for benchmarking JavaScript code &mdash; hot
+loops, ms-scale operations, whole commands, and code in browsers &mdash; with nonparametric
+statistics and significance testing.
 
-Five utilities are available:
+Eight utilities are available:
 
 - `nano-watch` &mdash; continuously benchmarks a single function, showing live statistics
   and memory usage.
 - `nano-bench` &mdash; benchmarks and compares multiple functions, calculating confidence
   intervals and statistical significance.
-- `nano-bench-io` &mdash; benchmarks slow (ms-scale) functions one call per run &mdash;
-  distributions and tail percentiles (p90/p99), no batching.
+- `nano-bench-io` &mdash; benchmarks slow (ms-scale) functions and whole commands one run at a
+  time &mdash; distributions and tail percentiles (p90/p99), no batching, optionally under load.
 - `nano-bench-compare` &mdash; views and compares saved results (JSON), recomputing
   significance from the raw samples &mdash; for before/after comparisons across runs.
 - `nano-bench-view` &mdash; serves a browser viewer for saved results: distribution plots,
@@ -24,7 +25,7 @@ Five utilities are available:
 - `nano-bench-suite` &mdash; runs several bench files, each in its own process, over one or more
   passes, and reports which function was fastest in each file and how often that held.
 
-Designed for performance tuning of small, fast code snippets used in tight loops.
+Designed for performance tuning, from small snippets in tight loops to slow operations under load.
 
 ## Visual samples
 
@@ -435,6 +436,7 @@ BSD 3-Clause License
 
 ## Release history
 
+- 1.3.0: _Added browser benchmarking (`nano-bench-view` with its viewer and runner, `nano-bench-playwright`, `nano-bench-puppeteer`), `nano-bench-suite`, load modes, `--isolate`, and `--settle`. Samples are now interleaved by default._
 - 1.2.0: _Added `nano-bench-io` for slow (ms-scale) functions and whole commands: per-run collection with p90/p99 tails, system metrics, warmup auto-detection, and multimodal cluster splitting. Added the `--smoke` pre-flight and effect sizes (Cliff's &delta;). Bugfixes._
 - 1.1.0: _Added saving to JSON, `nano-bench-compare` for comparing runs distribution histograms, and Holm/Bonferroni multiple-comparison. Also per-function selection and a `findLevel` termination fix._
 - 1.0.16: _Added User Timing API integration: `--observe` flag._

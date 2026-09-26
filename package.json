@@ -1,7 +1,7 @@
 {
   "name": "nano-benchmark",
-  "version": "1.2.0",
-  "description": "CLI micro- and macro-benchmarking for Node, Deno, and Bun — hot loops, ms-scale operations, and whole commands — with nonparametric statistics and significance testing.",
+  "version": "1.3.0",
+  "description": "CLI micro- and macro-benchmarking for Node, Deno, Bun, and browsers — hot loops, ms-scale operations, whole commands, and load — with nonparametric statistics and significance testing.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -61,6 +61,10 @@
     "watch",
     "compare",
     "cross-runtime",
+    "browser",
+    "playwright",
+    "puppeteer",
+    "load-testing",
     "nodejs",
     "deno",
     "bun"

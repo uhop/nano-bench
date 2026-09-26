@@ -84,7 +84,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - CLI binaries: `bin/nano-bench.js`, `bin/nano-bench-io.js`, `bin/nano-watch.js`, `bin/nano-bench-compare.js`, `bin/nano-bench-view.js`, `bin/nano-bench-playwright.js`, `bin/nano-bench-puppeteer.js`, `bin/nano-bench-suite.js`
 - Browser viewer: `web-app/` (served by `nano-bench-view`; server plugins in `src/server/`)
 - Internal source: `src/` (stats, significance, bench runner, streaming counters, utils)
-- Tests: `tests/test-*.js`
+- Tests: `tests/test-*.js` (tape-six; import the module under test by its `nano-benchmark/` package path)
 - Example benchmarks: `bench/bench-*.js`, `bench/watch-*.js`
 - AI coding skills: `skills/write-bench/`, `skills/write-watch/`
 - Wiki docs: `wiki/` (git submodule)
