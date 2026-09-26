@@ -7,7 +7,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 
 import {Option, program} from 'commander';
 
-import {CURSOR_NORMAL, CURSOR_INVISIBLE, CLEAR_EOL} from 'console-toolkit/ansi';
+import {CURSOR_NORMAL, CURSOR_INVISIBLE} from 'console-toolkit/ansi';
 import {
   formatInteger,
   formatNumber,
@@ -466,12 +466,9 @@ const pText = p => (p <= 1 / 201 ? 'p < 0.01' : 'p ≈ ' + formatNumber(p, {deci
 
 let progress = null;
 
-// the final frame drops the progress line, so it is one line shorter than the frame before
-// it; the updater does not clear the leftover line
 const finishUpdater = async () => {
   await updater.final();
   updater = null;
-  if (progress && writer.isTTY) await writer.writeString(CLEAR_EOL);
 };
 
 // the final frame drops the progress line: the table is all that remains
@@ -481,11 +478,7 @@ const report = state => {
   return lines;
 };
 
-updater = new Updater(
-  report,
-  {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL, afterLine: CLEAR_EOL},
-  writer
-);
+updater = new Updater(report, {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL}, writer);
 
 // warmup detection, the bootstrap summary, and the per-function notes
 const summarize = async (i, samples, detect = !warmupExplicit) => {

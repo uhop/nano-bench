@@ -7,7 +7,7 @@ import {readFile} from 'node:fs/promises';
 
 import {program} from 'commander';
 
-import {CURSOR_NORMAL, CURSOR_INVISIBLE, CLEAR_EOL} from 'console-toolkit/ansi';
+import {CURSOR_NORMAL, CURSOR_INVISIBLE} from 'console-toolkit/ansi';
 import {
   abbrNumber,
   formatInteger,
@@ -117,7 +117,7 @@ function reportFindLevel(state, level, time) {
 
 updater = new Updater(
   reportFindLevel,
-  {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL, afterLine: CLEAR_EOL},
+  {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL},
   writer
 );
 
@@ -205,7 +205,7 @@ function reportBenchmark(state, time) {
 
 updater = new Updater(
   reportBenchmark,
-  {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL, afterLine: CLEAR_EOL},
+  {prologue: CURSOR_INVISIBLE, epilogue: CURSOR_NORMAL},
   writer
 );
 

@@ -1,18 +1,20 @@
 import test from 'tape-six';
 
-import {formatDuration, progressBar, progressLine} from 'nano-benchmark/bench/render/progress.js';
+import {formatDuration, progressLine} from 'nano-benchmark/bench/render/progress.js';
 
 const plain = s => s.replace(/\x1b\[[0-9;]*m/g, '');
 
-test('progressBar()', t => {
-  t.equal(plain(progressBar(0, 10)), '░'.repeat(10), 'empty');
-  t.equal(plain(progressBar(1, 10)), '█'.repeat(10), 'full');
-  t.equal(plain(progressBar(0.5, 10)), '█'.repeat(5) + '░'.repeat(5), 'half');
-  t.equal(plain(progressBar(0.55, 10)), '█'.repeat(5) + '▌' + '░'.repeat(4), 'eighths');
-  t.equal(plain(progressBar(2, 10)).length, 10, 'clamped above');
-  t.equal(plain(progressBar(-1, 10)).length, 10, 'clamped below');
-  for (let f = 0; f <= 1; f += 0.01) {
-    if (plain(progressBar(f, 30)).length !== 30) t.fail(`width drifts at ${f}`);
+const bar = (done, total) => plain(progressLine({label: 'x', done, total})).slice(0, 30);
+
+test('progressLine() bar', t => {
+  t.equal(bar(0, 10), '░'.repeat(30), 'empty');
+  t.equal(bar(10, 10), '█'.repeat(30), 'full');
+  t.equal(bar(5, 10), '█'.repeat(15) + '░'.repeat(15), 'half');
+  t.equal(bar(1, 16), '█' + '▉' + '░'.repeat(28), 'eighths');
+  for (let done = 0; done <= 100; ++done) {
+    if (plain(progressLine({label: 'x', done, total: 100})).indexOf(' ') !== 30) {
+      t.fail(`width drifts at ${done}%`);
+    }
   }
 });
 
