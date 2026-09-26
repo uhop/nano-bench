@@ -65,6 +65,17 @@ const compare = (file, flags) =>
     child.on('error', () => resolve(1));
   });
 
+// the lines after the first carry the cause: browser logs, stderr
+export const launchFailure = (browser, error, installHint) => {
+  const [first, ...rest] = String(error?.message || error).split('\n'),
+    details = rest.join('\n').trim();
+  return (
+    `${browser}: could not launch: ${first}\n` +
+    (details ? details.replace(/^(?=.)/gm, '    ') + '\n' : '') +
+    `  To install it: ${installHint}`
+  );
+};
+
 /** @param {DriverSpec} spec */
 export const main = async spec => {
   program
@@ -158,10 +169,7 @@ export const main = async spec => {
       session = await spec.launch(driver, browser, {headless: !options.headed});
     } catch (error) {
       failed = true;
-      console.error(
-        `${browser}: could not launch: ${String(error?.message || error).split('\n')[0]}\n` +
-          `  To install it: ${spec.installBrowser(browser)}`
-      );
+      console.error(launchFailure(browser, error, spec.installBrowser(browser)));
       continue;
     }
     console.log(`${browser} ${session.version}`);

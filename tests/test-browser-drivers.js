@@ -8,6 +8,8 @@ import path from 'node:path';
 import process from 'node:process';
 import {fileURLToPath} from 'node:url';
 
+import {launchFailure} from 'nano-benchmark/driver/browser-cli.js';
+
 const bin = name => fileURLToPath(new URL(`../bin/${name}.js`, import.meta.url)),
   isNode = !(/** @type {any} */ (globalThis).Deno || /** @type {any} */ (globalThis).Bun);
 
@@ -88,4 +90,30 @@ test('driver arguments', {skip: !isNode}, async t => {
     t.equal(code, 1);
     t.ok(out.includes('is outside the root folder'), 'a file outside the root is refused');
   });
+});
+
+test('launchFailure()', t => {
+  const hint = 'npx puppeteer browsers install chrome';
+  t.equal(
+    launchFailure('chrome', new Error('Browser was not found at /x'), hint),
+    'chrome: could not launch: Browser was not found at /x\n  To install it: ' + hint,
+    'one line'
+  );
+  t.equal(
+    launchFailure(
+      'chrome',
+      new Error(
+        'Failed to launch the browser process: Code: null\n\nstderr:\nNo usable sandbox!\n'
+      ),
+      hint
+    ),
+    'chrome: could not launch: Failed to launch the browser process: Code: null\n' +
+      '    stderr:\n    No usable sandbox!\n  To install it: ' +
+      hint,
+    'the rest indented, blank edges dropped'
+  );
+  t.ok(
+    launchFailure('webkit', 'gone', hint).startsWith('webkit: could not launch: gone\n'),
+    'a string'
+  );
 });
