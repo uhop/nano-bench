@@ -56,6 +56,9 @@ export const readProcMetrics = pid => {
   try {
     const io = readFileSync(`/proc/${pid}/io`, 'utf8'),
       status = readFileSync(`/proc/${pid}/status`, 'utf8');
+    // an exiting process has released its memory: no Vm lines, and its reading would
+    // overwrite the last complete one (measured 2026-09-25: 2 of 300 short commands)
+    if (!/^VmHWM:/m.test(status)) return null;
     return {
       peakRSS: num(status, 'VmHWM') * 1024,
       logicalRead: num(io, 'rchar'),
