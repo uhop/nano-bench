@@ -65,15 +65,22 @@ const compare = (file, flags) =>
     child.on('error', () => resolve(1));
   });
 
+// Playwright's, then Puppeteer's two wordings (1.63, 25.12); a crash of an installed browser differs
+export const missingBrowser =
+  /executable doesn't exist at|^Could not find \S+ \(ver\.|Browser was not found at/i;
+
 // the lines after the first carry the cause: browser logs, stderr
 export const launchFailure = (browser, error, installHint) => {
-  const [first, ...rest] = String(error?.message || error).split('\n'),
-    details = rest.join('\n').trim();
-  return (
-    `${browser}: could not launch: ${first}\n` +
-    (details ? details.replace(/^(?=.)/gm, '    ') + '\n' : '') +
-    `  To install it: ${installHint}`
-  );
+  const message = String(error?.message || error),
+    [first, ...rest] = message.split('\n'),
+    details = rest
+      .join('\n')
+      .replace(/^(?:[ \t]*\n)+/, '')
+      .trimEnd(),
+    lines = [`${browser}: could not launch: ${first}`];
+  if (details) lines.push(details.replace(/^(?=.)/gm, '    '));
+  if (missingBrowser.test(message)) lines.push(`  To install it: ${installHint}`);
+  return lines.join('\n');
 };
 
 /** @param {DriverSpec} spec */

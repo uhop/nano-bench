@@ -8,7 +8,7 @@ import path from 'node:path';
 import process from 'node:process';
 import {fileURLToPath} from 'node:url';
 
-import {launchFailure} from 'nano-benchmark/driver/browser-cli.js';
+import {launchFailure, missingBrowser} from 'nano-benchmark/driver/browser-cli.js';
 
 const bin = name => fileURLToPath(new URL(`../bin/${name}.js`, import.meta.url)),
   isNode = !(/** @type {any} */ (globalThis).Deno || /** @type {any} */ (globalThis).Bun);
@@ -93,11 +93,11 @@ test('driver arguments', {skip: !isNode}, async t => {
 });
 
 test('launchFailure()', t => {
-  const hint = 'npx puppeteer browsers install chrome';
+  const hint = 'npx some install';
   t.equal(
     launchFailure('chrome', new Error('Browser was not found at /x'), hint),
     'chrome: could not launch: Browser was not found at /x\n  To install it: ' + hint,
-    'one line'
+    'one line, missing'
   );
   t.equal(
     launchFailure(
@@ -108,12 +108,31 @@ test('launchFailure()', t => {
       hint
     ),
     'chrome: could not launch: Failed to launch the browser process: Code: null\n' +
-      '    stderr:\n    No usable sandbox!\n  To install it: ' +
+      '    stderr:\n    No usable sandbox!',
+    'a crash: the rest indented, blank edges dropped, no install hint'
+  );
+  t.equal(
+    launchFailure('firefox', new Error('Could not find Firefox (ver. 1). If\n 1. a\n 2. b'), hint),
+    'firefox: could not launch: Could not find Firefox (ver. 1). If\n' +
+      '     1. a\n     2. b\n  To install it: ' +
       hint,
-    'the rest indented, blank edges dropped'
+    'the first detail line keeps its indentation'
   );
-  t.ok(
-    launchFailure('webkit', 'gone', hint).startsWith('webkit: could not launch: gone\n'),
-    'a string'
-  );
+  t.equal(launchFailure('webkit', 'gone', hint), 'webkit: could not launch: gone', 'a string');
+});
+
+test('missingBrowser', t => {
+  const missing = [
+      "browserType.launch: Executable doesn't exist at /c/chromium_headless_shell-1243/chrome\n╔══╗",
+      "browserType.launch: Failed to launch chromium because executable doesn't exist at /x",
+      'Could not find Chrome (ver. 154.0.8037.57). This can occur if either\n 1. you did not …',
+      'Could not find Firefox (ver. stable_156.0.1). This can occur if either',
+      'Browser was not found at the configured executablePath (/x)'
+    ],
+    crashed = [
+      'browserType.launch: Target page, context or browser has been closed\nBrowser logs:\n',
+      'Failed to launch the browser process:  Code: 1\n\nstderr:\n\n\nTROUBLESHOOTING: https://pptr.dev/troubleshooting'
+    ];
+  for (const message of missing) t.ok(missingBrowser.test(message), message.split('\n')[0]);
+  for (const message of crashed) t.notOk(missingBrowser.test(message), message.split('\n')[0]);
 });
