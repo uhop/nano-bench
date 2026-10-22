@@ -64,7 +64,7 @@ nano-benchmark is an ESM JavaScript package providing command-line utilities (`n
 - **`emoji-regex`** + **`get-east-asian-width`** — let `console-toolkit` measure wide-glyph widths faithfully (emoji markers 🐇/🐢, CJK/fullwidth names) so table cells align; without them every wide glyph would measure as 1 column.
 - **`tape-six`** — optional peer dependency: `nano-bench-view` and the driver bins serve the web app with its test server (`src/server/start.js`). Also a devDependency for testing.
 - **`playwright`**, **`puppeteer`** — optional peer dependencies of `nano-bench-playwright` and `nano-bench-puppeteer`, imported lazily; a missing one prints its install command. Also devDependencies: `tests/test-browser-drivers.js` runs each driver end to end under Node and skips when its browser isn't installed.
-- **Dev only:** `tape-six-proc` for testing; `prettier` for formatting; `typescript` + `@types/node` for the `js-check` step.
+- **Dev only:** `tape-six` for testing; `prettier` for formatting; `typescript` + `@types/node` for the `js-check` step.
 
 ## Verification commands
 
