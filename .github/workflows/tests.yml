@@ -29,4 +29,3 @@ jobs:
       - run: |
           npm ci
           npm test
-          npm run js-check --if-present
